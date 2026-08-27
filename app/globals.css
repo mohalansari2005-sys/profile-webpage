@@ -183,6 +183,36 @@
   transform: none;
 }
 
+/* The tool strip scrolls sideways when the tags outrun the column. Fade only
+   the edge that still has tags behind it, so the clip reads as "more here"
+   rather than "cut off" — and the last tag (or Clear) is never left dimmed. */
+.tool-strip[data-edge="end"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+}
+
+.tool-strip[data-edge="start"] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+}
+
+.tool-strip[data-edge="both"] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 3rem,
+    #000 calc(100% - 3rem),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 3rem,
+    #000 calc(100% - 3rem),
+    transparent
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

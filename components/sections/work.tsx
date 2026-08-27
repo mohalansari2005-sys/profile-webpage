@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Reveal } from "@/components/reveal";
 import { cn } from "@/lib/utils";
 import {
@@ -89,6 +89,29 @@ export function Work() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
 
+  // The strip is wider than the column, so it scrolls sideways. Fade only the
+  // edge that still has tags behind it — a clipped tag then reads as "more
+  // this way" instead of "cut off", and nothing is dimmed once you reach it.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState<"none" | "start" | "end" | "both">("none");
+
+  const syncEdges = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const atStart = el.scrollLeft <= 1;
+    const atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
+    setEdge(
+      atStart && atEnd ? "none" : atStart ? "end" : atEnd ? "start" : "both",
+    );
+  }, []);
+
+  // Re-measured on pin too: the Clear button changes the strip's width.
+  useEffect(() => {
+    syncEdges();
+    window.addEventListener("resize", syncEdges);
+    return () => window.removeEventListener("resize", syncEdges);
+  }, [syncEdges, pinned]);
+
   // Hovering or focusing previews a tool; letting go falls back to the pinned
   // one. Pinning locks a baseline without trapping you there.
   const activeTool = hovered ?? pinned;
@@ -126,7 +149,12 @@ export function Work() {
             </p>
           </div>
 
-          <div className="-mx-6 mt-2.5 overflow-x-auto px-6 pb-1">
+          <div
+            ref={stripRef}
+            onScroll={syncEdges}
+            data-edge={edge}
+            className="tool-strip -mx-6 mt-2.5 overflow-x-auto px-6 pb-1"
+          >
             <ul className="flex w-max items-center gap-1.5">
               {groupOrder.map((group, groupIndex) => (
                 <li key={group} className="contents">
@@ -150,11 +178,15 @@ export function Work() {
                           onMouseLeave={() => setHovered(null)}
                           onFocus={() => setHovered(tool.id)}
                           onBlur={() => setHovered(null)}
-                          onClick={() =>
-                            setPinned((current) =>
-                              current === tool.id ? null : tool.id,
-                            )
-                          }
+                          onClick={() => {
+                            // The pointer is still on the tag after the click,
+                            // so `hovered` has to be released alongside the
+                            // pin — otherwise `activeTool` keeps holding it
+                            // and toggling off looks like nothing happened.
+                            const next = pinned === tool.id ? null : tool.id;
+                            setPinned(next);
+                            setHovered(next);
+                          }}
                           className={cn(
                             "shrink-0 rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200",
                             isActive
