@@ -39,7 +39,11 @@ function RecordRow({
           className="absolute top-0 bottom-0 -left-4 w-0.5 origin-top scale-y-0 bg-match opacity-0 transition duration-200 group-data-[state=lit]:scale-y-100 group-data-[state=lit]:opacity-100 sm:-left-6"
         />
 
-        <div className="grid gap-2 py-6 sm:grid-cols-[1fr_auto] sm:gap-8 sm:py-7">
+        <div className="grid gap-2 py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-7">
+          {/* The period is the record's key, in the same label column the hero
+              fields and the contact links use. */}
+          <p className="field-label sm:pt-2">{record.period}</p>
+
           <div>
             <h3
               className="font-display text-xl font-semibold tracking-tight sm:text-2xl"
@@ -75,10 +79,6 @@ function RecordRow({
               })}
             </ul>
           </div>
-
-          <p className="font-mono text-xs tracking-[0.06em] text-dim sm:pt-2 sm:text-right">
-            {record.period}
-          </p>
         </div>
       </article>
     </Reveal>
@@ -240,7 +240,7 @@ export function Work() {
         </div>
       </section>
 
-      <section className="border-b border-rule">
+      <section className="on-deep border-b border-rule bg-surface-deep">
         <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
           <Reveal>
             <h2 className="field-label mb-2">Projects</h2>
