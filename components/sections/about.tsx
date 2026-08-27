@@ -1,27 +1,42 @@
-import { Separator } from "@/components/ui/separator";
+import { Reveal } from "@/components/reveal";
 
 export function About() {
   return (
-    <section id="about" className="mx-auto max-w-2xl px-6 py-24">
-      <h2 className="font-heading text-2xl font-semibold tracking-tight">
-        About Me
-      </h2>
-      <Separator className="my-6" />
-      <div className="flex flex-col gap-4 text-muted-foreground">
-        <p>
-          I enjoy turning ideas and real-world problems into practical
-          products, from developing full-stack applications to exploring
-          AI-powered solutions. My experience spans software development,
-          data, product thinking, and client-facing work, which has shaped
-          how I approach technology: not just by asking &ldquo;How do we
-          build this?&rdquo; but also &ldquo;Why does it matter, and who does
-          it help?&rdquo;
-        </p>
-        <p>
-          I&rsquo;m currently focused on growing as a software and AI
-          engineer, building real-world projects, and learning how to use
-          data and technology to create meaningful impact.
-        </p>
+    <section id="about" className="border-b border-rule">
+      <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
+        <Reveal>
+          <h2 className="field-label md:pt-2.5">About</h2>
+        </Reveal>
+
+        <div className="max-w-2xl">
+          <Reveal delay={80}>
+            <p className="text-lg leading-relaxed sm:text-xl">
+              I build backend systems, data pipelines, and AI-enabled
+              applications — Python services, REST API integrations,
+              asynchronous processing, and the databases underneath them.
+            </p>
+          </Reveal>
+
+          <Reveal delay={160}>
+            <blockquote className="my-9 border-l-2 border-signal pl-6">
+              <p
+                className="font-display text-2xl leading-[1.2] font-semibold tracking-tight text-balance sm:text-3xl"
+                style={{ fontStretch: "90%" }}
+              >
+                Not just &ldquo;How do we build this?&rdquo; but &ldquo;Why does
+                it matter, and who does it help?&rdquo;
+              </p>
+            </blockquote>
+          </Reveal>
+
+          <Reveal delay={240}>
+            <p className="text-lg leading-relaxed text-dim sm:text-xl">
+              I work from requirements up: structured requirement gathering
+              and systems analysis, then rapid prototyping to turn business
+              needs into something that runs.
+            </p>
+          </Reveal>
+        </div>
       </div>
     </section>
   );

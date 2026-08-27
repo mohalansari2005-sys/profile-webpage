@@ -28,7 +28,13 @@ Anything requiring server-side behavior (e.g. a contact form) needs to call an e
 
 **Styling**: Tailwind v4, wired through `postcss.config.mjs` → `@tailwindcss/postcss` plugin, entry point `app/globals.css` (`@import "tailwindcss"`). Tailwind v4 auto-detects source files for class scanning — there is no `content: [...]` array to maintain in a config file.
 
-**Fonts**: loaded via `next/font/google` in `app/layout.tsx` (Geist Sans/Mono), exposed as CSS variables (`--font-geist-sans`, `--font-geist-mono`) rather than imported per-component.
+**Fonts**: loaded via `next/font/google` in `app/layout.tsx` and exposed as CSS variables rather than imported per-component. Three roles, each with a job: `--font-display` (Bricolage Grotesque, variable `wdth`/`opsz` axes — headings and the name, used with restraint), `--font-body` (Source Serif 4 — prose and record values), `--font-mono` (JetBrains Mono — field labels, tags, dates).
+
+**Design direction — "records & joins"**: the page is built as a set of typed records. Palette tokens live in `app/globals.css` (`--signal` green marks structure, `--match` amber marks a joined row and appears nowhere else, `--dim` is secondary text at 4.9:1 on the paper ground). Keep the amber reserved for the match state — spending it elsewhere is what makes the signature stop reading.
+
+**Content** lives in `lib/content.ts`, not in the components. Every `tools` entry on an experience or project record must match a `Tool.id` — that string is the join key the tool strip filters on, so add the tool before referencing it.
+
+**Motion** is deliberately limited to three moments: the hero fields arriving (CSS, `.field-in`), rows arriving on scroll (`components/reveal.tsx`, IntersectionObserver), and the 180ms join transition. `Reveal` guards against stranding content at `opacity: 0`: IntersectionObserver only reports a *crossing*, so an element jumped clean over (anchor click, restored scroll position, any instant jump — which is what `prefers-reduced-motion` users always get) never intersects and no callback fires. It therefore checks geometry synchronously on mount and reveals anything already at or above the fold, independent of the observer; the observer's oversized top `rootMargin` covers jumps that happen later. Don't "simplify" either one away. a `<noscript>` rule in the layout covers the JS-disabled case. All of it is disabled under `prefers-reduced-motion`.
 
 ## Notes
 
