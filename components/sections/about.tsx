@@ -18,7 +18,7 @@ export function About() {
           </Reveal>
 
           <Reveal delay={160}>
-            <blockquote className="my-9 border-l-2 border-signal pl-6">
+            <blockquote className="my-9 border-l-2 border-foreground pl-6">
               <p
                 className="font-display text-2xl leading-[1.2] font-semibold tracking-tight text-balance sm:text-3xl"
                 style={{ fontStretch: "90%" }}

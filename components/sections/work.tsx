@@ -141,7 +141,7 @@ export function Work() {
             <h2 className="field-label">Built with</h2>
             <p
               aria-live="polite"
-              className="font-mono text-[0.6875rem] tracking-[0.1em] text-dim"
+              className="font-mono text-xs tracking-[0.1em] text-dim"
             >
               {activeLabel
                 ? `${matchCount} of ${experience.length + projects.length} use ${activeLabel}`
@@ -188,12 +188,12 @@ export function Work() {
                             setHovered(next);
                           }}
                           className={cn(
-                            "shrink-0 rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200",
+                            "shrink-0 cursor-pointer rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200",
                             isActive
                               ? "border-match bg-match/20 text-foreground"
                               : activeTool
-                                ? "border-rule text-dim"
-                                : "border-rule text-foreground hover:border-foreground",
+                                ? "border-rule bg-foreground/[0.04] text-dim"
+                                : "border-rule bg-foreground/[0.04] text-foreground hover:border-foreground",
                           )}
                         >
                           {tool.label}
@@ -212,7 +212,7 @@ export function Work() {
                   <button
                     type="button"
                     onClick={() => setPinned(null)}
-                    className="shrink-0 rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-signal underline underline-offset-4 transition-colors hover:text-foreground"
+                    className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink"
                   >
                     Clear
                   </button>

@@ -7,6 +7,8 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
+  --color-match-ink: var(--match-ink);
+
   --color-surface-base: var(--surface-base);
   --color-surface-raised: var(--surface-raised);
   --color-surface-deep: var(--surface-deep);
@@ -54,6 +56,11 @@
   --ink: #0f1626;
   --signal: #0b6e4f;
   --match: #e09b2d;
+  /* The same amber at text weight (hue 37, sat 74, darkened): #E09B2D is
+     2.03:1 on paper and can only ever be a fill or a bar. This one is 4.75:1
+     on base and 5.24:1 on raised — level with --dim, so labels change hue
+     without gaining weight, and it stays a step below the join's brightness. */
+  --match-ink: #8e5f15;
   --dim: #5c6779; /* 4.9:1 on paper — secondary text still has to be readable */
   --rule: #d2d8e0;
 
@@ -93,6 +100,7 @@
   --ink: #e7eaf0;
   --signal: #4bbd8e;
   --match: #f0b558;
+  --match-ink: #c8861e;
   --dim: #7b8598;
   --rule: #26304399;
 
@@ -145,11 +153,11 @@
 
 @utility field-label {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--dim);
+  color: var(--match-ink);
 }
 
 /* Motion — three moments only: the hero fields arriving, rows arriving on
@@ -212,6 +220,7 @@
   --border: var(--rule);
   --signal: #4bbd8e;
   --match: #f0b558;
+  --match-ink: #c8861e; /* 5.92:1 on navy, a step below the #F0B558 join */
 
   color: var(--foreground);
 }

@@ -84,7 +84,7 @@ export function Hero() {
         <div className="field-in mt-9" style={stagger(700)}>
           <a
             href="#about"
-            className="group inline-flex items-center gap-3 rounded-sm bg-foreground px-5 py-3 text-background transition-colors hover:bg-signal"
+            className="group inline-flex items-center gap-3 rounded-sm bg-foreground px-5 py-3 text-background transition-colors hover:bg-match-ink"
           >
             <span className="font-mono text-xs font-medium tracking-[0.14em] uppercase">
               See where the work connects
