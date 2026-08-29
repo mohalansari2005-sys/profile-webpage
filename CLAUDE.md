@@ -1,45 +1,54 @@
 # CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Commands
-
-- `npm run dev` — start the dev server (http://localhost:3000)
-- `npm run build` — production build; with `output: 'export'` set, this also generates the static site into `out/`
-- `npm run start` — serve the production build (not used for this project — see Deployment note below; useful only for local sanity-checking a server-mode build)
-- `npm run lint` — run ESLint (`eslint-config-next` core-web-vitals + TypeScript rules)
-
-There is no test script configured.
-
-## Architecture
-
-This is a static personal portfolio: Next.js (App Router) + TypeScript + Tailwind CSS v4, exported to static HTML/CSS/JS and deployed on Vercel via a GitHub-connected repo (`mohalansari2005-sys/profile-webpage`, `main` branch — push to `main` triggers an automatic Vercel rebuild/redeploy).
-
-**Static export (`next.config.ts`: `output: 'export'`)** is the central architectural constraint. `next build` pre-renders every route to static files at build time instead of relying on a Node/serverless runtime. This rules out, for any code added to this project:
-- API routes / Route Handlers that read the incoming request
-- Server Actions, Middleware, cookies-based logic
-- `rewrites`/`redirects`/`headers` in `next.config.ts`
-- Dynamic routes without `generateStaticParams()` covering every path
-- `next/image`'s default (server-based) optimizer — avoid `next/image` unless a custom `loader` is configured, since there is no image optimization server at runtime
-
-Anything requiring server-side behavior (e.g. a contact form) needs to call an external service (e.g. Formspree) client-side rather than a local API route.
-
-**Routing** follows standard App Router conventions under `app/`: a folder's `page.tsx` is its route, `layout.tsx` wraps it and any nested routes without re-rendering on navigation. Everything under `app/` is a Server Component (rendered at build time, ships no JS) unless the file starts with `'use client'`.
-
-**Styling**: Tailwind v4, wired through `postcss.config.mjs` → `@tailwindcss/postcss` plugin, entry point `app/globals.css` (`@import "tailwindcss"`). Tailwind v4 auto-detects source files for class scanning — there is no `content: [...]` array to maintain in a config file.
-
-**Fonts**: loaded via `next/font/google` in `app/layout.tsx` and exposed as CSS variables rather than imported per-component. Three roles, each with a job: `--font-display` (Bricolage Grotesque, variable `wdth`/`opsz` axes — headings and the name, used with restraint), `--font-body` (Source Serif 4 — prose and record values), `--font-mono` (JetBrains Mono — field labels, tags, dates).
-
-**Design direction — "records & joins"**: the page is built as a set of typed records. Palette tokens live in `app/globals.css` (`--signal` green marks structure, `--match` amber marks a joined row and appears nowhere else, `--dim` is secondary text at 4.9:1 on the paper ground). Keep the amber reserved for the match state — spending it elsewhere is what makes the signature stop reading.
-
-**Content** lives in `lib/content.ts`, not in the components. Every `tools` entry on an experience or project record must match a `Tool.id` — that string is the join key the tool strip filters on, so add the tool before referencing it.
-
-**Motion** is deliberately limited to three moments: the hero fields arriving (CSS, `.field-in`), rows arriving on scroll (`components/reveal.tsx`, IntersectionObserver), and the 180ms join transition. `Reveal` guards against stranding content at `opacity: 0`: IntersectionObserver only reports a *crossing*, so an element jumped clean over (anchor click, restored scroll position, any instant jump — which is what `prefers-reduced-motion` users always get) never intersects and no callback fires. It therefore checks geometry synchronously on mount and reveals anything already at or above the fold, independent of the observer; the observer's oversized top `rootMargin` covers jumps that happen later. Don't "simplify" either one away. a `<noscript>` rule in the layout covers the JS-disabled case. All of it is disabled under `prefers-reduced-motion`.
-
-## Notes
-
-@AGENTS.md
-
-`AGENTS.md` above is auto-generated/rewritten by `next dev` itself (not by us) and flags that this project's Next.js version (16.x) may differ from an AI assistant's training data — check `node_modules/next/dist/docs/` for the installed version's actual docs before assuming API behavior, particularly anything to do with routing, config, or static export. It's expected to reappear if deleted; commit it rather than fight it.
-
-`public/*.svg` (file/globe/next/vercel/window icons) are unused `create-next-app` starter assets, not yet cleaned up.
+ 
+Working conventions for this repo. Apply these to every task, not just the AI chat
+feature — they reflect how I want to work generally, not one-off instructions.
+ 
+## How to work with me
+ 
+- I want an interactive workflow, not autonomous execution. Explain what you're about to
+  change and why *before* changing it, especially for anything touching multiple files or
+  architecture.
+- IMPORTANT: If anything is unclear or ambiguous, ASK ME. Do not guess at what I meant or
+  fill gaps with assumptions — I would rather answer a question than review a change based
+  on a wrong assumption.
+- Inspect existing patterns/conventions in the repo before creating something new. Match
+  what's already here rather than introducing a parallel convention.
+- Make the smallest reasonable change for the task at hand. Don't touch unrelated files.
+- Do not claim something works unless it's actually been verified (tests run, endpoint
+  hit, etc.) — tell me how to verify it myself.
+## Branching
+ 
+- One branch per unit of work (a "tier," a bug fix, a feature). Do not merge to `main`
+  until I've reviewed the diff and explicitly confirmed.
+- If a branch's work goes sideways or blows its time budget, it gets discarded — `main`
+  should never see broken or half-finished work.
+## After any meaningful change
+ 
+Tell me:
+- What changed and which files, with their responsibilities.
+- Why it changed this way (not just that it works).
+- How the feature/fix works end-to-end.
+- What I should pay attention to or test myself.
+## Engineering principles for this repo
+ 
+- Prefer simple solutions; requirements should justify infrastructure, not the other way
+  around — with one standing exception: the AI chat feature is a deliberate learning
+  exercise where I chose heavier architecture (RAG, agent orchestration, self-hosted
+  ops) on purpose, documented in `portfolio-ai-chat-prompts-v2.md`. Don't apply that
+  same "keep it minimal" instinct to that feature's own scope — the complexity there is
+  intentional, not a mistake to correct.
+- Do not add a new framework, service, or dependency without telling me why it's needed
+  first.
+- Reuse existing patterns (content file structure, styling tokens, etc.) rather than
+  inventing new ones.
+## Stack reference
+ 
+- Monorepo: `/frontend` (Next.js/TypeScript/Tailwind, deployed on Vercel) + `/backend`
+  (Django/DRF, containerized, deployed on Hostinger via Docker Compose).
+- Backend: Postgres (pgvector extension) for both vector storage and logging, Redis for
+  rate limiting, LangGraph for the chat feature's agent logic, Gemini for embeddings,
+  Anthropic API for generation.
+- Typography/palette (frontend): Source Serif 4 (body) / JetBrains Mono (labels) /
+  display sans (headings); ink navy `#0F1626`, slate `rgb(92,103,121)`, base surface
+  `#EBEEF3`, amber accent `#E09B2D`, green `#0B6E4F`. Don't introduce new fonts or colors
+  without asking.
