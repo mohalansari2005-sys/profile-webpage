@@ -1,0 +1,15 @@
+{
+  "name": "profile-webpage-tooling",
+  "private": true,
+  "type": "module",
+  "description": "Repo-level tooling. The site itself lives in frontend/.",
+  "scripts": {
+    "content": "node scripts/build-content.mjs",
+    "content:check": "node scripts/build-content.mjs --check",
+    "test": "node --test scripts/"
+  },
+  "devDependencies": {
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^5.4.1"
+  }
+}
