@@ -30,13 +30,19 @@ The spec's Branch 2 section was written before Branch 1 surfaced how this repo a
 
 **2. The generator goes in repo-root `scripts/`, not `frontend/scripts/`.** The spec says `frontend/scripts/build-content.ts`. Anything inside `frontend/` is inside Tailwind's content-scan root, so the generator's own string literals — including every tool label and group name — would be scanned as candidate class names. Repo root keeps it out.
 
-**3. It is a `.mjs` file, not `.ts`.** A TypeScript generator needs a TS runner (`tsx` or similar) — a third dependency, for a build script no one type-checks. Plain ESM on Node 24 needs none.
+**3. A minimal root `package.json` is required.** The spec assumes the generator is a `frontend/` script using `frontend/`'s dependencies. Once it moves to the repo root (correction 2) it can no longer resolve them — Node walks up from the importing file and never descends into `frontend/`. Verified on Node 24: a repo-root script importing a package installed only in `frontend/node_modules` fails outright. So the tooling gets its own root manifest, and `frontend/package.json` is left completely untouched.
+
+**4. It is a `.mjs` file, not `.ts`.** A TypeScript generator needs a TS runner (`tsx` or similar) — a third dependency, for a build script no one type-checks. Plain ESM on Node 24 needs none.
 
 ---
 
 ## File Structure
 
 **Created (repo root, outside the Tailwind scan root):**
+- `package.json` — minimal, private, `"type": "module"`. Holds the tooling dev
+  dependencies and the `content` / `content:check` scripts. **Required**: Node resolves
+  bare imports by walking up from the *importing file*, so a script in repo-root
+  `scripts/` can never see `frontend/node_modules`. Verified directly on Node 24.
 - `scripts/build-content.mjs` — the generator. Reads `content/`, validates, emits `frontend/lib/content.ts`. One responsibility: corpus → typed module.
 - `scripts/lib/corpus.mjs` — parsing and validation, importable by the generator and by Branch 3's ingestion so the two never disagree about what the corpus means. Exports `loadCorpus(contentDir)` returning `{ groups, tools, records, byKind }` or throwing an aggregated validation error.
 
@@ -49,7 +55,7 @@ The spec's Branch 2 section was written before Branch 1 surfaced how this repo a
 
 **Modified:**
 - `frontend/lib/content.ts` — becomes generated output, header-marked, still committed.
-- `frontend/package.json` — two dev dependencies, two scripts. No `prebuild`.
+- `frontend/package.json` — untouched. The tooling lives in the root manifest instead; `frontend/` gains no dependency and no script.
 - `frontend/components/sections/work.tsx` — one line: import the generated `toolGroups` instead of hardcoding the group order. See Task 5 for why this deliberate deviation from the spec is included.
 - `README.md` — document the corpus and the generate/check workflow.
 
@@ -65,6 +71,38 @@ Validation is the whole point of this branch. Today a `tools` key matching no `T
 
 **Interfaces:**
 - Produces: `loadCorpus(contentDir) -> { groups: string[], tools: Array<{id,label,group}>, records: Array<{id,kind,title,org,period,summary,tools,href?,body}>, byKind: {experience:[], projects:[], about:[], faq:[]} }`. Throws `CorpusError` with an aggregated `.problems` array of human-readable strings. Consumed by Task 2 and by Branch 3's ingestion.
+
+- [ ] **Step 0: Create the root manifest and install the tooling**
+
+This must come first: Tasks 1 and 2 both have tests importing `gray-matter` and `js-yaml`, so the dependencies must exist before the first test runs.
+
+```bash
+cd /Users/mohammed/Desktop/profile-webpage
+cat > package.json <<'EOF'
+{
+  "name": "profile-webpage-tooling",
+  "private": true,
+  "type": "module",
+  "description": "Repo-level tooling. The site itself lives in frontend/.",
+  "scripts": {
+    "content": "node scripts/build-content.mjs",
+    "content:check": "node scripts/build-content.mjs --check",
+    "test": "node --test scripts/"
+  }
+}
+EOF
+npm install --save-dev gray-matter js-yaml
+```
+
+Then confirm resolution works from the root — this is the thing that would otherwise be broken:
+
+```bash
+node -e "import('gray-matter').then(()=>console.log('gray-matter resolves'))"
+node -e "import('js-yaml').then(()=>console.log('js-yaml resolves'))"
+git diff --stat frontend/package.json
+```
+
+Both imports must print, and the `frontend/package.json` diff must be empty.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -266,7 +304,7 @@ Expected: 7/7 passing.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/lib/corpus.mjs scripts/lib/corpus.test.mjs
+git add package.json package-lock.json scripts/lib/corpus.mjs scripts/lib/corpus.test.mjs
 git commit -m "Add corpus loader with hard validation
 
 Turns the silent footgun documented in README — a tools key matching no
@@ -568,23 +606,24 @@ all — they exist only for retrieval."
 **Files:**
 - Modify: `frontend/lib/content.ts` (becomes generated), `frontend/package.json`
 
-- [ ] **Step 1: Add the dependencies and scripts**
+- [ ] **Step 1: Confirm the scripts are in place**
+
+Dependencies and the `content` / `content:check` scripts were added to the root manifest in Task 1 Step 0. Nothing to install here — just confirm:
 
 ```bash
-cd frontend
-npm install --save-dev gray-matter js-yaml
-npm pkg set scripts.content="node ../scripts/build-content.mjs"
-npm pkg set scripts.content:check="node ../scripts/build-content.mjs --check"
+cd /Users/mohammed/Desktop/profile-webpage
+npm pkg get scripts
+git diff --stat frontend/package.json
 ```
 
-Deliberately **no** `prebuild`. Vercel's Root Directory is `frontend` and by default it does not upload files outside that directory, so `content/` is absent during a Vercel build. The committed `content.ts` is what deploys; `content:check` is what stops it going stale.
+The second command must print nothing. Deliberately **no** `prebuild`, and deliberately nothing added to `frontend/package.json`.
 
 - [ ] **Step 2: Snapshot the current file, then generate over it**
 
 ```bash
 cd /Users/mohammed/Desktop/profile-webpage
 cp frontend/lib/content.ts /tmp/content-before.ts
-npm --prefix frontend run content
+npm run content
 ```
 
 - [ ] **Step 3: Compare semantically, not textually**
@@ -613,21 +652,18 @@ A check that cannot fail is worthless.
 
 ```bash
 cd /Users/mohammed/Desktop/profile-webpage
-npm --prefix frontend run content:check          # expect: exit 0, "up to date"
+npm run content:check          # expect: exit 0, "up to date"
 printf '\n// drift\n' >> frontend/lib/content.ts
-npm --prefix frontend run content:check; echo "exit=$?"   # expect: exit 1, "is stale"
-npm --prefix frontend run content                # regenerate, back to clean
-npm --prefix frontend run content:check          # expect: exit 0 again
+npm run content:check; echo "exit=$?"   # expect: exit 1, "is stale"
+npm run content                # regenerate, back to clean
+npm run content:check          # expect: exit 0 again
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/lib/content.ts frontend/package.json frontend/package-lock.json
+git add frontend/lib/content.ts
 git commit -m "Generate lib/content.ts from the corpus
-
-Adds gray-matter and js-yaml as dev dependencies and two scripts: content
-(regenerate) and content:check (fail if the committed output is stale).
 
 Deliberately not wired as prebuild — Vercel's Root Directory is frontend
 and it does not upload content/, so a prebuild generator would fail every
@@ -675,7 +711,7 @@ Expected: `bb8c3eed6e2a116e420ba8e12c758e0e62b560d5`. Because `tools.yml` declar
 # then regenerate and confirm the new group renders without touching work.tsx
 ```
 
-Add a throwaway group to `content/tools.yml` with one tool in it, run `npm --prefix frontend run content`, rebuild, and confirm the new group appears in the tool strip. Then revert `tools.yml`, regenerate, rebuild, and confirm the fingerprint returns to `bb8c3eed...`. Leave no trace of the throwaway group in the commit.
+Add a throwaway group to `content/tools.yml` with one tool in it, run `npm run content`, rebuild, and confirm the new group appears in the tool strip. Then revert `tools.yml`, regenerate, rebuild, and confirm the fingerprint returns to `bb8c3eed...`. Leave no trace of the throwaway group in the commit.
 
 - [ ] **Step 4: Commit**
 
@@ -708,14 +744,14 @@ Expected: exactly `bb8c3eed6e2a116e420ba8e12c758e0e62b560d5`. This is the branch
 
 ```bash
 sed -i '' 's/tools: \[python,/tools: [rust,/' content/experience/majara.md
-npm --prefix frontend run content; echo "exit=$?"
+npm run content; echo "exit=$?"
 ```
 
 Expected: exit 1, naming `exp-majara` and the unknown tool `rust`. Then restore:
 
 ```bash
 sed -i '' 's/tools: \[rust,/tools: [python,/' content/experience/majara.md
-npm --prefix frontend run content && npm --prefix frontend run content:check
+npm run content && npm run content:check
 ```
 
 - [ ] **Step 3: Unit tests and lint**
@@ -742,7 +778,7 @@ Expected: the grep finds nothing, and the only `.md` under `frontend/` is the pr
 rm -rf /tmp/cp-check && git clone -q --branch feat/content-pipeline . /tmp/cp-check
 cd /tmp/cp-check/frontend && npm ci >/dev/null 2>&1 && npm run build 2>&1 | tail -3
 cd /tmp/cp-check && ./scripts/fingerprint-export.sh frontend/out
-cd /tmp/cp-check && npm --prefix frontend run content:check
+cd /tmp/cp-check && npm ci >/dev/null 2>&1 && npm run content:check && npm test
 rm -rf /tmp/cp-check
 ```
 
