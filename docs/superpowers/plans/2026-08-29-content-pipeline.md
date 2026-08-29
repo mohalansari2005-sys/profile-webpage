@@ -87,7 +87,7 @@ cat > package.json <<'EOF'
   "scripts": {
     "content": "node scripts/build-content.mjs",
     "content:check": "node scripts/build-content.mjs --check",
-    "test": "node --test scripts/"
+    "test": "node --test \"scripts/**/*.test.mjs\""
   }
 }
 EOF
@@ -209,7 +209,7 @@ test("reports every problem at once, not just the first", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `node --test scripts/lib/`
+Run: `node --test "scripts/**/*.test.mjs"`
 Expected: FAIL — `Cannot find module './corpus.mjs'`.
 
 - [ ] **Step 3: Implement the loader**
@@ -298,7 +298,7 @@ export function loadCorpus(contentDir) {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `node --test scripts/lib/`
+Run: `node --test "scripts/**/*.test.mjs"`
 Expected: 7/7 passing.
 
 - [ ] **Step 5: Commit**
@@ -757,7 +757,7 @@ npm run content && npm run content:check
 - [ ] **Step 3: Unit tests and lint**
 
 ```bash
-node --test scripts/
+node --test "scripts/**/*.test.mjs"
 cd frontend && npm run lint
 ```
 
