@@ -28,7 +28,7 @@ id: exp-a
 kind: experience
 title: Engineer
 org: Acme
-period: 2025
+period: "2025"
 tools: [python]
 summary: Did things.
 ---
@@ -112,4 +112,59 @@ test("reports every problem at once, not just the first", () => {
     err = e;
   }
   assert.equal(err.problems.length, 2);
+});
+
+test("rejects an unknown subdirectory in content", () => {
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "blog/a.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /unknown.*kind.*blog/i);
+});
+
+test("rejects a non-array tools value with clear error", () => {
+  const bad = REC.replace("tools: [python]", "tools: python");
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": bad }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /tools.*must be a list/i);
+});
+
+test("rejects non-string summary, title, org, period", () => {
+  const bad = REC.replace("summary: Did things.", "summary: 12345");
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": bad }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /summary.*must be a string/i);
+});
+
+test("rejects malformed tools.yml with a readable error", () => {
+  const badYaml = `groups:
+  - Build
+tools: [
+  { id: python, label: Python, group: Build }
+`;
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": badYaml, "experience/a.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /tools.yml.*parse/i);
 });

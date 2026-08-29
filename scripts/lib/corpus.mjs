@@ -19,7 +19,12 @@ export function loadCorpus(contentDir) {
 
   const toolsPath = join(contentDir, "tools.yml");
   if (!existsSync(toolsPath)) throw new CorpusError([`missing ${toolsPath}`]);
-  const registry = yaml.load(readFileSync(toolsPath, "utf8")) ?? {};
+  let registry;
+  try {
+    registry = yaml.load(readFileSync(toolsPath, "utf8")) ?? {};
+  } catch (e) {
+    throw new CorpusError([`tools.yml failed to parse: ${e.message}`]);
+  }
   const groups = registry.groups ?? [];
   const tools = registry.tools ?? [];
 
@@ -37,6 +42,16 @@ export function loadCorpus(contentDir) {
     }
   }
 
+  // Check for unknown subdirectories
+  if (existsSync(contentDir)) {
+    const entries = readdirSync(contentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !KINDS.includes(entry.name) && entry.name !== "." && entry.name !== "..") {
+        problems.push(`unknown kind directory "${entry.name}"; valid kinds are: ${KINDS.join(", ")}`);
+      }
+    }
+  }
+
   const records = [];
   const seenRecord = new Set();
   for (const kind of KINDS) {
@@ -44,7 +59,15 @@ export function loadCorpus(contentDir) {
     if (!existsSync(dir)) continue;
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
       const where = `${kind}/${file}`;
-      const { data, content } = matter(readFileSync(join(dir, file), "utf8"));
+      let data, content;
+      try {
+        const parsed = matter(readFileSync(join(dir, file), "utf8"));
+        data = parsed.data;
+        content = parsed.content;
+      } catch (e) {
+        problems.push(`${where} failed to parse: ${e.message}`);
+        continue;
+      }
       const missing = REQUIRED.filter((f) => data[f] === undefined);
       const id = data.id ?? where;
       if (missing.length) problems.push(`${id} (${where}) missing: ${missing.join(", ")}`);
@@ -55,11 +78,26 @@ export function loadCorpus(contentDir) {
         if (seenRecord.has(data.id)) problems.push(`duplicate id: ${data.id} (${where})`);
         seenRecord.add(data.id);
       }
-      for (const toolId of data.tools ?? []) {
-        if (!seenTool.has(toolId)) {
-          problems.push(`${id} (${where}) references unknown tool "${toolId}"`);
+
+      // Check string fields
+      for (const field of ["title", "org", "period", "summary"]) {
+        if (data[field] !== undefined && typeof data[field] !== "string") {
+          problems.push(`${id} (${where}) ${field} must be a string, got ${typeof data[field]}`);
         }
       }
+
+      // Check tools is an array
+      if (data.tools !== undefined && !Array.isArray(data.tools)) {
+        problems.push(`${id} (${where}) tools must be a list, got ${typeof data.tools}: ${JSON.stringify(data.tools)}`);
+        // Skip tool validation for this record
+      } else {
+        for (const toolId of data.tools ?? []) {
+          if (!seenTool.has(toolId)) {
+            problems.push(`${id} (${where}) references unknown tool "${toolId}"`);
+          }
+        }
+      }
+
       records.push({
         id: data.id, kind, title: data.title, org: data.org, period: data.period,
         summary: typeof data.summary === "string" ? data.summary.trim() : data.summary,
