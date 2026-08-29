@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Fingerprint a Next.js static export, ignoring the per-build random buildId.
+# Two builds of identical source MUST produce the same fingerprint.
+# Usage: scripts/fingerprint-export.sh <out-dir>
+set -euo pipefail
+export LC_ALL=C
+d="${1%/}"
+id=$(ls "$d/_next/static" | grep -Ev '^(chunks|media)$' | head -1)
+find "$d" -type f | while read -r f; do
+  rel="${f#"$d"/}"
+  if grep -Iq . "$f" 2>/dev/null; then
+    h=$(sed "s|$id|__BUILDID__|g" "$f" | shasum | awk '{print $1}')   # text
+  else
+    h=$(shasum "$f" | awk '{print $1}')                                # binary
+  fi
+  echo "$h ${rel//$id/__BUILDID__}"
+done | sort | shasum | awk '{print $1}'
