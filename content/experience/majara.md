@@ -1,11 +1,11 @@
 ---
 id: "exp-majara"
 kind: "experience"
-title: "Product Engineering intern"
+title: "Product Engineering Intern"
 org: "Majara — Riyadh, hybrid"
 period: "Nov 2025 — Present"
-tools: ["python", "javascript", "rest-apis", "langchain", "systems-analysis", "agile", "sdlc", "b2b"]
-summary: "Built and integrated Python backend services and REST APIs for a B2B product, and prototyped new product capabilities from requirements through to working software."
+tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"]
+summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software."
 ---
 
 ## What the work actually involved
