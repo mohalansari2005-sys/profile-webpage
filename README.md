@@ -15,7 +15,7 @@ he know?" but "where did he actually use it?"
 
 ```
 frontend/   Next.js app, static-exported, deployed on Vercel
-backend/    Django + DRF service for the chat feature (not yet built)
+backend/    Django + DRF service for the chat feature; runs locally via Docker Compose
 content/    Markdown corpus; frontend/lib/content.ts is generated from it
 docs/       Specs and implementation plans
 scripts/    Repo-level tooling
@@ -45,6 +45,15 @@ npm run lint    # ESLint (next/core-web-vitals + TypeScript)
 
 `npm test` at the repo root runs the corpus and generator unit tests.
 `npm run start` exists but isn't used here — see Deployment below.
+
+The backend runs separately, from the repo root:
+
+```bash
+docker compose up -d --build                              # web + postgres/pgvector + redis
+docker compose run --rm web python manage.py migrate
+docker compose run --rm web python manage.py ingest_content
+docker compose run --rm web pytest                        # no API key needed; calls are stubbed
+```
 
 ## Architecture
 
@@ -87,17 +96,30 @@ exactly that.
 
 Frontmatter carries the structured fields the page renders (title, org,
 period, tools, summary). The body carries long-form prose that only the
-future chat feature retrieves, and is deliberately never emitted into
-`content.ts`.
+chat feature retrieves. It is deliberately never emitted into `content.ts` —
+it reaches the backend through `backend/corpus.json` instead, so prose never
+ships to the browser.
 
 `frontend/lib/content.ts` is **generated** from `content/` — records are
 data, not markup, so editing content never means touching JSX, but it also
 means the file itself must never be hand-edited. From the repo root:
 
 ```bash
-npm run content         # regenerate frontend/lib/content.ts from content/
-npm run content:check   # fail if the committed file is stale
+npm run content         # regenerate both generated artifacts from content/
+npm run content:check   # fail if either committed artifact is stale
 ```
+
+The generator writes **two** artifacts from one validated load:
+
+| Artifact | Consumer | Contains |
+|---|---|---|
+| `frontend/lib/content.ts` | the rendered page | frontmatter fields only |
+| `backend/corpus.json` | the chat backend's ingestion | the same fields **plus each record's body prose** |
+
+Both are committed. One loader (`scripts/lib/corpus.mjs`) validates the corpus
+once and feeds both, so the page and the bot can never disagree about what a
+record says. Nothing in Python parses markdown — that duplication is exactly the
+drift this design avoids.
 
 The generator is deliberately *not* wired up as a `prebuild` step: Vercel
 clones the whole repo, so `content/` is present, but its Root Directory is
@@ -155,6 +177,26 @@ So it checks geometry synchronously on mount and reveals anything already at or
 above the fold, independent of the observer, and the observer's oversized top
 `rootMargin` covers jumps that happen later. A `<noscript>` rule in the layout
 handles the JS-disabled case. All three parts are load-bearing.
+
+## The chat backend
+
+`POST /api/chat/` answers questions about my work using only the `content/`
+corpus, and refuses anything it cannot ground. It is local-only for now — no
+VPS, no domain, no TLS.
+
+A request runs through a five-node LangGraph: `condense → relevance → retrieve
+→ generate → log`. Retrieval is pgvector cosine distance over 1536-dimension
+Gemini embeddings.
+
+**Grounding is enforced in Python, not asked for in the prompt.** The generate
+step returns schema-validated JSON naming the chunk ids it used; if that set is
+not a subset of what retrieval actually returned, or the model reports
+insufficient context, the answer is discarded and replaced with a refusal before
+it leaves the server.
+
+The API key never reaches the browser — that is the whole reason this service
+exists rather than calling Gemini from the client. See `backend/README.md` for
+how to run it, the two-model split, and the secrets checks.
 
 ## Deployment
 
