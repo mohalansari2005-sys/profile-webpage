@@ -16,8 +16,10 @@ opportunities, and the best way to reach me is through the contact
 details on this site.
 
 If you're asking because you're evaluating me for a role: my strongest
-fit is backend-leaning engineering work — API design, service
-integrations, and systems that need to hold up under real usage, not
-just a demo. I'm still early in my career, so I'm looking for roles
-that give me room to keep growing rather than assuming I already have
-every answer.
+fit is full-stack engineering work, with a particular interest in
+building products end to end — from frontend experiences to the
+systems and APIs behind them. I'm also actively interested in AI and
+agentic systems and building hands-on experience in that space. I'm
+still early in my career, so I'm looking for roles that give me room
+to keep growing, take on meaningful problems, and develop across both
+software engineering and AI.
