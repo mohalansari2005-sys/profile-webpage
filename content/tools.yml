@@ -1,0 +1,23 @@
+# Group order controls how the tool strip renders. Tool order within the file
+# controls order inside each group. Both are load-bearing.
+groups:
+  - Build
+  - Data & infrastructure
+  - Practice
+
+tools:
+  - { id: python, label: Python, group: Build }
+  - { id: javascript, label: JavaScript, group: Build }
+  - { id: fastapi, label: FastAPI, group: Build }
+  - { id: sqlalchemy, label: SQLAlchemy, group: Build }
+  - { id: rest-apis, label: REST APIs, group: Build }
+  - { id: langchain, label: LangChain, group: Build }
+  - { id: postgres, label: PostgreSQL, group: Data & infrastructure }
+  - { id: redis, label: Redis, group: Data & infrastructure }
+  - { id: celery, label: Celery, group: Data & infrastructure }
+  - { id: docker, label: Docker, group: Data & infrastructure }
+  - { id: pytest, label: pytest, group: Data & infrastructure }
+  - { id: systems-analysis, label: Systems analysis, group: Practice }
+  - { id: agile, label: Agile, group: Practice }
+  - { id: sdlc, label: SDLC, group: Practice }
+  - { id: b2b, label: B2B software, group: Practice }

@@ -1,7 +1,7 @@
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
-import { loadCorpus } from "./lib/corpus.mjs";
+import { loadCorpus, CorpusError } from "./lib/corpus.mjs";
 
 const s = (v) => JSON.stringify(v);
 
@@ -73,19 +73,28 @@ const CONTENT = join(here, "..", "content");
 const TARGET = join(here, "..", "frontend", "lib", "content.ts");
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const next = renderModule(loadCorpus(CONTENT));
-  if (process.argv.includes("--check")) {
-    const current = existsSync(TARGET) ? readFileSync(TARGET, "utf8") : "";
-    if (current !== next) {
-      console.error(
-        "frontend/lib/content.ts is stale.\n" +
-        "Run `npm run content` from frontend/ and commit the result.",
-      );
+  try {
+    const next = renderModule(loadCorpus(CONTENT));
+    if (process.argv.includes("--check")) {
+      const current = existsSync(TARGET) ? readFileSync(TARGET, "utf8") : "";
+      if (current !== next) {
+        console.error(
+          "frontend/lib/content.ts is stale.\n" +
+          "Run `npm run content` from frontend/ and commit the result.",
+        );
+        process.exit(1);
+      }
+      console.log("content.ts is up to date");
+    } else {
+      writeFileSync(TARGET, next);
+      console.log(`wrote ${TARGET}`);
+    }
+  } catch (e) {
+    if (e instanceof CorpusError) {
+      console.error("corpus validation failed:");
+      for (const problem of e.problems) console.error(`  - ${problem}`);
       process.exit(1);
     }
-    console.log("content.ts is up to date");
-  } else {
-    writeFileSync(TARGET, next);
-    console.log(`wrote ${TARGET}`);
+    throw e;
   }
 }
