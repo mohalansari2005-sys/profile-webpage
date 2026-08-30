@@ -47,7 +47,7 @@ Tell me:
   (Django/DRF, containerized, deployed on Hostinger via Docker Compose).
 - Backend: Postgres (pgvector extension) for both vector storage and logging, Redis for
   rate limiting, LangGraph for the chat feature's agent logic, Gemini for embeddings,
-  Anthropic API for generation.
+  gemini API for generation.
 - Typography/palette (frontend): Source Serif 4 (body) / JetBrains Mono (labels) /
   display sans (headings); ink navy `#0F1626`, slate `rgb(92,103,121)`, base surface
   `#EBEEF3`, amber accent `#E09B2D`, green `#0B6E4F`. Don't introduce new fonts or colors

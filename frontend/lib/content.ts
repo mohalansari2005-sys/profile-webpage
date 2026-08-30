@@ -44,7 +44,7 @@ export const tools: Tool[] = [
 export const experience: WorkRecord[] = [
   {
     id: "exp-majara",
-    title: "Product Engineer",
+    title: "Product Engineering intern",
     org: "Majara — Riyadh, hybrid",
     period: "Nov 2025 — Present",
     summary:
