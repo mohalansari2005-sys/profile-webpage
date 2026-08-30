@@ -20,7 +20,15 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 
 GEMINI_API_KEY = required("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# Two generation models, measured against the live API on 2026-08-30:
+#   gemini-3.5-flash       ~10.3s/call -- used for `generate`, where grounding
+#                          discipline and readable prose matter most.
+#   gemini-3.5-flash-lite   ~0.73s/call -- used for `condense` and `relevance`,
+#                          which are cheap classifier calls.
+# A follow-up turn makes all three calls; the split keeps that near 12s rather
+# than 31s. gemini-2.5-flash, which the spec named, now 404s.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_FAST_MODEL = os.environ.get("GEMINI_FAST_MODEL", "gemini-3.5-flash-lite")
 GEMINI_EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIMENSIONS = 1536
 

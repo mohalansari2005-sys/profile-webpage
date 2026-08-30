@@ -22,6 +22,8 @@
 - **Buffered JSON response, not SSE (spec D4).** Keeps gunicorn/WSGI and DRF.
 - **Local-only (spec D6).** No VPS, no domain, no TLS. `docker compose up` on localhost is the whole deployment.
 - **One API account:** Google AI Studio. It is the only key in the system.
+- **Two generation models.** `GEMINI_MODEL` (`gemini-3.5-flash`) for `generate`; `GEMINI_FAST_MODEL` (`gemini-3.5-flash-lite`) for `condense` and `relevance`. Never send a `thinking_config` — the fast models 400 on it. See correction 5.
+- **Never paste a real key into `backend/.env.example`.** It is a committed file. The real key goes in `backend/.env`, which is gitignored.
 - **No new frontend code in this branch.** The UI is Branch 4.
 - `main` is not touched. Work lands on `feat/chat-backend` for review.
 
@@ -46,7 +48,29 @@ Task 2 re-verifies rather than re-applies. Do **not** verify with `check-ignore 
 
 **4. There is no `ingestion/embedder.py`.** The spec's file tree lists one. Embedding is four lines that belong with the rest of the Gemini surface in `chat/gemini.py` — a separate module would exist only to re-export it, and would give the system two places to get the `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` distinction wrong. `ingestion/` keeps `chunker.py` and `loader.py`.
 
-**5. Model names are confirmed against the live API, not assumed.** The spec names `gemini-2.5-flash` and `gemini-embedding-001` and explicitly says to confirm at implementation time — free-tier lineups and quotas change. Task 6 Step 1 is a live check against the real key before any code depends on a model string.
+**5. `gemini-2.5-flash` is gone, and `thinking_budget=0` cannot be sent.** The spec names `gemini-2.5-flash` and says to confirm at implementation time. Confirmed on 2026-08-30 against the live API — it returns **404 NOT_FOUND, "no longer available"**, even though it still appears in `models.list()`. Measured replacements:
+
+| Model | Result |
+|---|---|
+| `gemini-3.5-flash` | works, ~10.3s per call |
+| `gemini-3.6-flash` | works, ~28s per call |
+| `gemini-3.7-flash`, `gemini-flash-latest` | 503 UNAVAILABLE, "high demand", on every attempt |
+| `gemini-3.5-flash-lite` | works, ~0.73s per call |
+
+So the system uses **two** generation models, not one: `GEMINI_FAST_MODEL`
+(`gemini-3.5-flash-lite`) for `condense` and `relevance`, which are cheap
+classifier calls, and `GEMINI_MODEL` (`gemini-3.5-flash`) for `generate`, where
+grounding discipline and readable prose matter. A follow-up turn makes all three
+calls; the split keeps that near 12s instead of 31s.
+
+The spec's `thinking_budget=0` optimization is **removed entirely**, not merely
+unused: `gemini-3.5-flash-lite` and `gemini-3.6-flash` reject a thinking config
+with `400 INVALID_ARGUMENT`, and on `gemini-3.5-flash` it saved about 1 second of
+11. `gemini.structured()` therefore never sends one, and a test asserts that.
+
+Both `gemini-embedding-001` and `gemini-embedding-2` return 3072 by default and
+honor `output_dimensionality=1536`. Staying on `gemini-embedding-001` per the
+spec; changing it later means re-ingesting the whole corpus.
 
 ---
 
@@ -317,7 +341,8 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 
 GEMINI_API_KEY = required("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_FAST_MODEL = os.environ.get("GEMINI_FAST_MODEL", "gemini-3.5-flash-lite")
 GEMINI_EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIMENSIONS = 1536
 
@@ -437,7 +462,8 @@ DJANGO_DEBUG=1
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 
 GEMINI_API_KEY=your-google-ai-studio-key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_FAST_MODEL=gemini-3.5-flash-lite
 GEMINI_EMBED_MODEL=gemini-embedding-001
 
 POSTGRES_DB=chat
@@ -989,7 +1015,7 @@ One file, one client, shared by embedding and generation. Every model call in th
 - Produces:
   - `embed_documents(texts: list[str]) -> list[list[float]]` — `RETRIEVAL_DOCUMENT`, 1536 dims, re-normalized.
   - `embed_query(text: str) -> list[float]` — `RETRIEVAL_QUERY`, 1536 dims, re-normalized.
-  - `structured(prompt: str, schema: type[BaseModel], *, thinking: bool = True) -> tuple[BaseModel, dict]` — returns the parsed model and a usage dict `{"prompt_tokens": int|None, "completion_tokens": int|None}`.
+  - `structured(prompt: str, schema: type[BaseModel], *, fast: bool = False) -> tuple[BaseModel | None, dict]` — returns the parsed model and a usage dict `{"prompt_tokens": int|None, "completion_tokens": int|None}`. `fast=True` selects `GEMINI_FAST_MODEL`.
   - `normalize(vec: list[float]) -> list[float]`
 
 - [ ] **Step 1: Confirm the model names against the live API before writing code that depends on them**
@@ -998,15 +1024,19 @@ The spec names `gemini-2.5-flash` and `gemini-embedding-001` but explicitly says
 
 ```bash
 docker compose run --rm web python -c "
-from google import genai
-from django.conf import settings
-import django, os
+import os, django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings'); django.setup()
+from django.conf import settings
+from google import genai
 c = genai.Client(api_key=settings.GEMINI_API_KEY)
 for m in c.models.list():
-    print(m.name, m.supported_actions)
+    print(m.name, list(getattr(m, 'supported_actions', []) or []))
 "
 ```
+
+`models.list()` is necessary but **not sufficient** — it lists models that then
+404 on use. Follow it with an actual one-token call to each candidate before
+committing to a name. That is how `gemini-2.5-flash` was found to be dead.
 
 Read the output. Confirm a current free-tier flash generation model and a current embedding model that supports `output_dimensionality`. If either name differs from the defaults in `settings.py`, set `GEMINI_MODEL` / `GEMINI_EMBED_MODEL` in `backend/.env` and note the real names in this plan's task — do not hardcode a model string anywhere but `settings.py`.
 
@@ -1114,18 +1144,21 @@ def embed_query(text: str) -> list[float]:
     return _embed([text], "RETRIEVAL_QUERY")[0]
 
 
-def structured(prompt: str, schema: type[BaseModel], *, thinking: bool = True):
-    """Returns (parsed_model, usage). response_schema guarantees the shape, so
-    no caller ever parses a refusal out of prose."""
-    config = types.GenerateContentConfig(
-        response_mime_type="application/json",
-        response_schema=schema,
-    )
-    if not thinking:
-        config.thinking_config = types.ThinkingConfig(thinking_budget=0)
+def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
+    """Returns (parsed, usage). response_schema guarantees the shape, so no
+    caller ever parses a refusal out of prose.
 
+    `fast=True` selects GEMINI_FAST_MODEL for the cheap classifier calls
+    (condense, relevance). No thinking_budget is ever sent: the fast models
+    reject it with a 400, and on the strong model it saved ~1s of 11.
+    """
     resp = _client.models.generate_content(
-        model=settings.GEMINI_MODEL, contents=prompt, config=config
+        model=settings.GEMINI_FAST_MODEL if fast else settings.GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=schema,
+        ),
     )
     usage = getattr(resp, "usage_metadata", None)
     return resp.parsed, {
@@ -1555,9 +1588,9 @@ def test_follow_up_is_rewritten_standalone(monkeypatch):
 
     captured = {}
 
-    def fake(prompt, schema, *, thinking=True):
+    def fake(prompt, schema, *, fast=False):
         captured["prompt"] = prompt
-        captured["thinking"] = thinking
+        captured["fast"] = fast
         return Standalone(standalone_question="What did he build at Majara?"), {}
 
     monkeypatch.setattr(node, "structured", fake)
@@ -1570,7 +1603,7 @@ def test_follow_up_is_rewritten_standalone(monkeypatch):
     })
     assert out["condensed"] == "What did he build at Majara?"
     assert "Majara" in captured["prompt"]
-    assert captured["thinking"] is False
+    assert captured["fast"] is True
 
 
 def test_a_blank_rewrite_falls_back_to_the_raw_question(monkeypatch):
@@ -1620,7 +1653,7 @@ def condense(state: ChatState) -> dict:
     parsed, _ = structured(
         PROMPT.format(history=transcript, question=question),
         Standalone,
-        thinking=False,
+        fast=True,
     )
     rewritten = (parsed.standalone_question or "").strip() if parsed else ""
     return {"condensed": rewritten or question}
@@ -1723,7 +1756,7 @@ class Relevance(BaseModel):
 
 def relevance(state: ChatState) -> dict:
     parsed, _ = structured(PROMPT.format(question=state["condensed"]),
-                           Relevance, thinking=False)
+                           Relevance, fast=True)
     if parsed is None:
         # Fail closed: a response we cannot read is not permission to answer.
         return {"in_scope": False, "refusal_reason": "scope check failed"}
