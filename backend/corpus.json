@@ -1,0 +1,161 @@
+{
+  "generatedBy": "scripts/build-content.mjs — do not edit; run `npm run content`",
+  "groups": [
+    "Build",
+    "Data & infrastructure",
+    "Practice"
+  ],
+  "tools": [
+    {
+      "id": "python",
+      "label": "Python",
+      "group": "Build"
+    },
+    {
+      "id": "javascript",
+      "label": "JavaScript",
+      "group": "Build"
+    },
+    {
+      "id": "fastapi",
+      "label": "FastAPI",
+      "group": "Build"
+    },
+    {
+      "id": "sqlalchemy",
+      "label": "SQLAlchemy",
+      "group": "Build"
+    },
+    {
+      "id": "rest-apis",
+      "label": "REST APIs",
+      "group": "Build"
+    },
+    {
+      "id": "langchain",
+      "label": "LangChain",
+      "group": "Build"
+    },
+    {
+      "id": "postgres",
+      "label": "PostgreSQL",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "redis",
+      "label": "Redis",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "celery",
+      "label": "Celery",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "docker",
+      "label": "Docker",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "pytest",
+      "label": "pytest",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "systems-analysis",
+      "label": "Systems analysis",
+      "group": "Practice"
+    },
+    {
+      "id": "agile",
+      "label": "Agile",
+      "group": "Practice"
+    },
+    {
+      "id": "sdlc",
+      "label": "SDLC",
+      "group": "Practice"
+    },
+    {
+      "id": "b2b",
+      "label": "B2B software",
+      "group": "Practice"
+    }
+  ],
+  "records": [
+    {
+      "id": "exp-majara",
+      "kind": "experience",
+      "title": "Product Engineering intern",
+      "org": "Majara — Riyadh, hybrid",
+      "period": "Nov 2025 — Present",
+      "summary": "Built and integrated Python backend services and REST APIs for a B2B product, and prototyped new product capabilities from requirements through to working software.",
+      "tools": [
+        "python",
+        "javascript",
+        "rest-apis",
+        "langchain",
+        "systems-analysis",
+        "agile",
+        "sdlc",
+        "b2b"
+      ],
+      "body": "## What the work actually involved\n\nI joined Majara as a product engineering intern, working hybrid out of\nRiyadh. The team is small, so the role spans further than a typical\ninternship: building backend services in Python, wiring up REST APIs\nfor the frontend and integrations to consume, and prototyping product\ncapabilities that started as a requirements conversation rather than\na finished spec.\n\nA lot of the work sat at the intersection of \"figure out what's\nactually being asked for\" and \"make it work in production\" — reading\na stakeholder's description of a workflow, translating it into a data\nmodel and an API surface, then iterating once real usage showed the\ngaps in the first pass. LangChain came in for the pieces that needed\nto reason over unstructured input rather than follow a fixed branch of\nlogic.\n\nThe B2B product context mattered: customers are companies, not\nindividuals, so multi-tenancy, permissions, and predictable behavior\nunder someone else's business process were constant constraints, not\nedge cases to handle later.",
+      "source": "experience/majara.md"
+    },
+    {
+      "id": "exp-seet",
+      "kind": "experience",
+      "title": "Business Development Intern",
+      "org": "SEET (صيت) — marketing solutions agency, Riyadh",
+      "period": "Feb — Apr 2025",
+      "summary": "Ran client meetings, prepared sales pitches, presented proposals, and managed ongoing client relationships. It taught me to read what a client actually needs and present a practical solution — the other half of the problem-solving process from the engineering side.",
+      "tools": [],
+      "body": "## What the work actually involved\n\nBefore Majara, I spent a few months in business development at SEET\n(صيت), a marketing solutions agency in Riyadh. The role was almost the\ninverse of engineering work: instead of starting from a technical\nrequirement, I started from a client conversation and had to figure\nout what solution actually fit, then make the case for it.\n\nDay to day that meant running client meetings, putting together sales\npitches and proposal decks, presenting them, and staying in the loop\non the relationship afterward rather than treating a signed deal as\nthe end of the interaction. Clients rarely describe their problem in a\nform that maps directly onto a service line, so a lot of the value was\nin translation — turning a vague complaint or goal into a concrete,\nsellable scope.\n\nI think about this experience often on the engineering side now: a\nbadly scoped technical requirement and a badly scoped sales pitch fail\nfor the same reason, and the fix is the same skill — sit with the\nclient or stakeholder until you understand what they actually need,\nnot just what they first said.",
+      "source": "experience/seet.md"
+    },
+    {
+      "id": "proj-booking-backend",
+      "kind": "projects",
+      "title": "Corporate hotel booking backend",
+      "org": "Majara",
+      "period": "2026",
+      "summary": "A FastAPI service that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed.",
+      "tools": [
+        "python",
+        "fastapi",
+        "sqlalchemy",
+        "postgres",
+        "redis",
+        "celery",
+        "docker",
+        "rest-apis",
+        "pytest"
+      ],
+      "body": "## What the work actually involved\n\nThis was a FastAPI backend for a corporate travel workflow: a company\nsubmits a bulk trip request for a group of employees, and the system\nhas to turn that into actual booked hotel rooms. I built the core\nflows solo.\n\nThe shape of the problem was mostly about talking to an external,\nrate-limited API (Amadeus) reliably at scale. Search and booking calls\nran through Celery workers rather than inline in the request/response\ncycle, both to keep the API responsive and to get retry and\nexponential backoff around calls that would otherwise fail under\nnormal Amadeus rate limits. Idempotency was a hard requirement —\nretrying a failed booking call must never double-book a room or double-\ncharge a client, so every booking operation carried an idempotency key\nand the write path was built to be safely repeatable.\n\nThe service was multi-tenant from the start: each corporate client's\nrequests, bookings, and traveler data needed to stay isolated from\nevery other client sharing the same deployment. Postgres (via\nSQLAlchemy) held the booking and tenant state, Redis backed the Celery\nqueue, and confirmation emails went out once a booking cleared.\n\nThe project was shelved before launch when industry regulations\nchanged in a way that affected the booking model it was built around —\nnot a technical failure, but the kind of external shift that can kill\na project regardless of how solid the implementation is.",
+      "source": "projects/corporate-hotel-booking.md"
+    },
+    {
+      "id": "about-bio",
+      "kind": "about",
+      "title": "About",
+      "org": "",
+      "period": "",
+      "summary": "Backend-leaning software engineer based in Riyadh, currently interning at Majara and building this site's own AI chat feature as a hands-on exercise in RAG and agent orchestration.",
+      "tools": [],
+      "body": "## Who I am\n\nI'm a software engineer based in Riyadh, currently interning at Majara\nas a product engineering intern, where I work on Python backend\nservices, REST APIs, and new product prototypes for a B2B platform.\nBefore that I spent a few months in business development at SEET\n(صيت), a Riyadh marketing agency, which is where I picked up the habit\nof treating \"what does the other side actually need\" as the first\nquestion in any project, technical or not.\n\nMost of my hands-on engineering experience so far centers on backend\nwork: Python, FastAPI, SQLAlchemy, REST API design, and the\ninfrastructure around that (Postgres, Redis, Celery, Docker, pytest).\nI'm comfortable moving from a requirements conversation to a working\nsystem, and I care about the parts of backend work that don't show up\nin a demo — idempotency, retries, multi-tenancy, and what happens when\nan external dependency misbehaves.\n\nThis portfolio site's chat feature is a deliberate exception to how I\notherwise approach projects: where I usually default to the simplest\ntool that solves the problem, the chat feature is a dedicated learning\nexercise, so I chose heavier architecture on purpose — retrieval over\nthis markdown corpus, agent orchestration with LangGraph, and\nself-hosting the backend on my own infrastructure — specifically to\nget hands-on practice with those pieces rather than to keep the site\nitself minimal.",
+      "source": "about/bio.md"
+    },
+    {
+      "id": "faq-availability",
+      "kind": "faq",
+      "title": "Are you available for work?",
+      "org": "",
+      "period": "",
+      "summary": "Currently interning at Majara; open to hearing about new opportunities, best reached through the contact details on this site.",
+      "tools": [],
+      "body": "## Availability\n\nI'm currently interning at Majara in a product engineering role. That\ndoesn't mean I'm off the market — I'm happy to hear about new\nopportunities, and the best way to reach me is through the contact\ndetails on this site.\n\nIf you're asking because you're evaluating me for a role: my strongest\nfit is backend-leaning engineering work — API design, service\nintegrations, and systems that need to hold up under real usage, not\njust a demo. I'm still early in my career, so I'm looking for roles\nthat give me room to keep growing rather than assuming I already have\nevery answer.",
+      "source": "faq/availability.md"
+    }
+  ]
+}

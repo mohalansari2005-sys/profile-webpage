@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderModule } from "./build-content.mjs";
+import { renderModule, renderCorpusJson } from "./build-content.mjs";
 
 const corpus = {
   groups: ["Build", "Practice"],
@@ -20,6 +20,14 @@ const corpus = {
                  summary: "Built it.", tools: ["python", "agile"], href: "https://x.test" }],
     about: [], faq: [],
   },
+  records: [
+    { id: "exp-a", kind: "experience", title: "Engineer", org: "Acme", period: "2025",
+      summary: 'He said "hi" — really', tools: ["python"],
+      body: "## What I did\n\nProse.", source: "experience/a.md" },
+    { id: "proj-b", kind: "projects", title: "Thing", org: "Acme", period: "2026",
+      summary: "Built it.", tools: ["python", "agile"], href: "https://x.test",
+      body: "## Overview\n\nMore prose.", source: "projects/b.md" },
+  ],
 };
 
 test("emits the ToolGroup union from declared groups, in order", () => {
@@ -72,8 +80,32 @@ test("the entrypoint guard runs identically through a symlink", () => {
     const direct = execFileSync("node", [real, "--check"], { encoding: "utf8" });
     const viaSymlink = execFileSync("node", [link, "--check"], { encoding: "utf8" });
     assert.equal(viaSymlink, direct);
-    assert.match(viaSymlink, /content\.ts is up to date/);
+    assert.match(viaSymlink, /up to date/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("corpus.json carries record bodies the site never ships", () => {
+  const parsed = JSON.parse(renderCorpusJson(corpus));
+  const rec = parsed.records.find((r) => r.id === "exp-a");
+  assert.equal(rec.body, "## What I did\n\nProse.");
+  assert.equal(rec.kind, "experience");
+});
+
+test("corpus.json preserves record order", () => {
+  const parsed = JSON.parse(renderCorpusJson(corpus));
+  assert.deepEqual(parsed.records.map((r) => r.id), ["exp-a", "proj-b"]);
+});
+
+test("corpus.json carries the tool registry and group order", () => {
+  const parsed = JSON.parse(renderCorpusJson(corpus));
+  assert.deepEqual(parsed.groups, ["Build", "Practice"]);
+  assert.deepEqual(parsed.tools.map((t) => t.id), ["python", "agile"]);
+});
+
+test("corpus.json is marked generated and ends with a newline", () => {
+  const out = renderCorpusJson(corpus);
+  assert.match(JSON.parse(out).generatedBy, /build-content\.mjs/);
+  assert.ok(out.endsWith("\n"));
 });

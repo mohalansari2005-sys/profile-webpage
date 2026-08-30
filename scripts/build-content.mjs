@@ -68,26 +68,42 @@ export const toolById = new Map(tools.map((tool) => [tool.id, tool]));
 `;
 }
 
+export function renderCorpusJson(corpus) {
+  return JSON.stringify({
+    generatedBy: "scripts/build-content.mjs — do not edit; run `npm run content`",
+    groups: corpus.groups,
+    tools: corpus.tools,
+    records: corpus.records,
+  }, null, 2) + "\n";
+}
+
 const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT = join(here, "..", "content");
 const TARGET = join(here, "..", "frontend", "lib", "content.ts");
+const CORPUS_JSON = join(here, "..", "backend", "corpus.json");
 
 if (import.meta.main) {
   try {
-    const next = renderModule(loadCorpus(CONTENT));
+    const corpus = loadCorpus(CONTENT);
+    const artifacts = [
+      { path: TARGET, next: renderModule(corpus), label: "frontend/lib/content.ts" },
+      { path: CORPUS_JSON, next: renderCorpusJson(corpus), label: "backend/corpus.json" },
+    ];
     if (process.argv.includes("--check")) {
-      const current = existsSync(TARGET) ? readFileSync(TARGET, "utf8") : "";
-      if (current !== next) {
-        console.error(
-          "frontend/lib/content.ts is stale.\n" +
-          "Run `npm run content` from the repo root and commit the result.",
-        );
+      const stale = artifacts.filter(
+        (a) => (existsSync(a.path) ? readFileSync(a.path, "utf8") : "") !== a.next,
+      );
+      if (stale.length) {
+        for (const a of stale) console.error(`${a.label} is stale.`);
+        console.error("Run `npm run content` from the repo root and commit the result.");
         process.exit(1);
       }
-      console.log("content.ts is up to date");
+      console.log("generated artifacts are up to date");
     } else {
-      writeFileSync(TARGET, next);
-      console.log(`wrote ${TARGET}`);
+      for (const a of artifacts) {
+        writeFileSync(a.path, a.next);
+        console.log(`wrote ${a.path}`);
+      }
     }
   } catch (e) {
     if (e instanceof CorpusError) {
