@@ -80,7 +80,7 @@ if (import.meta.main) {
       if (current !== next) {
         console.error(
           "frontend/lib/content.ts is stale.\n" +
-          "Run `npm run content` from frontend/ and commit the result.",
+          "Run `npm run content` from the repo root and commit the result.",
         );
         process.exit(1);
       }
