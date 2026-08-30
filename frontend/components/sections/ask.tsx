@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Reveal } from "@/components/reveal";
+import { useJoin } from "@/components/join-context";
+import { experience, projects } from "@/lib/content";
 import { askChat, MAX_HISTORY, type ChatMessage, type ChatSource } from "@/lib/chat-api";
+
+/** Only these records have a row to scroll to. `about-bio` and the faq
+    records can be cited but are not rendered anywhere on the page, so their
+    chips stay inert rather than pointing at nothing. */
+const ROW_IDS = new Set([...experience, ...projects].map((record) => record.id));
 
 /** Three questions the corpus can actually answer, so the first turn teaches
     the edges: a role, a project, and an faq that has no row on the page. */
@@ -19,6 +26,19 @@ type Turn = {
   sources: ChatSource[];
   refused: boolean;
 };
+
+function scrollToRecord(recordId: string) {
+  const row = document.getElementById(`record-${recordId}`);
+  if (!row) return;
+  // Focus first, scroll second. `preventScroll` stops the focus call from
+  // doing its own jump, but issuing it *after* scrollIntoView cancels the
+  // smooth scroll already in flight and leaves the reader where they were.
+  row.focus({ preventScroll: true });
+  // No `behavior` argument on purpose: the page's own `scroll-behavior` is
+  // smooth in CSS and forced to `auto` under prefers-reduced-motion, so
+  // inheriting it is what makes the reduced-motion case correct.
+  row.scrollIntoView({ block: "center" });
+}
 
 function historyFrom(turns: Turn[]): ChatMessage[] {
   return turns
@@ -40,6 +60,7 @@ export function Ask() {
   // supplies its own question rather than reading the (now-cleared) field, so
   // the state guard alone can be beaten by two activations in one tick.
   const inFlight = useRef(false);
+  const { setCited } = useJoin();
 
   async function ask(question: string) {
     const trimmed = question.trim();
@@ -60,6 +81,9 @@ export function Ask() {
     }
     const id = nextId.current++;
     setTurns((current) => [...current, { id, question: trimmed, ...result.data }]);
+    // A refusal cites nothing, so this clears the join rather than leaving a
+    // pinned tool lit beside an answer that has nothing to do with it.
+    setCited(result.data.sources.map((source) => source.record_id));
   }
 
   // Focus returns to the input once an answer has rendered, so a follow-up
@@ -164,6 +188,35 @@ export function Ask() {
                   >
                     {turn.answer}
                   </p>
+
+                  {turn.sources.length > 0 && (
+                    <div className="mt-4">
+                      <p className="field-label mb-2">Sources</p>
+                      <ul className="flex flex-wrap gap-1.5">
+                        {turn.sources.map((source) => {
+                          const hasRow = ROW_IDS.has(source.record_id);
+                          return (
+                            <li key={source.record_id}>
+                              {hasRow ? (
+                                <button
+                                  type="button"
+                                  onClick={() => scrollToRecord(source.record_id)}
+                                  className="cursor-pointer rounded-sm border border-match bg-match/20 px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
+                                >
+                                  <span aria-hidden="true">&uarr; </span>
+                                  {source.title}
+                                </button>
+                              ) : (
+                                <span className="rounded-sm border border-rule px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
+                                  {source.title}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </article>
             ))}
