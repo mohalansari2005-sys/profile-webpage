@@ -1,0 +1,34 @@
+[project]
+name = "chat-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "django>=5.1,<6",
+  "djangorestframework>=3.15",
+  "django-cors-headers>=4.4",
+  "django-redis>=5.4",
+  "psycopg[binary]>=3.2",
+  "pgvector>=0.3.6",
+  "langgraph>=0.2.60",
+  "google-genai>=1.0.0",
+  "gunicorn>=23.0",
+  "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-django>=4.9"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Deliberately empty: `pip install .` runs before `COPY . .` so the dependency
+# layer stays cached, and setuptools would find no package to build. The code
+# arrives with the later COPY and is importable via PYTHONPATH=/app.
+py-modules = []
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
