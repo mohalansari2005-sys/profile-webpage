@@ -7,12 +7,12 @@ import {
   experience,
   projects,
   toolById,
+  toolGroups,
   tools,
-  type ToolGroup,
   type WorkRecord,
 } from "@/lib/content";
 
-const groupOrder: ToolGroup[] = ["Build", "Data & infrastructure", "Practice"];
+const groupOrder = toolGroups;
 
 type RowState = "neutral" | "lit" | "dim";
 
