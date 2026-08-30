@@ -5,7 +5,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def required(name: str) -> str:
-    value = os.environ.get(name)
+    # .strip() because a value pasted into .env with a stray leading space is
+    # sent verbatim and fails upstream with a confusing 400, not a clear error.
+    value = (os.environ.get(name) or "").strip()
     if not value:
         raise RuntimeError(
             f"{name} is not set. Copy backend/.env.example to backend/.env and fill it in."
