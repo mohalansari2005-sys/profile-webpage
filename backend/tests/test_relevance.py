@@ -27,6 +27,16 @@ def test_an_unparseable_response_fails_closed(monkeypatch):
     monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {}))
     out = node.relevance({"condensed": "anything"})
     assert out["in_scope"] is False
+    assert out["refusal_reason"] == "scope check failed"
+
+
+def test_an_api_failure_is_distinguished_from_an_unparseable_response(monkeypatch):
+    from chat.graph.nodes import relevance as node
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {"api_error": True}))
+    out = node.relevance({"condensed": "anything"})
+    assert out["in_scope"] is False
+    assert out["refusal_reason"] == "generation unavailable"
 
 
 def test_the_gate_uses_the_fast_model(monkeypatch):

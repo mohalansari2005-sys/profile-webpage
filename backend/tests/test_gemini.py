@@ -1,5 +1,7 @@
 import math
 
+from google.genai import errors
+
 
 def _fake_client(embed_hook=None, generate_hook=None):
     class FakeModels:
@@ -17,6 +19,22 @@ def _fake_client(embed_hook=None, generate_hook=None):
                 "U", (), {"prompt_token_count": 11, "candidates_token_count": 7})()})()
 
     return type("C", (), {"models": FakeModels()})()
+
+
+def _quota_exhausted_client():
+    """A client whose calls fail the way Gemini's free tier does once the
+    daily quota for the model is used up."""
+    error = errors.APIError(429, {"error": {
+        "status": "RESOURCE_EXHAUSTED", "message": "quota exceeded"}}, None)
+
+    class FailingModels:
+        def embed_content(self, *, model, contents, config):
+            raise error
+
+        def generate_content(self, *, model, contents, config):
+            raise error
+
+    return type("C", (), {"models": FailingModels()})()
 
 
 def test_normalize_returns_a_unit_vector():
@@ -99,3 +117,23 @@ def test_structured_never_sends_a_thinking_budget(monkeypatch, settings):
 
     gemini.structured("prompt", dict, fast=True)
     assert seen["thinking"] is None
+
+
+def test_structured_fails_closed_on_a_quota_error(monkeypatch):
+    """A 429 from the API must not crash the request -- it should look like
+    an unparseable response to callers, who already fail closed on that."""
+    from chat import gemini
+
+    monkeypatch.setattr(gemini, "_client", _quota_exhausted_client())
+
+    parsed, usage = gemini.structured("prompt", dict)
+    assert parsed is None
+    assert usage == {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
+
+
+def test_embed_query_fails_closed_on_a_quota_error(monkeypatch):
+    from chat import gemini
+
+    monkeypatch.setattr(gemini, "_client", _quota_exhausted_client())
+
+    assert gemini.embed_query("who is he") is None

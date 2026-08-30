@@ -2,7 +2,7 @@ import math
 
 from django.conf import settings
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel
 
 _client = genai.Client(api_key=settings.GEMINI_API_KEY)
@@ -31,8 +31,13 @@ def embed_documents(texts: list[str]) -> list[list[float]]:
     return _embed(texts, "RETRIEVAL_DOCUMENT")
 
 
-def embed_query(text: str) -> list[float]:
-    return _embed([text], "RETRIEVAL_QUERY")[0]
+def embed_query(text: str) -> list[float] | None:
+    """None means the API call itself failed (e.g. quota exhausted) -- the
+    caller, retrieve(), treats that the same as finding nothing."""
+    try:
+        return _embed([text], "RETRIEVAL_QUERY")[0]
+    except errors.APIError:
+        return None
 
 
 def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
@@ -42,15 +47,24 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     `fast=True` selects GEMINI_FAST_MODEL for the cheap classifier calls
     (condense, relevance). No thinking_budget is ever sent: the fast models
     reject it with a 400, and on the strong model it saved ~1s of 11.
+
+    A failed API call (quota exhausted, transient 5xx) returns parsed=None,
+    same as a response the schema couldn't parse -- every caller already
+    fails closed on that. usage["api_error"] tells the two apart so refusal
+    logs don't call a quota outage an "unparseable response".
     """
-    resp = _client.models.generate_content(
-        model=settings.GEMINI_FAST_MODEL if fast else settings.GEMINI_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=schema,
-        ),
-    )
+    try:
+        resp = _client.models.generate_content(
+            model=settings.GEMINI_FAST_MODEL if fast else settings.GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=schema,
+            ),
+        )
+    except errors.APIError:
+        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
+
     usage = getattr(resp, "usage_metadata", None)
     return resp.parsed, {
         "prompt_tokens": getattr(usage, "prompt_token_count", None),

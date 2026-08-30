@@ -49,7 +49,8 @@ def generate(state: ChatState) -> dict:
     )
 
     if parsed is None:
-        return _refuse("unparseable response", usage)
+        reason = "generation unavailable" if usage.get("api_error") else "unparseable response"
+        return _refuse(reason, usage)
     if not parsed.sufficient:
         return _refuse("insufficient context", usage)
 

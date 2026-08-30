@@ -24,11 +24,12 @@ class Relevance(BaseModel):
 
 
 def relevance(state: ChatState) -> dict:
-    parsed, _ = structured(PROMPT.format(question=state["condensed"]),
-                           Relevance, fast=True)
+    parsed, usage = structured(PROMPT.format(question=state["condensed"]),
+                               Relevance, fast=True)
     if parsed is None:
         # Fail closed: a response we cannot read is not permission to answer.
-        return {"in_scope": False, "refusal_reason": "scope check failed"}
+        reason = "generation unavailable" if usage.get("api_error") else "scope check failed"
+        return {"in_scope": False, "refusal_reason": reason}
     return {
         "in_scope": parsed.in_scope,
         "refusal_reason": "" if parsed.in_scope else parsed.reason,

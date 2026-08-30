@@ -59,6 +59,16 @@ def test_an_unparseable_response_becomes_a_refusal(monkeypatch):
     monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {}))
     out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
     assert out["refused"] is True
+    assert out["refusal_reason"] == "unparseable response"
+
+
+def test_an_api_failure_is_distinguished_from_an_unparseable_response(monkeypatch):
+    from chat.graph.nodes import generate as node
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {"api_error": True}))
+    out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
+    assert out["refused"] is True
+    assert out["refusal_reason"] == "generation unavailable"
 
 
 def test_empty_retrieval_refuses_without_calling_the_model(monkeypatch):
