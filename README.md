@@ -16,7 +16,7 @@ he know?" but "where did he actually use it?"
 ```
 frontend/   Next.js app, static-exported, deployed on Vercel
 backend/    Django + DRF service for the chat feature (not yet built)
-content/    Markdown corpus feeding both the site and the bot (not yet built)
+content/    Markdown corpus; frontend/lib/content.ts is generated from it
 docs/       Specs and implementation plans
 scripts/    Repo-level tooling
 ```
@@ -75,13 +75,40 @@ two files opt into the client:
 
 Everything else — hero, about, contact — is server-rendered and ships zero JS.
 
-### Content lives in `frontend/lib/content.ts`
+### The corpus lives in `content/`, generated into `frontend/lib/content.ts`
 
-Records are data, not markup, so editing the content never means touching JSX.
+The Markdown corpus in `content/` at the repo root is the source of truth
+for both the rendered site and, later, the chat feature's retrieval. It sits
+outside `frontend/` on purpose: Tailwind v4's automatic content scan sweeps
+text files under the project root for candidate class names, so prose
+tracked inside `frontend/` feeds stray strings into that scan and injects
+dead utility classes into production CSS — this project was bitten by
+exactly that.
 
-The important detail: every string in a record's `tools` array must match a
-`Tool.id`. **That string is the join key** the tool strip filters on, so add the
-tool before referencing it. A key that matches nothing renders nothing, silently.
+Frontmatter carries the structured fields the page renders (title, org,
+period, tools, summary). The body carries long-form prose that only the
+future chat feature retrieves, and is deliberately never emitted into
+`content.ts`.
+
+`frontend/lib/content.ts` is **generated** from `content/` — records are
+data, not markup, so editing content never means touching JSX, but it also
+means the file itself must never be hand-edited. From the repo root:
+
+```bash
+npm run content         # regenerate frontend/lib/content.ts from content/
+npm run content:check   # fail if the committed file is stale
+```
+
+The generator is deliberately *not* wired up as a `prebuild` step: Vercel's
+Root Directory is `frontend`, so `content/` may not be present during a
+Vercel build. The committed `frontend/lib/content.ts` is what actually
+deploys — regenerate it and commit the result whenever `content/` changes.
+
+The important detail carried over from before: every string in a record's
+`tools` array must match a `Tool.id`. **That string is the join key** the
+tool strip filters on, so add the tool before referencing it. A key that
+matches nothing used to render nothing, silently — it's now a hard
+validation error, naming the offending record and the unknown tool.
 
 ### Design tokens
 
