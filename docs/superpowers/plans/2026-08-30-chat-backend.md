@@ -1283,8 +1283,13 @@ def test_orphaned_chunks_are_deleted(db, corpus_file, fake_embeddings):
 
 def test_a_missing_corpus_file_fails_loudly(db, tmp_path):
     from django.core.management.base import CommandError
-    with pytest.raises(CommandError, match="corpus.json"):
-        call_command("ingest_content", corpus=str(tmp_path / "nope.json"))
+
+    missing = tmp_path / "nope.json"
+    with pytest.raises(CommandError) as e:
+        call_command("ingest_content", corpus=str(missing))
+    # Names the path it actually looked for, and how to produce it.
+    assert str(missing) in str(e.value)
+    assert "npm run content" in str(e.value)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
