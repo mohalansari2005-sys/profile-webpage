@@ -11,9 +11,8 @@ export function About() {
         <div className="max-w-2xl">
           <Reveal delay={80}>
             <p className="text-lg leading-relaxed sm:text-xl">
-              I build backend systems, data pipelines, and AI-enabled
-              applications — Python services, REST API integrations,
-              asynchronous processing, and the databases underneath them.
+              I build full-stack software from the problem up, turning ideas
+              and real-world needs into products people can actually use.
             </p>
           </Reveal>
 
@@ -23,17 +22,18 @@ export function About() {
                 className="font-display text-2xl leading-[1.2] font-semibold tracking-tight text-balance sm:text-3xl"
                 style={{ fontStretch: "90%" }}
               >
-                Not just &ldquo;How do we build this?&rdquo; but &ldquo;Why does
-                it matter, and who does it help?&rdquo;
+                Not just &ldquo;How do we build this?&rdquo; but &ldquo;Why
+                does it matter?&rdquo; and &ldquo;Who does it help?&rdquo;
               </p>
             </blockquote>
           </Reveal>
 
           <Reveal delay={240}>
             <p className="text-lg leading-relaxed text-dim sm:text-xl">
-              I work from requirements up: structured requirement gathering
-              and systems analysis, then rapid prototyping to turn business
-              needs into something that runs.
+              I work from the requirements up, translating business needs
+              into structured requirements, and rapidly prototyping and
+              iterating until the idea becomes working software. I also
+              explore AI and agentic systems through hands-on projects.
             </p>
           </Reveal>
         </div>
