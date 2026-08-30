@@ -198,6 +198,32 @@ The API key never reaches the browser — that is the whole reason this service
 exists rather than calling Gemini from the client. See `backend/README.md` for
 how to run it, the two-model split, and the secrets checks.
 
+## The Ask section
+
+The chat UI is `frontend/components/sections/ask.tsx`, and it renders **only
+when `NEXT_PUBLIC_CHAT_API_URL` is set at build time**. Production does not set
+it, so the live site's markup and behaviour are unchanged until a deployed
+backend exists. (The gate is on rendering, not bundling — Turbopack keeps the
+module in a chunk either way, where it is unreachable dead code with no URL to
+talk to.)
+
+To run it locally, with the backend stack already up:
+
+```bash
+cd frontend
+cp .env.example .env.local     # points at http://localhost:8000/api/chat/
+npm run dev
+```
+
+An answer's `sources` are `record_id`s — the same keys the tool strip filters
+on — so citing a record lights its row in amber, and each source chip scrolls
+you to it. A cited record with no row on the page (`about-bio`, an faq) renders
+as an inert chip and dims nothing.
+
+There is **one active join at a time**, owned by `frontend/components/join-context.tsx`:
+asking a question releases a pinned tool, picking a tool releases the citation,
+and hovering a tool previews over either without destroying it.
+
 ## Deployment
 
 Vercel is connected to this repository. Pushing to `main` triggers a production

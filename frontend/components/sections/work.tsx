@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Reveal } from "@/components/reveal";
+import { useJoin } from "@/components/join-context";
 import { cn } from "@/lib/utils";
 import {
   experience,
@@ -30,6 +31,8 @@ function RecordRow({
   return (
     <Reveal delay={delay}>
       <article
+        id={`record-${record.id}`}
+        tabIndex={-1}
         data-state={state}
         className="group relative border-b border-rule transition-opacity duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100"
       >
@@ -86,8 +89,8 @@ function RecordRow({
 }
 
 export function Work() {
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<string | null>(null);
+  const { activeTool, citedRecordIds, pinnedTool, setHoveredTool, toggleTool, clear } =
+    useJoin();
 
   // The strip is wider than the column, so it scrolls sideways. Fade only the
   // edge that still has tags behind it — a clipped tag then reads as "more
@@ -110,11 +113,7 @@ export function Work() {
     syncEdges();
     window.addEventListener("resize", syncEdges);
     return () => window.removeEventListener("resize", syncEdges);
-  }, [syncEdges, pinned]);
-
-  // Hovering or focusing previews a tool; letting go falls back to the pinned
-  // one. Pinning locks a baseline without trapping you there.
-  const activeTool = hovered ?? pinned;
+  }, [syncEdges, pinnedTool, citedRecordIds]);
 
   const matchCount = useMemo(() => {
     if (!activeTool) return 0;
@@ -123,9 +122,24 @@ export function Work() {
     ).length;
   }, [activeTool]);
 
+  // Rows dim only when something is actually lit. A citation that names only
+  // records with no row on the page — about-bio, an faq — must not dim the
+  // whole list to highlight nothing.
+  const litByCitation = useMemo(() => {
+    if (!citedRecordIds.length) return null;
+    const rows = new Set([...experience, ...projects].map((r) => r.id));
+    const lit = citedRecordIds.filter((id) => rows.has(id));
+    return lit.length ? new Set(lit) : null;
+  }, [citedRecordIds]);
+
   function rowState(record: WorkRecord): RowState {
-    if (!activeTool) return "neutral";
-    return record.tools.includes(activeTool) ? "lit" : "dim";
+    if (activeTool) {
+      return record.tools.includes(activeTool) ? "lit" : "dim";
+    }
+    if (litByCitation) {
+      return litByCitation.has(record.id) ? "lit" : "dim";
+    }
+    return "neutral";
   }
 
   const activeLabel = activeTool ? toolById.get(activeTool)?.label : null;
@@ -145,7 +159,9 @@ export function Work() {
             >
               {activeLabel
                 ? `${matchCount} of ${experience.length + projects.length} use ${activeLabel}`
-                : "Pick a tool to see where it was used"}
+                : litByCitation
+                  ? `${litByCitation.size} of ${experience.length + projects.length} cited in the answer`
+                  : "Pick a tool to see where it was used"}
             </p>
           </div>
 
@@ -168,25 +184,17 @@ export function Work() {
                     .filter((tool) => tool.group === group)
                     .map((tool) => {
                       const isActive = activeTool === tool.id;
-                      const isPinned = pinned === tool.id;
+                      const isPinned = pinnedTool === tool.id;
                       return (
                         <button
                           key={tool.id}
                           type="button"
                           aria-pressed={isPinned}
-                          onMouseEnter={() => setHovered(tool.id)}
-                          onMouseLeave={() => setHovered(null)}
-                          onFocus={() => setHovered(tool.id)}
-                          onBlur={() => setHovered(null)}
-                          onClick={() => {
-                            // The pointer is still on the tag after the click,
-                            // so `hovered` has to be released alongside the
-                            // pin — otherwise `activeTool` keeps holding it
-                            // and toggling off looks like nothing happened.
-                            const next = pinned === tool.id ? null : tool.id;
-                            setPinned(next);
-                            setHovered(next);
-                          }}
+                          onMouseEnter={() => setHoveredTool(tool.id)}
+                          onMouseLeave={() => setHoveredTool(null)}
+                          onFocus={() => setHoveredTool(tool.id)}
+                          onBlur={() => setHoveredTool(null)}
+                          onClick={() => toggleTool(tool.id)}
                           className={cn(
                             "shrink-0 cursor-pointer rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200",
                             isActive
@@ -203,7 +211,7 @@ export function Work() {
                 </li>
               ))}
 
-              {pinned && (
+              {(pinnedTool || citedRecordIds.length > 0) && (
                 <li className="contents">
                   <span
                     aria-hidden="true"
@@ -211,7 +219,7 @@ export function Work() {
                   />
                   <button
                     type="button"
-                    onClick={() => setPinned(null)}
+                    onClick={clear}
                     className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink"
                   >
                     Clear
