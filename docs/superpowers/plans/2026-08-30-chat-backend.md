@@ -407,6 +407,16 @@ if __name__ == "__main__":
     execute_from_command_line(sys.argv)
 ```
 
+`backend/chat/urls.py` — a stub, because `config/urls.py` includes it from this task onward and `manage.py check` fails without it. Task 13 fills it in:
+
+```python
+from django.urls import path
+
+# Populated in Task 13 when ChatView exists. Present from the scaffold onward so
+# `manage.py check` is meaningful before the view is written.
+urlpatterns: list[path] = []
+```
+
 `backend/chat/apps.py`:
 
 ```python
@@ -483,7 +493,8 @@ Expected: `backend/.env` absent from `git status`. If it appears, stop.
 
 ```bash
 git add backend/pyproject.toml backend/manage.py backend/.env.example backend/.dockerignore \
-        backend/config backend/chat/__init__.py backend/chat/apps.py backend/tests/__init__.py .gitignore
+        backend/config backend/chat/__init__.py backend/chat/apps.py backend/chat/urls.py \
+        backend/tests/__init__.py .gitignore
 git commit -m "Scaffold the Django backend and its secrets boundary"
 ```
 
@@ -595,10 +606,16 @@ Expected: all three services running, `db` and `redis` healthy.
 
 ```bash
 docker compose run --rm web python manage.py check
-docker compose run --rm --no-deps --entrypoint sh web -c 'printenv | grep -i gemini'
+docker run --rm --entrypoint sh profile-webpage-web:latest -c 'printenv | grep -i gemini'
+docker run --rm --entrypoint sh profile-webpage-web:latest -c 'ls -a /app | grep "^\.env"'
+docker history --no-trunc profile-webpage-web:latest --format '{{.CreatedBy}}' | grep -iE 'gemini|api_key|secret'
 ```
 
-Expected: `check` reports no issues. The second command must print **nothing** — proving the key lives only in the runtime environment, not in an image layer. (`--no-deps` and the overridden entrypoint avoid `env_file` injection; if it prints the key, the `.dockerignore` is wrong.)
+Expected: `check` reports no issues; the second command prints **nothing** (exit 1); the third prints `.env.example` and **not** `.env`; the fourth prints nothing.
+
+**The second command must be plain `docker run`, not `docker compose run`.** Compose always applies the service's `env_file`, so a compose-based check prints the runtime-injected key and proves nothing about the image — it looks like a failure when the image is in fact clean. `--no-deps` does not suppress `env_file`. Only a bare `docker run` against the image tests what is actually baked into a layer.
+
+Note that `grep -rl "<key>" /` inside the container is a poor check: `/proc` self-matches the grep's own command line, and the scan is slow enough to be killed before it finishes. Grep `/app` instead. A match on `/app/.env.example` is expected and correct — that is the committed template.
 
 - [ ] **Step 5: Prove the missing-key boot failure is loud**
 
@@ -2126,7 +2143,8 @@ git commit -m "Wire the LangGraph pipeline and log both paths"
 ### Task 13: `POST /api/chat/`
 
 **Files:**
-- Create: `backend/chat/ip.py`, `backend/chat/serializers.py`, `backend/chat/views.py`, `backend/chat/urls.py`, `backend/tests/test_api.py`
+- Create: `backend/chat/ip.py`, `backend/chat/serializers.py`, `backend/chat/views.py`, `backend/tests/test_api.py`
+- Modify: `backend/chat/urls.py` (stubbed in Task 2)
 
 **Interfaces:**
 - Request: `{"question": str, "history": [{"role": "user"|"assistant", "content": str}]}`
@@ -2293,7 +2311,7 @@ class ChatView(APIView):
 
 `GRAPH` is compiled once at import, not per request — compilation is pure wiring and repeating it per request would add latency for nothing.
 
-- [ ] **Step 6: Write `backend/chat/urls.py`**
+- [ ] **Step 6: Fill in `backend/chat/urls.py`** (replacing the Task 2 stub)
 
 ```python
 from django.urls import path
