@@ -26,3 +26,4 @@ class ChatState(TypedDict, total=False):
 
     # accounting
     usage: dict[str, int | None]
+    model: str

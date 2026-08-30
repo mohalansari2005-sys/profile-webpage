@@ -1,3 +1,4 @@
+from django.conf import settings
 from pydantic import BaseModel
 
 from chat.gemini import structured
@@ -33,6 +34,7 @@ def _refuse(reason: str, usage: dict | None = None) -> dict:
     return {
         "answer": REFUSAL, "used_chunk_ids": [], "sources": [],
         "refused": True, "refusal_reason": reason, "usage": usage or {},
+        "model": settings.GEMINI_MODEL,
     }
 
 
@@ -68,4 +70,5 @@ def generate(state: ChatState) -> dict:
     return {
         "answer": parsed.answer, "used_chunk_ids": parsed.used_chunk_ids,
         "sources": sources, "refused": False, "refusal_reason": "", "usage": usage,
+        "model": settings.GEMINI_MODEL,
     }

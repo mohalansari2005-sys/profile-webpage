@@ -23,6 +23,8 @@ def log(state: ChatState) -> dict:
         prompt_tokens=usage.get("prompt_tokens"),
         completion_tokens=usage.get("completion_tokens"),
         latency_ms=int((time.monotonic() - started) * 1000),
-        model=settings.GEMINI_MODEL,
+        # The model that actually decided this turn: the gate refuses on the
+        # fast model without ever reaching generate.
+        model=state.get("model") or settings.GEMINI_MODEL,
     )
     return {}

@@ -82,3 +82,20 @@ def test_the_log_row_never_holds_a_raw_ip(db, stub_nodes, monkeypatch):
     build_graph().invoke({"question": "q", "history": [],
                           "ip_hash": hash_ip("203.0.113.9"), "started_at": 0.0})
     assert "203.0.113.9" not in ChatLog.objects.get().ip_hash
+
+
+def test_a_scope_refusal_logs_the_fast_model_not_the_strong_one(db, stub_nodes, monkeypatch, settings):
+    """The gate refuses without ever reaching generate, so attributing that row
+    to the answer model would misreport the refusal analytics."""
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog
+
+    settings.GEMINI_MODEL = "strong-model"
+    settings.GEMINI_FAST_MODEL = "fast-model"
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (Relevance(in_scope=False, reason="weather"), {}))
+
+    build_graph().invoke({"question": "weather", "history": [],
+                          "ip_hash": "h" * 64, "started_at": 0.0})
+    assert ChatLog.objects.get().model == "fast-model"
