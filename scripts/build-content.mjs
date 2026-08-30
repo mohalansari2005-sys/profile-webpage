@@ -25,7 +25,7 @@ export function renderModule(corpus) {
  * GENERATED FILE — DO NOT EDIT.
  *
  * Written by scripts/build-content.mjs from the markdown corpus in content/.
- * Edit the corpus, then run \`npm run content\` from frontend/.
+ * Edit the corpus, then run \`npm run content\` from the repo root.
  *
  * Only the fields the page renders live here. Each record's body prose stays
  * in content/ and is read by the chat backend's ingestion, never shipped to
@@ -72,7 +72,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CONTENT = join(here, "..", "content");
 const TARGET = join(here, "..", "frontend", "lib", "content.ts");
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   try {
     const next = renderModule(loadCorpus(CONTENT));
     if (process.argv.includes("--check")) {

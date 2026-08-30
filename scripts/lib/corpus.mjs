@@ -29,7 +29,21 @@ export function loadCorpus(contentDir) {
   const tools = registry.tools ?? [];
 
   if (groups.length === 0) problems.push("tools.yml declares no groups");
+
+  const validGroupNames = new Set();
+  const seenGroupName = new Set();
+  for (const group of groups) {
+    if (typeof group !== "string" || group.trim() === "") {
+      problems.push(`tools.yml group name must be a non-empty string, got ${JSON.stringify(group)}`);
+      continue;
+    }
+    if (seenGroupName.has(group)) problems.push(`duplicate group name: "${group}"`);
+    seenGroupName.add(group);
+    validGroupNames.add(group);
+  }
+
   const seenTool = new Set();
+  const groupsWithTools = new Set();
   for (const tool of tools) {
     if (!tool?.id || !tool?.label || !tool?.group) {
       problems.push(`tool entry missing id/label/group: ${JSON.stringify(tool)}`);
@@ -39,15 +53,28 @@ export function loadCorpus(contentDir) {
     seenTool.add(tool.id);
     if (!groups.includes(tool.group)) {
       problems.push(`tool "${tool.id}" is in undeclared group "${tool.group}"`);
+    } else {
+      groupsWithTools.add(tool.group);
     }
   }
 
-  // Check for unknown subdirectories
+  for (const group of validGroupNames) {
+    if (!groupsWithTools.has(group)) problems.push(`group "${group}" has no tools`);
+  }
+
+  // Check for unknown entries at the corpus root: only tools.yml, README.md,
+  // and known kind directories are allowed. A stray file here loads clean
+  // and its record simply never appears.
   if (existsSync(contentDir)) {
     const entries = readdirSync(contentDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && !KINDS.includes(entry.name) && entry.name !== "." && entry.name !== "..") {
-        problems.push(`unknown kind directory "${entry.name}"; valid kinds are: ${KINDS.join(", ")}`);
+      if (entry.name === "." || entry.name === "..") continue;
+      if (entry.isDirectory()) {
+        if (!KINDS.includes(entry.name)) {
+          problems.push(`unknown kind directory "${entry.name}"; valid kinds are: ${KINDS.join(", ")}`);
+        }
+      } else if (entry.name !== "tools.yml" && entry.name !== "README.md") {
+        problems.push(`unexpected file "${entry.name}" at the corpus root; only tools.yml, README.md, and kind directories (${KINDS.join(", ")}) are allowed`);
       }
     }
   }
@@ -57,8 +84,18 @@ export function loadCorpus(contentDir) {
   for (const kind of KINDS) {
     const dir = join(contentDir, kind);
     if (!existsSync(dir)) continue;
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
+    const dirEntries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of dirEntries) {
+      const file = entry.name;
       const where = `${kind}/${file}`;
+      if (entry.isDirectory()) {
+        problems.push(`unexpected subdirectory "${where}"; kind directories may only contain .md files`);
+        continue;
+      }
+      if (!file.endsWith(".md")) {
+        problems.push(`unexpected file "${where}"; kind directories may only contain .md files`);
+        continue;
+      }
       let data, content;
       try {
         const parsed = matter(readFileSync(join(dir, file), "utf8"));
@@ -91,10 +128,15 @@ export function loadCorpus(contentDir) {
         problems.push(`${id} (${where}) tools must be a list, got ${typeof data.tools}: ${JSON.stringify(data.tools)}`);
         // Skip tool validation for this record
       } else {
+        const seenRecordTool = new Set();
         for (const toolId of data.tools ?? []) {
           if (!seenTool.has(toolId)) {
             problems.push(`${id} (${where}) references unknown tool "${toolId}"`);
           }
+          if (seenRecordTool.has(toolId)) {
+            problems.push(`${id} (${where}) repeats tool "${toolId}" in its tools list`);
+          }
+          seenRecordTool.add(toolId);
         }
       }
 

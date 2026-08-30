@@ -1,5 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderModule } from "./build-content.mjs";
 
 const corpus = {
@@ -51,4 +56,24 @@ test("does not leak the body prose into the module", () => {
   const withBody = structuredClone(corpus);
   withBody.byKind.experience[0].body = "SECRET_BODY_MARKER";
   assert.doesNotMatch(renderModule(withBody), /SECRET_BODY_MARKER/);
+});
+
+test("the entrypoint guard runs identically through a symlink", () => {
+  // process.argv[1] === fileURLToPath(import.meta.url) is false when the
+  // script is reached via a symlinked path, because Node realpaths
+  // import.meta.url but not argv[1] — the guard silently no-ops instead of
+  // running the --check. import.meta.main is realpath-independent, so a
+  // direct run and a symlinked run must produce identical output.
+  const real = fileURLToPath(new URL("./build-content.mjs", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "build-content-symlink-"));
+  const link = join(dir, "build-content.mjs");
+  symlinkSync(real, link);
+  try {
+    const direct = execFileSync("node", [real, "--check"], { encoding: "utf8" });
+    const viaSymlink = execFileSync("node", [link, "--check"], { encoding: "utf8" });
+    assert.equal(viaSymlink, direct);
+    assert.match(viaSymlink, /content\.ts is up to date/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

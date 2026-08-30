@@ -43,8 +43,8 @@ npm run build   # production build; writes the static site to frontend/out/
 npm run lint    # ESLint (next/core-web-vitals + TypeScript)
 ```
 
-There is no test script. `npm run start` exists but isn't used here — see
-Deployment below.
+`npm test` at the repo root runs the corpus and generator unit tests.
+`npm run start` exists but isn't used here — see Deployment below.
 
 ## Architecture
 
@@ -99,10 +99,12 @@ npm run content         # regenerate frontend/lib/content.ts from content/
 npm run content:check   # fail if the committed file is stale
 ```
 
-The generator is deliberately *not* wired up as a `prebuild` step: Vercel's
-Root Directory is `frontend`, so `content/` may not be present during a
-Vercel build. The committed `frontend/lib/content.ts` is what actually
-deploys — regenerate it and commit the result whenever `content/` changes.
+The generator is deliberately *not* wired up as a `prebuild` step: Vercel
+clones the whole repo, so `content/` is present, but its Root Directory is
+`frontend`, so it installs only `frontend/`'s dependencies — `gray-matter`
+and `js-yaml` aren't available there. The committed `frontend/lib/content.ts`
+is what actually deploys — regenerate it and commit the result whenever
+`content/` changes.
 
 The important detail carried over from before: every string in a record's
 `tools` array must match a `Tool.id`. **That string is the join key** the

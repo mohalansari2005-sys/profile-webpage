@@ -152,6 +152,111 @@ test("rejects non-string summary, title, org, period", () => {
   assert.match(err.problems.join("\n"), /summary.*must be a string/i);
 });
 
+test("rejects a stray record file at the corpus root", () => {
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": REC, "orphan.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /unexpected file "orphan\.md".*corpus root/i);
+});
+
+test("rejects a non-.md file inside a kind directory", () => {
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": REC, "experience/x.markdown": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /unexpected file "experience\/x\.markdown"/i);
+});
+
+test("rejects a subdirectory inside a kind directory", () => {
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": REC, "experience/2024/x.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /unexpected subdirectory "experience\/2024"/i);
+});
+
+test("rejects a declared group with zero tools", () => {
+  const bad = `groups:
+  - Build
+  - Practice
+  - Empty
+tools:
+  - { id: python, label: Python, group: Build }
+  - { id: agile, label: Agile, group: Practice }
+`;
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": bad, "experience/a.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /group "Empty" has no tools/i);
+});
+
+test("rejects a duplicate group name", () => {
+  const bad = `groups:
+  - Build
+  - Build
+tools:
+  - { id: python, label: Python, group: Build }
+`;
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": bad, "experience/a.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /duplicate group name: "Build"/i);
+});
+
+test("rejects a duplicate tool id inside one record's tools list", () => {
+  const bad = REC.replace("tools: [python]", "tools: [python, python]");
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": TOOLS, "experience/a.md": bad }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /exp-a.*repeats tool "python"/i);
+});
+
+test("rejects a non-string group name", () => {
+  const bad = `groups:
+  - Build
+  - 2026
+tools:
+  - { id: python, label: Python, group: Build }
+`;
+  let err;
+  try {
+    loadCorpus(fixture({ "tools.yml": bad, "experience/a.md": REC }));
+    assert.fail("Expected CorpusError to be thrown");
+  } catch (e) {
+    assert(e instanceof CorpusError);
+    err = e;
+  }
+  assert.match(err.problems.join("\n"), /group name must be a non-empty string, got 2026/i);
+});
+
 test("rejects malformed tools.yml with a readable error", () => {
   const badYaml = `groups:
   - Build
