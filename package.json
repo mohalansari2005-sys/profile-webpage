@@ -6,7 +6,7 @@
   "scripts": {
     "content": "node scripts/build-content.mjs",
     "content:check": "node scripts/build-content.mjs --check",
-    "test": "node --test scripts/"
+    "test": "node --test \"scripts/**/*.test.mjs\""
   },
   "devDependencies": {
     "gray-matter": "^4.0.3",
