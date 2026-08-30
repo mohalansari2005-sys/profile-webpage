@@ -35,7 +35,7 @@ export const tools: Tool[] = [
   { id: "fastapi", label: "FastAPI", group: "Build" },
   { id: "sqlalchemy", label: "SQLAlchemy", group: "Build" },
   { id: "rest-apis", label: "REST APIs", group: "Build" },
-  { id: "langchain", label: "LangChain", group: "Build" },
+  { id: "full-stack", label: "Full-stack", group: "Build" },
   { id: "postgres", label: "PostgreSQL", group: "Data & infrastructure" },
   { id: "redis", label: "Redis", group: "Data & infrastructure" },
   { id: "celery", label: "Celery", group: "Data & infrastructure" },
@@ -50,18 +50,18 @@ export const tools: Tool[] = [
 export const experience: WorkRecord[] = [
   {
     id: "exp-majara",
-    title: "Product Engineering intern",
+    title: "Product Engineering Intern",
     org: "Majara — Riyadh, hybrid",
     period: "Nov 2025 — Present",
-    summary: "Built and integrated Python backend services and REST APIs for a B2B product, and prototyped new product capabilities from requirements through to working software.",
-    tools: ["python", "javascript", "rest-apis", "langchain", "systems-analysis", "agile", "sdlc", "b2b"],
+    summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software.",
+    tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"],
   },
   {
     id: "exp-seet",
     title: "Business Development Intern",
     org: "SEET (صيت) — marketing solutions agency, Riyadh",
     period: "Feb — Apr 2025",
-    summary: "Ran client meetings, prepared sales pitches, presented proposals, and managed ongoing client relationships. It taught me to read what a client actually needs and present a practical solution — the other half of the problem-solving process from the engineering side.",
+    summary: "Worked backward from client objectives to concrete proposals — client meetings, sales pitches, and ongoing relationships. It taught me to translate a loosely defined problem into a solution that's actually useful and deliverable, the same skill that scopes a good engineering requirement.",
     tools: [],
   },
 ];

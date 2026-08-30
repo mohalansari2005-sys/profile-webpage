@@ -11,7 +11,7 @@ tools:
   - { id: fastapi, label: FastAPI, group: Build }
   - { id: sqlalchemy, label: SQLAlchemy, group: Build }
   - { id: rest-apis, label: REST APIs, group: Build }
-  - { id: langchain, label: LangChain, group: Build }
+  - { id: full-stack, label: Full-stack, group: Build }
   - { id: postgres, label: PostgreSQL, group: Data & infrastructure }
   - { id: redis, label: Redis, group: Data & infrastructure }
   - { id: celery, label: Celery, group: Data & infrastructure }
