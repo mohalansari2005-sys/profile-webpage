@@ -18,7 +18,7 @@ def _mark_refused(state: ChatState) -> dict:
     """The not_in_scope edge skips generate, so the refusal text is set here
     rather than in log -- a logging node should not own user-facing copy."""
     return {"answer": REFUSAL_OUT_OF_SCOPE, "refused": True, "sources": [],
-            "used_chunk_ids": [], "model": settings.GEMINI_FAST_MODEL}
+            "used_chunk_ids": [], "model": settings.OPENAI_FAST_MODEL}
 
 
 def build_graph():

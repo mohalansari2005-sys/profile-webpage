@@ -1,6 +1,6 @@
 from pgvector.django import CosineDistance
 
-from chat.gemini import embed_query
+from chat.openai_client import embed_query
 from chat.graph.state import ChatState
 from chat.models import ContentChunk
 

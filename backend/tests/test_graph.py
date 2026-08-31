@@ -91,8 +91,8 @@ def test_a_scope_refusal_logs_the_fast_model_not_the_strong_one(db, stub_nodes, 
     from chat.graph.nodes.relevance import Relevance
     from chat.models import ChatLog
 
-    settings.GEMINI_MODEL = "strong-model"
-    settings.GEMINI_FAST_MODEL = "fast-model"
+    settings.OPENAI_MODEL = "strong-model"
+    settings.OPENAI_FAST_MODEL = "fast-model"
     monkeypatch.setattr(stub_nodes["relevance"], "structured",
                         lambda *a, **k: (Relevance(in_scope=False, reason="weather"), {}))
 

@@ -25,6 +25,6 @@ def log(state: ChatState) -> dict:
         latency_ms=int((time.monotonic() - started) * 1000),
         # The model that actually decided this turn: the gate refuses on the
         # fast model without ever reaching generate.
-        model=state.get("model") or settings.GEMINI_MODEL,
+        model=state.get("model") or settings.OPENAI_MODEL,
     )
     return {}

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from chat.gemini import structured
 from chat.graph.state import ChatState
+from chat.openai_client import structured
 
 PROMPT = """Rewrite the user's latest message as a standalone question that makes \
 sense without the conversation. Resolve pronouns and references using the history. \

@@ -1,5 +1,13 @@
 # Chat Backend Implementation Plan
 
+> **Historical record — implemented, then superseded on 2026-08-30.** The
+> provider moved from Gemini to OpenAI for both generation and embeddings:
+> `chat/gemini.py` no longer exists, `chat/openai_client.py` replaces it, and
+> `GEMINI_*` settings are now `OPENAI_*`. The 1536-dimension vector column is
+> unchanged (`text-embedding-3-small` is natively that wide). Everything below
+> reads as it did when written, not as the code is now. See decision D7a in the
+> spec and `backend/README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up the Django/DRF service behind `POST /api/chat/` — a LangGraph pipeline that answers recruiter questions strictly from the `content/` corpus, backed by pgvector retrieval, and refuses anything it cannot ground.

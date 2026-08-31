@@ -37,6 +37,7 @@ complexity. The "keep it minimal" instinct does not apply to its scope.
 | D5 | Grounding is **enforced in Python**, not prompted: both the relevance gate and the generate step return schema-validated JSON, and cited chunk IDs are checked against what retrieval actually returned. |
 | D6 | **Local-only.** docker-compose runs on localhost. No VPS, no domain, no TLS. Production deploy is a later, separate piece of work. |
 | D7 | **Gemini for everything** — generation *and* embeddings, on the free tier. One provider, one API key, one SDK (`google-genai`). No Anthropic dependency, no second account. |
+| D7a | **Revised 2026-08-30.** Gemini's free-tier generation quota was the binding constraint. Groq was evaluated as a replacement and rejected — no embeddings endpoint, so it would have split the system across two providers. Moved to **OpenAI for everything** instead (`openai` SDK, `text-embedding-3-small` at the same 1536 dims, so no migration). D7's *shape* — one provider, one key, one SDK — survives; only the provider changed, and it is now paid rather than free-tier. |
 | D8 | **The API key never leaves the server.** See "Secrets" below — this is the reason the Django backend exists at all rather than calling Gemini from the browser. |
 
 ---

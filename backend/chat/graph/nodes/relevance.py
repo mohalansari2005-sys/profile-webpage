@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from chat.gemini import structured
 from chat.graph.state import ChatState
+from chat.openai_client import structured
 
 PROMPT = """You are the scope gate for a portfolio chat bot that answers ONLY \
 questions about Mohammed Alansari's professional background: his work experience, \

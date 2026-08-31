@@ -10,7 +10,7 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pgvector>=0.3.6",
   "langgraph>=0.2.60",
-  "google-genai>=1.0.0",
+  "openai>=3.6,<4",
   "gunicorn>=23.0",
   "pydantic>=2.9",
 ]

@@ -25,7 +25,7 @@ def test_chatlog_stores_a_hash_never_a_raw_ip(db):
     log = ChatLog.objects.create(
         ip_hash=hash_ip("203.0.113.9"), question="q", condensed_question="q",
         answer="a", refused=False, retrieved_chunk_ids=["exp-majara#summary"],
-        used_chunk_ids=["exp-majara#summary"], latency_ms=12, model="gemini-2.5-flash",
+        used_chunk_ids=["exp-majara#summary"], latency_ms=12, model="gpt-model",
     )
     assert "203.0.113.9" not in log.ip_hash
     assert len(log.ip_hash) == 64

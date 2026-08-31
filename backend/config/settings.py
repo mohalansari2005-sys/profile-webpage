@@ -19,17 +19,35 @@ SECRET_KEY = required("DJANGO_SECRET_KEY")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 
-GEMINI_API_KEY = required("GEMINI_API_KEY")
-# Two generation models, measured against the live API on 2026-08-30:
-#   gemini-3.5-flash       ~10.3s/call -- used for `generate`, where grounding
-#                          discipline and readable prose matter most.
-#   gemini-3.5-flash-lite   ~0.73s/call -- used for `condense` and `relevance`,
-#                          which are cheap classifier calls.
-# A follow-up turn makes all three calls; the split keeps that near 12s rather
-# than 31s. gemini-2.5-flash, which the spec named, now 404s.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-GEMINI_FAST_MODEL = os.environ.get("GEMINI_FAST_MODEL", "gemini-3.5-flash-lite")
-GEMINI_EMBED_MODEL = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+OPENAI_API_KEY = required("OPENAI_API_KEY")
+# One provider again, generation and embeddings both. Groq was evaluated first
+# and rejected: it has no embeddings endpoint, so it would have forced a second
+# provider and a second key just to keep retrieval working.
+#
+# Two generation models, both confirmed against the live API on 2026-08-31 by
+# running the real node prompts, not by reading a model list. Prices below are
+# per 1M tokens and were current that day; re-check before assuming them.
+#
+# OPENAI_MODEL (gpt-4.1-mini, $0.40 in / $1.60 out) serves `generate`. gpt-4.1,
+# gpt-5.4 and gpt-5.4-mini were measured on the same grounding cases -- all four
+# correctly set sufficient=false on questions the corpus cannot answer and none
+# invented a chunk id, so the choice came down to price: at ~550 in / ~80 out
+# per question and the 200/day CHAT_DAILY_CAP, this is ~$2.40/month worst case,
+# against ~$12 for gpt-4.1 and ~$19 for gpt-5.4.
+#
+# OPENAI_FAST_MODEL (gpt-4.1-nano, $0.10 in / $0.40 out) serves the classifier
+# calls, `condense` and `relevance`. gpt-5.4-nano is cheaper-looking but was
+# rejected: on the relevance gate it returned in_scope=False for a plainly
+# in-scope question on one trial and True on the next -- with a reason string
+# arguing the question WAS in scope. relevance fails closed, so an unstable
+# gate silently refuses real visitors. gpt-4.1-nano was 6/6 over two trials,
+# including a prompt-injection attempt.
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+OPENAI_FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "gpt-4.1-nano")
+# text-embedding-3-small is natively 1536 dimensions, which is exactly the
+# ContentChunk vector column -- no migration, and `dimensions` below is a
+# no-op assertion rather than a Matryoshka truncation.
+OPENAI_EMBED_MODEL = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
 EMBED_DIMENSIONS = 1536
 
 IP_HASH_SALT = required("IP_HASH_SALT")
