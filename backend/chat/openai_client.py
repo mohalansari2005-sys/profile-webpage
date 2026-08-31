@@ -46,6 +46,25 @@ def embed_query(text: str) -> list[float] | None:
         return None
 
 
+def merge_usage(*usages: dict | None) -> dict:
+    """Add token counts from several calls **on the same model**.
+
+    Never merge across models: a ChatLog row names one model, and tokens billed
+    at two different rates summed into one number cannot be priced. condense and
+    relevance both run on OPENAI_FAST_MODEL, so they merge; generate does not.
+
+    None means "not reported", not zero -- an api_error carries no counts, and a
+    merged 0 would read as a call that happened and cost nothing.
+    """
+    merged: dict = {}
+    for key in ("prompt_tokens", "completion_tokens"):
+        counts = [u[key] for u in usages if u and u.get(key) is not None]
+        merged[key] = sum(counts) if counts else None
+    if any(u and u.get("api_error") for u in usages):
+        merged["api_error"] = True
+    return merged
+
+
 def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     """Returns (parsed, usage). `parse` enforces the schema server-side, so no
     caller ever parses a refusal out of prose.

@@ -25,10 +25,11 @@ def condense(state: ChatState) -> dict:
         return {"condensed": question}
 
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history)
-    parsed, _ = structured(
+    parsed, usage = structured(
         PROMPT.format(history=transcript, question=question),
         Standalone,
         fast=True,
     )
     rewritten = (parsed.standalone_question or "").strip() if parsed else ""
-    return {"condensed": rewritten or question}
+    # Billable even when the rewrite is discarded, so it is carried, not dropped.
+    return {"condensed": rewritten or question, "usage": usage}

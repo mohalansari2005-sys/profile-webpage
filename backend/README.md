@@ -108,3 +108,17 @@ It was sized against a free-tier daily quota. OpenAI is billed per token, not
 capped, so this counter is now the **spend** limit — it is the only thing
 between a scripted abuser and a real bill. Size it against what you are willing
 to pay per day, not against a quota.
+
+To read the spend, each `ChatLog` row's `prompt_tokens`/`completion_tokens`
+belong to the model in its `model` column, and never mix two rates:
+
+| Row | `model` | Tokens counted |
+|---|---|---|
+| Refused at the gate | `OPENAI_FAST_MODEL` | `condense` + `relevance`, summed |
+| Answered, or refused by `generate` | `OPENAI_MODEL` | the `generate` call only |
+
+So an answered turn does not record the two fast calls that preceded it. That
+undercount is deliberate: one row names one model, and adding nano tokens to a
+mini row at mini's rate would overstate the bill by more than the tokens are
+worth. Multiply each row by its own model's price and sum — do not sum the
+token columns across rows and multiply once.

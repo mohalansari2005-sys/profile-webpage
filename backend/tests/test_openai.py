@@ -199,3 +199,38 @@ def test_a_refusal_is_not_reported_as_an_api_error(monkeypatch):
     assert parsed is None
     assert usage == {"prompt_tokens": 11, "completion_tokens": 7}
     assert "api_error" not in usage
+
+
+def test_merge_usage_adds_counts_from_calls_on_the_same_model():
+    from chat.openai_client import merge_usage
+
+    merged = merge_usage({"prompt_tokens": 30, "completion_tokens": 5},
+                         {"prompt_tokens": 40, "completion_tokens": 9})
+    assert merged == {"prompt_tokens": 70, "completion_tokens": 14}
+
+
+def test_merge_usage_keeps_unreported_counts_as_none_not_zero():
+    """A row of zeros reads as "the call happened and cost nothing", which is a
+    different claim from "nobody reported what it cost"."""
+    from chat.openai_client import merge_usage
+
+    merged = merge_usage(None, {"prompt_tokens": None, "completion_tokens": None})
+    assert merged == {"prompt_tokens": None, "completion_tokens": None}
+
+
+def test_merge_usage_keeps_a_reported_count_when_another_call_reported_nothing():
+    from chat.openai_client import merge_usage
+
+    merged = merge_usage({"prompt_tokens": None, "completion_tokens": None},
+                         {"prompt_tokens": 40, "completion_tokens": 9})
+    assert merged == {"prompt_tokens": 40, "completion_tokens": 9}
+
+
+def test_merge_usage_propagates_an_api_error_from_any_call():
+    """condense failing upstream must not be erased by a gate call that worked;
+    the flag is what keeps a refusal log honest about an outage."""
+    from chat.openai_client import merge_usage
+
+    merged = merge_usage({"prompt_tokens": None, "completion_tokens": None, "api_error": True},
+                         {"prompt_tokens": 40, "completion_tokens": 9})
+    assert merged["api_error"] is True
