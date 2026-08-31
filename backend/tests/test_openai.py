@@ -30,9 +30,9 @@ def _fake_client(embed_hook=None, parse_hook=None, parsed=SHAPE, raises=None):
                 type("D", (), {"embedding": [3.0, 4.0]})() for _ in input]})()
 
     class FakeCompletions:
-        def parse(self, *, model, messages, response_format):
+        def parse(self, *, model, messages, response_format, **kwargs):
             if parse_hook:
-                parse_hook(model, messages, response_format)
+                parse_hook(model, messages, response_format, kwargs)
             if raises:
                 raise raises
             message = type("M", (), {"parsed": parsed})()
@@ -116,7 +116,7 @@ def test_structured_uses_the_strong_model_by_default(monkeypatch, settings):
     settings.OPENAI_FAST_MODEL = "fast-model"
     seen = {}
     monkeypatch.setattr(openai_client, "_client",
-                        _fake_client(parse_hook=lambda m, msg, fmt: seen.update(model=m)))
+                        _fake_client(parse_hook=lambda m, msg, fmt, kw: seen.update(model=m)))
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert seen["model"] == "strong-model"
@@ -131,7 +131,7 @@ def test_structured_uses_the_fast_model_when_asked(monkeypatch, settings):
     settings.OPENAI_FAST_MODEL = "fast-model"
     seen = {}
     monkeypatch.setattr(openai_client, "_client",
-                        _fake_client(parse_hook=lambda m, msg, fmt: seen.update(model=m)))
+                        _fake_client(parse_hook=lambda m, msg, fmt, kw: seen.update(model=m)))
 
     openai_client.structured("prompt", Shape, fast=True)
     assert seen["model"] == "fast-model"
@@ -144,7 +144,7 @@ def test_structured_hands_the_schema_class_to_the_sdk(monkeypatch):
 
     seen = {}
     monkeypatch.setattr(openai_client, "_client",
-                        _fake_client(parse_hook=lambda m, msg, fmt: seen.update(fmt=fmt)))
+                        _fake_client(parse_hook=lambda m, msg, fmt, kw: seen.update(fmt=fmt)))
 
     openai_client.structured("prompt", Shape)
     assert seen["fmt"] is Shape
@@ -234,3 +234,28 @@ def test_merge_usage_propagates_an_api_error_from_any_call():
     merged = merge_usage({"prompt_tokens": None, "completion_tokens": None, "api_error": True},
                          {"prompt_tokens": 40, "completion_tokens": 9})
     assert merged["api_error"] is True
+
+
+def test_the_classifiers_are_pinned_to_a_deterministic_temperature(monkeypatch):
+    """The gate must not sample its verdict: measured against the live model, one
+    borderline question came back in_scope on 2 of 5 identical calls, so the same
+    visitor could be refused and then answered on a retry."""
+    from chat import openai_client
+
+    seen = {}
+    monkeypatch.setattr(openai_client, "_client",
+                        _fake_client(parse_hook=lambda m, msg, fmt, kw: seen.update(kw)))
+    openai_client.structured("q", Shape, fast=True)
+    assert seen["temperature"] == 0
+
+
+def test_generate_keeps_the_default_temperature(monkeypatch):
+    """Only the classifiers are pinned. generate writes prose, where sampling
+    costs nothing -- grounding is enforced in Python, not by the temperature."""
+    from chat import openai_client
+
+    seen = {}
+    monkeypatch.setattr(openai_client, "_client",
+                        _fake_client(parse_hook=lambda m, msg, fmt, kw: seen.update(kw=kw)))
+    openai_client.structured("q", Shape)
+    assert "temperature" not in seen["kw"]

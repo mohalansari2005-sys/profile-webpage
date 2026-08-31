@@ -82,6 +82,13 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             model=settings.OPENAI_FAST_MODEL if fast else settings.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format=schema,
+            # The classifiers are decisions, not prose. At the default
+            # temperature the gate samples its verdict: the same question
+            # measured 2/5 in_scope across five calls, so a visitor could be
+            # refused and then answered on a retry. generate keeps the default
+            # -- there the temperature shapes wording, and grounding is
+            # enforced in Python regardless.
+            **({"temperature": 0} if fast else {}),
         )
     except APIError:
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}

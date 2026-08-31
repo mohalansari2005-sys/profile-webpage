@@ -27,6 +27,17 @@ the old value:
 Every test stubs the OpenAI calls, so the suite needs no API key and spends no
 money.
 
+    docker compose run --rm web pytest -m eval
+
+The `eval` cases are the exception, and are deselected above by default. They
+call the real `OPENAI_FAST_MODEL` to check what the stubs cannot: whether the
+prompts *judge* correctly. A full run is ~30 nano calls, well under a cent.
+
+They exist because a scope gate that refused "What is Majara?" -- naming his own
+employer as unrelated to him -- passed a fully green suite. Every other test
+stubs `structured`, so all of them proved the wiring and none of them read the
+prompt. Run these after editing any prompt.
+
 ## How it fits together
 
 `corpus.json` is generated from `content/` by the same Node loader that
