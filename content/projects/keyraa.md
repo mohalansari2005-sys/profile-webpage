@@ -1,16 +1,16 @@
 ---
-id: "proj-booking-backend"
+id: "proj-keyraa"
 kind: "projects"
-title: "Corporate hotel booking backend"
+title: "Keyraa"
 org: "Majara"
 period: "2026"
 tools: ["python", "fastapi", "sqlalchemy", "postgres", "redis", "celery", "docker", "rest-apis", "pytest"]
-summary: "A FastAPI service that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed."
+summary: "Keyraa, a corporate hotel booking platform: a FastAPI backend that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed."
 ---
 
 ## What the work actually involved
 
-This was a backend proof of concept for a B2B corporate housing platform designed to solve a largely operational problem: companies often need to arrange accommodation for groups of employees, but the process can end up being handled manually by HR teams, project managers, or relocation staff. They may need to find suitable properties, negotiate with multiple suppliers, coordinate individual employee stays, track availability and costs, handle changes in headcount, and reconcile multiple bookings and invoices. As the number of employees grows, this becomes a time-consuming administrative job rather than something the company should have to manage manually.
+Keyraa is a corporate hotel booking platform, and what I built was its backend. It began as a proof of concept for a B2B corporate housing product designed to solve a largely operational problem: companies often need to arrange accommodation for groups of employees, but the process can end up being handled manually by HR teams, project managers, or relocation staff. They may need to find suitable properties, negotiate with multiple suppliers, coordinate individual employee stays, track availability and costs, handle changes in headcount, and reconcile multiple bookings and invoices. As the number of employees grows, this becomes a time-consuming administrative job rather than something the company should have to manage manually.
 
 The product was designed to centralize that process. Instead of a project manager coordinating dozens of accommodation arrangements separately, a company could manage its housing requirements through one platform, with bulk booking workflows, centralized booking information, and a single view of occupancy and accommodation costs. The broader business model was aimed at organizations such as consulting and contracting companies housing project teams, large HR departments managing relocation and housing, and recruitment companies arranging accommodation for incoming employees.
 
