@@ -15,7 +15,7 @@ const ROW_IDS = new Set([...experience, ...projects].map((record) => record.id))
     the edges: a role, a project, and an faq that has no row on the page. */
 const SEEDS = [
   "What did he build at Majara?",
-  "What was the hotel booking backend?",
+  "What is Keyraa?",
   "Is he available for work?",
 ];
 

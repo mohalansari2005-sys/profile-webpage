@@ -186,7 +186,7 @@ VPS, no domain, no TLS.
 
 A request runs through a five-node LangGraph: `condense → relevance → retrieve
 → generate → log`. Retrieval is pgvector cosine distance over 1536-dimension
-Gemini embeddings.
+OpenAI embeddings.
 
 **Grounding is enforced in Python, not asked for in the prompt.** The generate
 step returns schema-validated JSON naming the chunk ids it used; if that set is
@@ -195,8 +195,9 @@ insufficient context, the answer is discarded and replaced with a refusal before
 it leaves the server.
 
 The API key never reaches the browser — that is the whole reason this service
-exists rather than calling Gemini from the client. See `backend/README.md` for
-how to run it, the two-model split, and the secrets checks.
+exists rather than calling the model provider from the client. See
+`backend/README.md` for how to run it, the two-model split, and the secrets
+checks.
 
 ## The Ask section
 

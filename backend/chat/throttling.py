@@ -22,9 +22,10 @@ class ChatRateThrottle(ScopedRateThrottle):
 
 
 class GlobalDailyThrottle(BaseThrottle):
-    """One counter for the whole service, sized below the Gemini free-tier
-    daily quota so the system refuses politely instead of collapsing into
-    upstream quota errors it cannot explain to the user.
+    """One counter for the whole service. It was sized below a free-tier daily
+    quota; on a metered provider it is the daily **spend** limit instead, and
+    the only thing between a scripted abuser and a real bill. Refusing here is
+    cheaper than refusing upstream, and explainable to the user.
 
     Extends BaseThrottle, not ScopedRateThrottle: it replaces allow_request
     wholesale and never consults a rate string, so inheriting the sliding

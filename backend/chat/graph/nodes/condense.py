@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from chat.gemini import structured
 from chat.graph.state import ChatState
+from chat.openai_client import structured
 
 PROMPT = """Rewrite the user's latest message as a standalone question that makes \
 sense without the conversation. Resolve pronouns and references using the history. \
@@ -25,10 +25,11 @@ def condense(state: ChatState) -> dict:
         return {"condensed": question}
 
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history)
-    parsed, _ = structured(
+    parsed, usage = structured(
         PROMPT.format(history=transcript, question=question),
         Standalone,
         fast=True,
     )
     rewritten = (parsed.standalone_question or "").strip() if parsed else ""
-    return {"condensed": rewritten or question}
+    # Billable even when the rewrite is discarded, so it is carried, not dropped.
+    return {"condensed": rewritten or question, "usage": usage}

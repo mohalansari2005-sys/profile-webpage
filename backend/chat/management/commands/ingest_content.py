@@ -1,10 +1,12 @@
+import hashlib
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from chat.gemini import embed_documents
 from chat.ingestion.chunker import chunk_record
 from chat.ingestion.loader import CorpusMissing, load_corpus
 from chat.models import ContentChunk
+from chat.openai_client import embed_documents
 
 
 class Command(BaseCommand):
@@ -23,8 +25,18 @@ class Command(BaseCommand):
         wanted = [c for record in corpus["records"] for c in chunk_record(record)]
         existing = dict(ContentChunk.objects.values_list("chunk_id", "content_hash"))
 
+        # The stored hash covers the text AND the model that embedded it.
+        # Vectors from two different embedding models are not comparable, so a
+        # model change has to invalidate every row -- and the text alone cannot
+        # see that. Without this, switching models leaves the old vectors in
+        # place and retrieval degrades silently instead of failing.
+        def stamp(chunk):
+            return hashlib.sha256(
+                f"{settings.OPENAI_EMBED_MODEL}:{chunk.content_hash}".encode()
+            ).hexdigest()
+
         # Hash comparison is what makes re-running free.
-        changed = [c for c in wanted if existing.get(c.chunk_id) != c.content_hash]
+        changed = [c for c in wanted if existing.get(c.chunk_id) != stamp(c)]
         for i in range(0, len(changed), options["batch"]):
             batch = changed[i : i + options["batch"]]
             vectors = embed_documents([c.text for c in batch])
@@ -34,7 +46,7 @@ class Command(BaseCommand):
                     defaults={
                         "record_id": chunk.record_id, "kind": chunk.kind,
                         "title": chunk.title, "text": chunk.text,
-                        "content_hash": chunk.content_hash, "embedding": vector,
+                        "content_hash": stamp(chunk), "embedding": vector,
                     },
                 )
 

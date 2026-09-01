@@ -2,9 +2,9 @@
  * The browser's whole view of the chat backend.
  *
  * The only environment variable the frontend gets is the API's URL, which is
- * safe to inline into the bundle. The Gemini key lives exclusively in the
+ * safe to inline into the bundle. The OpenAI key lives exclusively in the
  * Django container — that separation is the reason the backend exists, so
- * nothing in `frontend/` may ever read a GEMINI_* variable.
+ * nothing in `frontend/` may ever read an OPENAI_* variable.
  */
 export const CHAT_API_URL = process.env.NEXT_PUBLIC_CHAT_API_URL;
 

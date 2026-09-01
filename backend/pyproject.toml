@@ -10,7 +10,7 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pgvector>=0.3.6",
   "langgraph>=0.2.60",
-  "google-genai>=1.0.0",
+  "openai>=3.6,<4",
   "gunicorn>=23.0",
   "pydantic>=2.9",
 ]
@@ -32,3 +32,7 @@ py-modules = []
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
 testpaths = ["tests"]
+# The eval marker is excluded by default: those tests call the real OpenAI API,
+# so `pytest` stays free and offline and `pytest -m eval` opts into spending.
+addopts = "-m 'not eval'"
+markers = ["eval: live-model checks of prompt judgment; needs OPENAI_API_KEY"]

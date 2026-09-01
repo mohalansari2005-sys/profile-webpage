@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir ".[dev]"
 
 COPY . .
 
-# --timeout 120 because three sequential Gemini calls on a cold free-tier
-# connection can exceed gunicorn's 30s default and be killed mid-answer.
+# --timeout 120 because a turn makes three sequential generation calls plus an
+# embedding call, and a cold connection can push that past gunicorn's 30s
+# default and kill the request mid-answer.
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--timeout", "120"]

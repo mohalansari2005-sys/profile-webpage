@@ -62,6 +62,21 @@ def test_changed_text_is_re_embedded(db, corpus_file, fake_embeddings):
     assert ContentChunk.objects.get(chunk_id="exp-a#summary").text == "Did other things."
 
 
+def test_changing_the_embedding_model_re_embeds_everything(db, corpus_file,
+                                                          fake_embeddings, settings):
+    """Vectors from two embedding models are not comparable, and the chunk text
+    is identical across the switch -- so nothing but the model stamp can force
+    the re-embed. Without it the old vectors survive and retrieval degrades
+    silently instead of failing."""
+    call_command("ingest_content", corpus=str(corpus_file))
+    before = fake_embeddings["n"]
+    assert before == 2
+
+    settings.OPENAI_EMBED_MODEL = "a-different-embedding-model"
+    call_command("ingest_content", corpus=str(corpus_file))
+    assert fake_embeddings["n"] == before + 2
+
+
 def test_orphaned_chunks_are_deleted(db, corpus_file, fake_embeddings):
     from chat.models import ContentChunk
 

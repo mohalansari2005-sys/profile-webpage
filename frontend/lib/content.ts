@@ -68,11 +68,11 @@ export const experience: WorkRecord[] = [
 
 export const projects: WorkRecord[] = [
   {
-    id: "proj-booking-backend",
-    title: "Corporate hotel booking backend",
+    id: "proj-keyraa",
+    title: "Keyraa",
     org: "Majara",
     period: "2026",
-    summary: "A FastAPI service that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed.",
+    summary: "Keyraa, a corporate hotel booking platform: a FastAPI backend that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed.",
     tools: ["python", "fastapi", "sqlalchemy", "postgres", "redis", "celery", "docker", "rest-apis", "pytest"],
   },
 ];
