@@ -84,6 +84,7 @@ and substituted into `Caddyfile`'s `{$DOMAIN}`.
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
 ```
 
 Caddy will automatically request and renew a Let's Encrypt certificate for `$DOMAIN`
@@ -125,4 +126,5 @@ cd profile-webpage
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
 ```
