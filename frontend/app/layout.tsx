@@ -19,10 +19,23 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+const description =
+  "Mohammed Alansari — Product Engineer at Majara and Computer Information Systems student at King Saud University, building backend systems, data pipelines, and AI-enabled applications.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://profile-webpage-liart.vercel.app"),
   title: "Mohammed Alansari",
-  description:
-    "Mohammed Alansari — Product Engineer at Majara and Computer Information Systems student at King Saud University, building backend systems, data pipelines, and AI-enabled applications.",
+  description,
+  openGraph: {
+    title: "Mohammed Alansari",
+    description,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mohammed Alansari",
+    description,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
