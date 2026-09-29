@@ -27,6 +27,9 @@ export type WorkRecord = {
   summary: string;
   tools: string[];
   href?: string;
+  /** GitHub repository. Every project should have one; it renders as the
+      card's GitHub icon link. */
+  repo?: string;
 };
 
 export const tools: Tool[] = [
@@ -74,6 +77,7 @@ export const projects: WorkRecord[] = [
     period: "2026",
     summary: "Keyraa, a corporate hotel booking platform: a FastAPI backend that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed.",
     tools: ["python", "fastapi", "sqlalchemy", "postgres", "redis", "celery", "docker", "rest-apis", "pytest"],
+    repo: "https://github.com/mohalansari2005-sys/keyraa-hotel-booking",
   },
 ];
 

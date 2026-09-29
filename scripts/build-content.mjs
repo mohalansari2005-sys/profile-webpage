@@ -16,6 +16,7 @@ function renderRecord(r) {
     `    tools: [${r.tools.map(s).join(", ")}],`,
   ];
   if (r.href) lines.push(`    href: ${s(r.href)},`);
+  if (r.repo) lines.push(`    repo: ${s(r.repo)},`);
   lines.push(`  },`);
   return lines.join("\n");
 }
@@ -50,6 +51,9 @@ export type WorkRecord = {
   summary: string;
   tools: string[];
   href?: string;
+  /** GitHub repository. Every project should have one; it renders as the
+      card's GitHub icon link. */
+  repo?: string;
 };
 
 export const tools: Tool[] = [
@@ -85,6 +89,10 @@ const CORPUS_JSON = join(here, "..", "backend", "corpus.json");
 if (import.meta.main) {
   try {
     const corpus = loadCorpus(CONTENT);
+    // A convention, not a hard failure: a private project may have no repo.
+    for (const r of corpus.byKind.projects) {
+      if (!r.repo) console.warn(`warning: project ${r.id} has no repo; every project should link its GitHub repository`);
+    }
     const artifacts = [
       { path: TARGET, next: renderModule(corpus), label: "frontend/lib/content.ts" },
       { path: CORPUS_JSON, next: renderCorpusJson(corpus), label: "backend/corpus.json" },

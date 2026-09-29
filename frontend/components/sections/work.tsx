@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GithubIcon } from "@/components/github-icon";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
 import { cn } from "@/lib/utils";
@@ -85,6 +86,191 @@ function RecordRow({
         </div>
       </article>
     </Reveal>
+  );
+}
+
+/** Chevron for the rail's paging buttons (Lucide's "chevron-right" path, ISC).
+    Drawn inline rather than importing an icon package for two arrows; it
+    flips itself in RTL, so the button that pages forward always points forward. */
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={cn("size-4 rtl:rotate-180", direction === "left" && "scale-x-[-1]")}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/** One project as a rounded card in the horizontal rail. State styling mirrors
+    RecordRow (lit on a tool/citation match, dim otherwise); the card border
+    stands in for RecordRow's left-edge marker, which would be clipped by the
+    rail's overflow. */
+function ProjectCard({
+  record,
+  state,
+  activeTool,
+  delay,
+}: {
+  record: WorkRecord;
+  state: RowState;
+  activeTool: string | null;
+  delay: number;
+}) {
+  return (
+    <Reveal delay={delay} className="w-[min(22rem,85vw)] shrink-0 snap-start">
+      <article
+        id={`record-${record.id}`}
+        tabIndex={-1}
+        data-state={state}
+        className="flex h-full flex-col rounded-2xl border border-rule bg-foreground/[0.04] p-5 transition duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100 data-[state=lit]:border-match data-[state=lit]:bg-match/10"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="field-label pt-1">{record.period}</p>
+          {record.repo && (
+            <a
+              href={record.repo}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${record.title} on GitHub`}
+              title="View on GitHub"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground"
+            >
+              <GithubIcon className="size-4" />
+            </a>
+          )}
+        </div>
+
+        <h3
+          className="mt-3 font-display text-xl font-semibold tracking-tight sm:text-2xl"
+          style={{ fontStretch: "90%" }}
+        >
+          {record.title}
+        </h3>
+        <p className="mt-1.5 font-mono text-xs tracking-[0.06em] text-dim">
+          {record.org}
+        </p>
+        <p className="mt-3 leading-relaxed">{record.summary}</p>
+
+        <ul className="mt-auto flex flex-wrap gap-1.5 pt-4">
+          {record.tools.map((toolId) => {
+            const tool = toolById.get(toolId);
+            if (!tool) return null;
+            const isMatch = activeTool === toolId;
+            return (
+              <li
+                key={toolId}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 font-mono text-[0.6875rem] tracking-[0.06em] transition-colors duration-200",
+                  isMatch
+                    ? "border-match bg-match/20 text-foreground"
+                    : "border-rule text-dim",
+                )}
+              >
+                {tool.label}
+              </li>
+            );
+          })}
+        </ul>
+      </article>
+    </Reveal>
+  );
+}
+
+/** Projects side by side, scrolling sideways, so a growing list stays one
+    row tall instead of a long stack. Chevrons page by one card. Direction-
+    aware: scrollLeft is negative in RTL, and "previous" points the other way. */
+function ProjectRail({
+  rowState,
+  activeTool,
+}: {
+  rowState: (record: WorkRecord) => RowState;
+  activeTool: string | null;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const sync = useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const position = Math.abs(el.scrollLeft);
+    const max = el.scrollWidth - el.clientWidth;
+    setCanPrev(position > 1);
+    setCanNext(position < max - 1);
+  }, []);
+
+  useEffect(() => {
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, [sync]);
+
+  function page(direction: "prev" | "next") {
+    const el = railRef.current;
+    if (!el) return;
+    const rtl = getComputedStyle(el).direction === "rtl";
+    const card = el.firstElementChild as HTMLElement | null;
+    const step = (card?.offsetWidth ?? el.clientWidth) + 16; // card + gap-4
+    const sign = (direction === "next" ? 1 : -1) * (rtl ? -1 : 1);
+    el.scrollBy({ left: sign * step });
+  }
+
+  const chevron =
+    "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule";
+
+  return (
+    <>
+      <div className="mb-4 flex items-center justify-between">
+        <Reveal>
+          <h2 className="field-label">Projects</h2>
+        </Reveal>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-label="Previous project"
+            disabled={!canPrev}
+            onClick={() => page("prev")}
+            className={chevron}
+          >
+            <Chevron direction="left" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next project"
+            disabled={!canNext}
+            onClick={() => page("next")}
+            className={chevron}
+          >
+            <Chevron direction="right" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={railRef}
+        data-project-rail=""
+        onScroll={sync}
+        className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {projects.map((record, index) => (
+          <ProjectCard
+            key={record.id}
+            record={record}
+            state={rowState(record)}
+            activeTool={activeTool}
+            delay={index * 70}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -250,18 +436,7 @@ export function Work() {
 
       <section className="on-deep border-b border-rule bg-surface-deep">
         <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
-          <Reveal>
-            <h2 className="field-label mb-2">Projects</h2>
-          </Reveal>
-          {projects.map((record, index) => (
-            <RecordRow
-              key={record.id}
-              record={record}
-              state={rowState(record)}
-              activeTool={activeTool}
-              delay={index * 70}
-            />
-          ))}
+          <ProjectRail rowState={rowState} activeTool={activeTool} />
         </div>
       </section>
     </div>
