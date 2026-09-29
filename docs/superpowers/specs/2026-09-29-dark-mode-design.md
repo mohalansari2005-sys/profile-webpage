@@ -12,3 +12,6 @@ The site only had a light palette. Visitors on a dark OS get a bright page, and 
 
 ## Tests
 `frontend/e2e/theme.spec.ts`: OS-dark default, explicit light beats OS dark, Projects section distinct from page, script-blocked CSS fallback, toggle cycle + persistence across reload.
+
+## Follow-up: cream text
+The dark-mode ink was `#e7eaf0`, a bluish white that read as harsh. It is now `#e8e0cc` (warm cream, 13.73:1 on the base navy, 12.75:1 on raised). It is also the `.on-deep` foreground, so the Projects section text is cream in light mode too.

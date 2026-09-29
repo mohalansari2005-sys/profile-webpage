@@ -99,7 +99,7 @@
 .dark {
   color-scheme: dark;
   --paper: #0f1626;
-  --ink: #e7eaf0;
+  --ink: #e8e0cc;
   --signal: #4bbd8e;
   --match: #f0b558;
   --match-ink: #c8861e;
@@ -137,7 +137,7 @@
   :root:not(.light) {
     color-scheme: dark;
     --paper: #0f1626;
-    --ink: #e7eaf0;
+    --ink: #e8e0cc;
     --signal: #4bbd8e;
     --match: #f0b558;
     --match-ink: #c8861e;
@@ -249,11 +249,11 @@
 
 /* Content on the deep surface re-derives the palette against navy instead of
    paper — same roles, ground-appropriate values, all measured against
-   #0F1626: foreground 14.98:1, dim 4.86:1, signal 7.71:1, match 9.85:1.
+   #0F1626: foreground 13.73:1, dim 4.86:1, signal 7.71:1, match 9.85:1.
    Light mode's equivalents are 15.52:1 and 4.92:1, so the two grounds carry
    the same weight. `rule` at 1.36:1 matches how the paper hairline reads. */
 .on-deep {
-  --foreground: #e7eaf0;
+  --foreground: #e8e0cc;
   --dim: #7b8598;
   --rule: #263043;
   --border: var(--rule);
