@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from chat.graph.state import ChatState
+from chat.language import NAME_GLOSSARY
 from chat.openai_client import merge_usage, structured
 
 # The gate names the subject; Python decides scope. Asking the fast model for
@@ -44,8 +45,8 @@ Classify the subject only. Do not consider whether you know the answer: a \
 question about Mohammed that nobody has written down is still mohammed.
 
 The message may be in any language, including Arabic. Judge it by meaning, and \
-treat a name written in Arabic script (for example ماجرة or صيت) as you would \
-the same name in Latin letters.
+treat a name written in Arabic script as you would the same name in Latin \
+letters. {glossary}
 
 Message: {question}
 
@@ -66,7 +67,7 @@ class Relevance(BaseModel):
 
 
 def relevance(state: ChatState) -> dict:
-    parsed, usage = structured(PROMPT.format(question=state["condensed"]),
+    parsed, usage = structured(PROMPT.format(glossary=NAME_GLOSSARY, question=state["condensed"]),
                                Relevance, fast=True)
     # Same model as condense, so the two merge into one honest fast-model total.
     # A turn that survives the gate has this overwritten by generate, whose
