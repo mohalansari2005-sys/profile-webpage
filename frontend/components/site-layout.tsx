@@ -26,7 +26,7 @@ export function SiteLayout({
     >
       {/* eslint-disable-next-line @next/next/no-head-element -- this is the app-router root shell, where <head> is correct; the rule only knows layout.tsx */}
       <head>
-        <SiteHead restoreArabic={locale === "en"} />
+        <SiteHead locale={locale} />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

@@ -37,12 +37,14 @@ test.describe("Arabic page", () => {
   });
 
   test("uses the Arabic typeface, English keeps its own", async ({ page }) => {
-    await page.goto("/ar");
     const family = (sel: string) =>
       page.locator(sel).first().evaluate((el) => getComputedStyle(el).fontFamily);
-    expect(await family("h1")).toMatch(/IBM_Plex_Sans_Arabic|IBM Plex Sans Arabic/);
+    // English first: visiting /ar remembers Arabic, which would send a later
+    // visit to `/` back to /ar.
     await page.goto("/");
     expect(await family("h1")).not.toMatch(/IBM_Plex_Sans_Arabic|IBM Plex Sans Arabic/);
+    await page.goto("/ar");
+    expect(await family("h1")).toMatch(/IBM_Plex_Sans_Arabic|IBM Plex Sans Arabic/);
   });
 
   test("translates the work records and the project link", async ({ page }) => {
@@ -123,14 +125,54 @@ test.describe("switching language", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
 
     await page.getByRole("link", { name: "التبديل إلى الإنجليزية" }).click();
-    await expect(page).toHaveURL(/\/$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test("keeps the #section", async ({ page }) => {
     await page.goto("/#about");
     await page.getByRole("link", { name: "Switch to Arabic" }).click();
     await expect(page).toHaveURL(/\/ar\/?#about$/);
+  });
+
+  test("the link itself carries the #section and the choice", async ({ page }) => {
+    // Middle-click / "open in new tab" never fire a click handler, so the href
+    // must already hold everything.
+    await page.goto("/#about");
+    await expect(page.getByRole("link", { name: "Switch to Arabic" })).toHaveAttribute(
+      "href",
+      "/ar#about",
+    );
+    await page.goto("/ar#work");
+    await expect(page.getByRole("link", { name: "التبديل إلى الإنجليزية" })).toHaveAttribute(
+      "href",
+      "/?lang=en#work",
+    );
+  });
+
+  test("opening the English link directly (not clicking) still remembers English", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/ar"); // visiting /ar remembers Arabic
+    const href = await page
+      .getByRole("link", { name: "التبديل إلى الإنجليزية" })
+      .getAttribute("href");
+
+    const tab = await context.newPage();
+    await tab.goto(href!);
+    await expect(tab.locator("html")).toHaveAttribute("lang", "en");
+    await expect(tab).toHaveURL(/\/$/); // ?lang=en cleaned from the URL
+
+    await tab.goto("/"); // no bounce back to /ar
+    await expect(tab.locator("html")).toHaveAttribute("lang", "en");
+    await expect(tab).toHaveURL(/\/$/);
+  });
+
+  test("visiting /ar directly remembers Arabic", async ({ page }) => {
+    await page.goto("/ar");
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/ar\/?$/);
   });
 
   test("remembers Arabic when the reader returns to /", async ({ page }) => {
