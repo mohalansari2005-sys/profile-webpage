@@ -6,6 +6,10 @@ org: "Majara — Riyadh, hybrid"
 period: "Nov 2025 — Present"
 tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"]
 summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software."
+title_ar: "متدرب هندسة منتجات"
+org_ar: "ماجرة — الرياض، عمل هجين"
+period_ar: "نوفمبر 2025 — الآن"
+summary_ar: "عملتُ في تطوير البرمجيات المتكاملة وتطوير المنتجات، محوّلًا المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات منتج، من الفكرة حتى برمجية تعمل."
 ---
 
 ## What the work actually involved

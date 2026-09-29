@@ -310,6 +310,20 @@
   mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
 }
 
+/* Arabic pages use IBM Plex Sans Arabic for display and body (its Latin glyphs
+   cover names like Majara inside Arabic text). The mono labels keep JetBrains
+   Mono for Latin (tool names, chips) and fall back to Plex for Arabic glyphs,
+   which JetBrains does not have. Loaded only by the /ar layout. */
+html[lang="ar"] {
+  --font-display: var(--font-arabic);
+  --font-body: var(--font-arabic);
+}
+
+:lang(ar) .font-mono,
+:lang(ar) .field-label {
+  font-family: var(--font-mono), var(--font-arabic), sans-serif;
+}
+
 /* Arabic letters join, so any letter-spacing (the mono labels' 0.14em, the
    hero's negative tracking, chip tracking) pulls words apart. */
 :lang(ar) .field-label,

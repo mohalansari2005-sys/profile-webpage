@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GithubIcon } from "@/components/github-icon";
+import { useI18n } from "@/components/i18n-provider";
+import { format, localize } from "@/lib/i18n";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,8 @@ function RecordRow({
   activeTool: string | null;
   delay: number;
 }) {
+  const { locale } = useI18n();
+  const text = localize(record, locale);
   return (
     <Reveal delay={delay}>
       <article
@@ -46,20 +50,20 @@ function RecordRow({
         <div className="grid gap-2 py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-7">
           {/* The period is the record's key, in the same label column the hero
               fields and the contact links use. */}
-          <p className="field-label sm:pt-2">{record.period}</p>
+          <p className="field-label sm:pt-2">{text.period}</p>
 
           <div>
             <h3
               className="font-display text-xl font-semibold tracking-tight sm:text-2xl"
               style={{ fontStretch: "90%" }}
             >
-              {record.title}
+              {text.title}
             </h3>
             <p className="mt-1.5 font-mono text-xs tracking-[0.06em] text-dim">
-              {record.org}
+              {text.org}
             </p>
             <p className="mt-3 max-w-xl leading-relaxed text-balance">
-              {record.summary}
+              {text.summary}
             </p>
 
             <ul className="mt-4 flex flex-wrap gap-1.5">
@@ -124,6 +128,8 @@ function ProjectCard({
   activeTool: string | null;
   delay: number;
 }) {
+  const { locale, t } = useI18n();
+  const text = localize(record, locale);
   return (
     <Reveal delay={delay} className="w-[min(22rem,85vw)] shrink-0 snap-start">
       <article
@@ -133,14 +139,14 @@ function ProjectCard({
         className="flex h-full flex-col rounded-2xl border border-rule bg-foreground/[0.04] p-5 transition duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100 data-[state=lit]:border-match data-[state=lit]:bg-match/10"
       >
         <div className="flex items-start justify-between gap-3">
-          <p className="field-label pt-1">{record.period}</p>
+          <p className="field-label pt-1">{text.period}</p>
           {record.repo && (
             <a
               href={record.repo}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`${record.title} on GitHub`}
-              title="View on GitHub"
+              aria-label={format(t.work.onGithub, { title: text.title })}
+              title={t.work.viewOnGithub}
               className="flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground"
             >
               <GithubIcon className="size-4" />
@@ -152,12 +158,12 @@ function ProjectCard({
           className="mt-3 font-display text-xl font-semibold tracking-tight sm:text-2xl"
           style={{ fontStretch: "90%" }}
         >
-          {record.title}
+          {text.title}
         </h3>
         <p className="mt-1.5 font-mono text-xs tracking-[0.06em] text-dim">
-          {record.org}
+          {text.org}
         </p>
-        <p className="mt-3 leading-relaxed">{record.summary}</p>
+        <p className="mt-3 leading-relaxed">{text.summary}</p>
 
         <ul className="mt-auto flex flex-wrap gap-1.5 pt-4">
           {record.tools.map((toolId) => {
@@ -194,6 +200,7 @@ function ProjectRail({
   rowState: (record: WorkRecord) => RowState;
   activeTool: string | null;
 }) {
+  const { t } = useI18n();
   const railRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -230,12 +237,12 @@ function ProjectRail({
     <>
       <div className="mb-4 flex items-center justify-between">
         <Reveal>
-          <h2 className="field-label">Projects</h2>
+          <h2 className="field-label">{t.work.projects}</h2>
         </Reveal>
         <div className="flex gap-2">
           <button
             type="button"
-            aria-label="Previous project"
+            aria-label={t.work.previousProject}
             disabled={!canPrev}
             onClick={() => page("prev")}
             className={chevron}
@@ -244,7 +251,7 @@ function ProjectRail({
           </button>
           <button
             type="button"
-            aria-label="Next project"
+            aria-label={t.work.nextProject}
             disabled={!canNext}
             onClick={() => page("next")}
             className={chevron}
@@ -275,6 +282,7 @@ function ProjectRail({
 }
 
 export function Work() {
+  const { t } = useI18n();
   const { activeTool, citedRecordIds, pinnedTool, setHoveredTool, toggleTool, clear } =
     useJoin();
 
@@ -341,16 +349,23 @@ export function Work() {
       <div className="sticky top-0 z-20 border-b border-rule bg-background/95 backdrop-blur-md">
         <div className="mx-auto w-full max-w-5xl px-6 py-3.5">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="field-label">Built with</h2>
+            <h2 className="field-label">{t.work.builtWith}</h2>
             <p
               aria-live="polite"
               className="font-mono text-xs tracking-[0.1em] text-dim"
             >
               {activeLabel
-                ? `${matchCount} of ${experience.length + projects.length} use ${activeLabel}`
+                ? format(t.work.toolMatch, {
+                    count: matchCount,
+                    total: experience.length + projects.length,
+                    tool: activeLabel,
+                  })
                 : litByCitation
-                  ? `${litByCitation.size} of ${experience.length + projects.length} cited in the answer`
-                  : "Pick a tool to see where it was used"}
+                  ? format(t.work.cited, {
+                      count: litByCitation.size,
+                      total: experience.length + projects.length,
+                    })
+                  : t.work.pickTool}
             </p>
           </div>
 
@@ -411,7 +426,7 @@ export function Work() {
                     onClick={clear}
                     className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink"
                   >
-                    Clear
+                    {t.work.clear}
                   </button>
                 </li>
               )}
@@ -423,7 +438,7 @@ export function Work() {
       <section className="border-b border-rule">
         <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
           <Reveal>
-            <h2 className="field-label mb-2">Experience</h2>
+            <h2 className="field-label mb-2">{t.work.experience}</h2>
           </Reveal>
           {experience.map((record, index) => (
             <RecordRow

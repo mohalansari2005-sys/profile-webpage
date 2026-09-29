@@ -17,6 +17,10 @@ function renderRecord(r) {
   ];
   if (r.href) lines.push(`    href: ${s(r.href)},`);
   if (r.repo) lines.push(`    repo: ${s(r.repo)},`);
+  if (r.ar) {
+    const fields = Object.entries(r.ar).map(([k, v]) => `${k}: ${s(v)}`);
+    lines.push(`    ar: { ${fields.join(", ")} },`);
+  }
   lines.push(`  },`);
   return lines.join("\n");
 }
@@ -54,6 +58,8 @@ export type WorkRecord = {
   /** GitHub repository. Every project should have one; it renders as the
       card's GitHub icon link. */
   repo?: string;
+  /** Arabic display copy for /ar; any field missing falls back to English. */
+  ar?: { title?: string; org?: string; period?: string; summary?: string };
 };
 
 export const tools: Tool[] = [
@@ -77,7 +83,9 @@ export function renderCorpusJson(corpus) {
     generatedBy: "scripts/build-content.mjs — do not edit; run `npm run content`",
     groups: corpus.groups,
     tools: corpus.tools,
-    records: corpus.records,
+    // Arabic display copy never reaches the (English) chat corpus: it would
+    // change nothing the ingest embeds and risk mixing languages in retrieval.
+    records: corpus.records.map(({ ar: _ar, ...record }) => record),
   }, null, 2) + "\n";
 }
 

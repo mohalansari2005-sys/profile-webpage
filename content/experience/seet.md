@@ -6,6 +6,10 @@ org: "SEET (صيت) — marketing solutions agency, Riyadh"
 period: "Feb — Apr 2025"
 tools: []
 summary: "Worked backward from client objectives to concrete proposals — client meetings, sales pitches, and ongoing relationships. It taught me to translate a loosely defined problem into a solution that's actually useful and deliverable, the same skill that scopes a good engineering requirement."
+title_ar: "متدرب تطوير أعمال"
+org_ar: "صيت — وكالة حلول تسويقية، الرياض"
+period_ar: "فبراير — أبريل 2025"
+summary_ar: "كنتُ أنطلق من أهداف العميل إلى مقترحات ملموسة: اجتماعات مع العملاء وعروض مبيعات وعلاقات مستمرة. علّمني ذلك أن أحوّل مشكلة غير محددة إلى حل مفيد وقابل للتسليم، وهي المهارة نفسها التي تصنع متطلبات هندسية جيدة."
 ---
 
 ## What the work actually involved

@@ -123,6 +123,20 @@ export function loadCorpus(contentDir) {
         }
       }
 
+      // Arabic display copy: optional `<field>_ar`, shown on /ar only. It is kept
+      // apart from the record proper (as `ar`) so the chat backend, whose
+      // corpus is English, never receives it.
+      const ar = {};
+      for (const field of ["title", "org", "period", "summary"]) {
+        const value = data[`${field}_ar`];
+        if (value === undefined) continue;
+        if (typeof value !== "string") {
+          problems.push(`${id} (${where}) ${field}_ar must be a string, got ${typeof value}`);
+        } else {
+          ar[field] = field === "summary" ? value.trim() : value;
+        }
+      }
+
       // Check tools is an array
       if (data.tools !== undefined && !Array.isArray(data.tools)) {
         problems.push(`${id} (${where}) tools must be a list, got ${typeof data.tools}: ${JSON.stringify(data.tools)}`);
@@ -145,6 +159,7 @@ export function loadCorpus(contentDir) {
         summary: typeof data.summary === "string" ? data.summary.trim() : data.summary,
         tools: data.tools ?? [], ...(data.href ? { href: data.href } : {}),
         ...(data.repo ? { repo: data.repo } : {}),
+        ...(Object.keys(ar).length ? { ar } : {}),
         body: content.trim(), source: where,
       });
     }

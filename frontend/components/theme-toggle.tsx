@@ -1,16 +1,13 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useI18n } from "@/components/i18n-provider";
+import { format } from "@/lib/i18n";
 
 type Theme = "system" | "light" | "dark";
 
 const KEY = "theme";
 const ORDER: Theme[] = ["system", "light", "dark"];
-const LABEL: Record<Theme, string> = {
-  system: "System",
-  light: "Light",
-  dark: "Dark",
-};
 
 function read(): Theme {
   try {
@@ -66,15 +63,16 @@ export function ThemeToggle() {
   // right after hydration, so the markup never mismatches.
   const theme = useSyncExternalStore(subscribe, read, () => "system" as Theme);
   const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
+  const { t } = useI18n();
 
   return (
     <button
       type="button"
       onClick={() => choose(next)}
-      aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[next]}.`}
+      aria-label={format(t.theme.aria, { current: t.theme[theme], next: t.theme[next] })}
       className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground transition-colors duration-200 hover:border-foreground"
     >
-      Theme: {LABEL[theme]}
+      {t.theme.label}: {t.theme[theme]}
     </button>
   );
 }
