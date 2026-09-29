@@ -8,6 +8,7 @@ from chat.language import is_arabic
     "ماذا فعل محمد في صيت؟",
     "ما هي Majara؟",  # Arabic sentence carrying a Latin name
     "ماذا يعني  ١٢٣ ؟",
+    "من هو مُحَمَّد؟",  # vowelled (diacritized) Arabic
 ])
 def test_arabic_questions_are_detected(text):
     assert is_arabic(text) is True
@@ -17,6 +18,7 @@ def test_arabic_questions_are_detected(text):
     "What is Majara?",
     "What does صيت mean?",  # English sentence quoting an Arabic name
     "",
+    "What does \u0645\u064f\u062d\u064e\u0645\u0651\u064e\u062f mean?",  # vowelled Arabic name
     "1234 ?!",
     None,
 ])

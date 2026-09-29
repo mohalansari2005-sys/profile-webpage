@@ -1,5 +1,3 @@
-import re
-
 # Arabic, Arabic Supplement, Arabic Extended-A, and both Presentation Forms blocks.
 _ARABIC_RANGES = (
     (0x0600, 0x06FF),
@@ -8,7 +6,6 @@ _ARABIC_RANGES = (
     (0xFB50, 0xFDFF),
     (0xFE70, 0xFEFF),
 )
-_WORD = re.compile(r"[^\W\d_]+")
 
 
 def _has_arabic(word: str) -> bool:
@@ -25,7 +22,9 @@ def is_arabic(text: str) -> bool:
     question that merely quotes an Arabic name ("What does صيت mean?") stays
     English.
     """
-    words = _WORD.findall(text or "")
+    # Whitespace tokens, not a \w regex: that splits a vowelled word such as
+    # مُحَمَّد at each diacritic (a combining mark, not a word character).
+    words = [w for w in (text or "").split() if any(ch.isalpha() for ch in w)]
     if not words:
         return False
     return sum(1 for w in words if _has_arabic(w)) * 2 > len(words)
