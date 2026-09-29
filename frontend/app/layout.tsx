@@ -38,13 +38,19 @@ export const metadata: Metadata = {
   },
 };
 
+// Runs before first paint, so a reader who chose dark (or whose OS is dark)
+// never sees a light flash. Mirrors apply() in components/theme-toggle.tsx.
+const themeScript = `try{var t=localStorage.getItem("theme"),r=document.documentElement;r.classList.toggle("dark",t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches));r.classList.toggle("light",t==="light")}catch(e){}`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${bricolage.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Without JS, scroll-revealed content would stay at opacity 0. */}
         <noscript>
           <style>{`.reveal,.field-in{opacity:1!important;transform:none!important}.rule-draw{transform:none!important}`}</style>
