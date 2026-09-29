@@ -60,6 +60,28 @@ test("a long answer keeps its start in view", async ({ page }) => {
     .toBe(true);
 });
 
+test("a short answer after a long one is still brought into view", async ({ page }) => {
+  await page.route(CHAT_API, (route) => {
+    const question = JSON.parse(route.request().postData()!).question as string;
+    return route.fulfill({
+      json: { answer: question.includes("long") ? LONG : "Short reply.", sources: [], refused: false },
+    });
+  });
+  await page.goto("/");
+  await ask(page, "the long one?");
+  await expect(page.getByText("Sentence 1 about")).toBeVisible();
+  await ask(page, "and a short one?");
+  const reply = page.getByText("Short reply.");
+  await expect(reply).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await scroller(page).boundingBox();
+      const r = await reply.boundingBox();
+      return r!.y >= box!.y && r!.y + r!.height <= box!.y + box!.height + 1;
+    })
+    .toBe(true);
+});
+
 test("Arabic text gets its own direction", async ({ page }) => {
   await mock(page, "محمد مهندس منتجات في ماجرة.");
   await page.goto("/");

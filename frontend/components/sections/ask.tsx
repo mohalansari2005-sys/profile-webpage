@@ -59,15 +59,33 @@ function historyFrom(turns: Turn[]): ChatMessage[] {
     A turn taller than the box would land past its start instead, so pin the
     top of it — the question and the first lines of the answer — in view. Only
     the box scrolls: scrollTo on the scroller, never scrollIntoView, which
-    would also move the page. */
-function KeepTurnInView({ turnId }: { turnId: number | undefined }) {
-  const { scrollRef, stopScroll } = useStickToBottomContext();
+    would also move the page.
+
+    `stopScroll` (needed so the library doesn't drag the view back down) leaves
+    it un-stuck, so every other case re-sticks explicitly: a question being
+    sent, and a turn that fits. */
+function KeepTurnInView({
+  turnId,
+  pending,
+}: {
+  turnId: number | undefined;
+  pending: boolean;
+}) {
+  const { scrollRef, stopScroll, scrollToBottom } = useStickToBottomContext();
+
+  useEffect(() => {
+    if (pending) void scrollToBottom();
+  }, [pending, scrollToBottom]);
 
   useEffect(() => {
     if (turnId === undefined) return;
     const scroller = scrollRef.current;
     const turn = document.getElementById(`turn-${turnId}`);
-    if (!scroller || !turn || turn.offsetHeight <= scroller.clientHeight) return;
+    if (!scroller || !turn) return;
+    if (turn.offsetHeight <= scroller.clientHeight) {
+      void scrollToBottom();
+      return;
+    }
 
     stopScroll();
     const top =
@@ -76,7 +94,7 @@ function KeepTurnInView({ turnId }: { turnId: number | undefined }) {
       scroller.scrollTop;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     scroller.scrollTo({ top: top - 16, behavior: reduced ? "auto" : "smooth" });
-  }, [turnId, scrollRef, stopScroll]);
+  }, [turnId, scrollRef, stopScroll, scrollToBottom]);
 
   return null;
 }
@@ -242,7 +260,10 @@ export function Ask() {
                     </div>
                   )}
                 </ConversationContent>
-                <KeepTurnInView turnId={turns[turns.length - 1]?.id} />
+                <KeepTurnInView
+                  turnId={turns[turns.length - 1]?.id}
+                  pending={pending !== null}
+                />
                 <ConversationScrollButton />
               </Conversation>
 
