@@ -5,7 +5,9 @@ from chat.openai_client import structured
 
 PROMPT = """Rewrite the user's latest message as a standalone question that makes \
 sense without the conversation. Resolve pronouns and references using the history. \
-Do not answer it. Do not add information that is not in the conversation.
+Do not answer it. Do not add information that is not in the conversation. Keep \
+the latest message's language: never translate it (an Arabic message stays \
+Arabic).
 
 Conversation so far:
 {history}

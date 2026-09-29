@@ -43,6 +43,10 @@ help, or anything else unconnected to Mohammed.
 Classify the subject only. Do not consider whether you know the answer: a \
 question about Mohammed that nobody has written down is still mohammed.
 
+The message may be in any language, including Arabic. Judge it by meaning, and \
+treat a name written in Arabic script (for example ماجرة or صيت) as you would \
+the same name in Latin letters.
+
 Message: {question}
 
 Set subject, and give a short reason."""
