@@ -117,7 +117,7 @@ export function loadCorpus(contentDir) {
       }
 
       // Check string fields
-      for (const field of ["title", "org", "period", "summary"]) {
+      for (const field of ["title", "org", "period", "summary", "repo"]) {
         if (data[field] !== undefined && typeof data[field] !== "string") {
           problems.push(`${id} (${where}) ${field} must be a string, got ${typeof data[field]}`);
         }
@@ -144,6 +144,7 @@ export function loadCorpus(contentDir) {
         id: data.id, kind, title: data.title, org: data.org, period: data.period,
         summary: typeof data.summary === "string" ? data.summary.trim() : data.summary,
         tools: data.tools ?? [], ...(data.href ? { href: data.href } : {}),
+        ...(data.repo ? { repo: data.repo } : {}),
         body: content.trim(), source: where,
       });
     }

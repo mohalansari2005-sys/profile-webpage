@@ -17,7 +17,8 @@ const corpus = {
     experience: [{ id: "exp-a", title: "Engineer", org: "Acme", period: "2025",
                    summary: 'He said "hi" — really', tools: ["python"] }],
     projects: [{ id: "proj-b", title: "Thing", org: "Acme", period: "2026",
-                 summary: "Built it.", tools: ["python", "agile"], href: "https://x.test" }],
+                 summary: "Built it.", tools: ["python", "agile"], href: "https://x.test",
+                 repo: "https://github.com/x/proj-b" }],
     about: [], faq: [],
   },
   records: [
@@ -54,6 +55,14 @@ test("emits href only when present", () => {
   assert.match(proj, /href: "https:\/\/x\.test"/);
   const exp = out.slice(out.indexOf("exp-a"), out.indexOf("proj-b"));
   assert.doesNotMatch(exp, /href:/);
+});
+
+test("emits repo only when present", () => {
+  const out = renderModule(corpus);
+  const proj = out.slice(out.indexOf("proj-b"));
+  assert.match(proj, /repo: "https:\/\/github\.com\/x\/proj-b"/);
+  const exp = out.slice(out.indexOf("exp-a"), out.indexOf("proj-b"));
+  assert.doesNotMatch(exp, /repo:/);
 });
 
 test("marks the file as generated", () => {
