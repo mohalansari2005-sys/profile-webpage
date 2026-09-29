@@ -111,7 +111,7 @@ function Chevron({ direction }: { direction: "left" | "right" }) {
 
 /** One project as a rounded card in the horizontal rail. State styling mirrors
     RecordRow (lit on a tool/citation match, dim otherwise); the card border
-    stands in for RecordRow's left-edge marker, which would be clipped by the
+    stands in for RecordRow's start-edge marker, which would be clipped by the
     rail's overflow. */
 function ProjectCard({
   record,

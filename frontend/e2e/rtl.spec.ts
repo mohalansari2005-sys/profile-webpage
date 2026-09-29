@@ -22,7 +22,9 @@ test("the hero rule draws from the right", async ({ page }) => {
   await goRtl(page);
   const { originX, width } = await page.locator(".rule-draw").evaluate((el) => ({
     originX: parseFloat(getComputedStyle(el).transformOrigin.split(" ")[0]),
-    width: el.getBoundingClientRect().width,
+    // offsetWidth, not getBoundingClientRect: the rule animates scaleX, and the
+    // bounding box shrinks mid-animation while the origin stays in layout px.
+    width: (el as HTMLElement).offsetWidth,
   }));
   expect(originX).toBeCloseTo(width, 0);
 });
