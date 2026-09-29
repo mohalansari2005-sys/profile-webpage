@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { GithubIcon } from "@/components/github-icon";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
@@ -87,6 +86,26 @@ function RecordRow({
         </div>
       </article>
     </Reveal>
+  );
+}
+
+/** Chevron for the rail's paging buttons (Lucide's "chevron-right" path, ISC).
+    Drawn inline rather than importing an icon package for two arrows; it
+    flips itself in RTL, so the button that pages forward always points forward. */
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={cn("size-4 rtl:rotate-180", direction === "left" && "scale-x-[-1]")}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
   );
 }
 
@@ -221,7 +240,7 @@ function ProjectRail({
             onClick={() => page("prev")}
             className={chevron}
           >
-            <ChevronLeft className="size-4 rtl:rotate-180" aria-hidden="true" />
+            <Chevron direction="left" />
           </button>
           <button
             type="button"
@@ -230,7 +249,7 @@ function ProjectRail({
             onClick={() => page("next")}
             className={chevron}
           >
-            <ChevronRight className="size-4 rtl:rotate-180" aria-hidden="true" />
+            <Chevron direction="right" />
           </button>
         </div>
       </div>
