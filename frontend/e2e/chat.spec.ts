@@ -12,7 +12,7 @@ function mock(page: Page, answer: string, sources: { record_id: string; title: s
 
 async function ask(page: Page, question: string) {
   await page.locator("#ask-input").fill(question);
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByRole("button", { name: "Send question" }).click();
 }
 
 const scroller = (page: Page) => page.locator('#ask [role="log"] > div').first();
@@ -38,6 +38,9 @@ test("a new answer scrolls the box, not the page", async ({ page }) => {
       ["one?", "two?", "three?"].indexOf(q) + 1,
     );
   }
+  // A reader typing has the input on screen. Bring it there first, or
+  // Playwright's own scroll-to-click would be counted as the page moving.
+  await page.locator("#ask-input").scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
   await ask(page, "four?");
   await expect(page.getByText("Sentence 1 about")).toHaveCount(4);
@@ -95,8 +98,10 @@ test("an Arabic question stays on the question side of an English page", async (
   await mock(page, "محمد مهندس منتجات في ماجرة.");
   await page.goto("/");
   await ask(page, "ما هي ماجرة؟");
+  const answer = page.getByText("محمد مهندس منتجات في ماجرة.");
+  await expect(answer).toBeVisible();
   const q = await page.getByText("ما هي ماجرة؟").last().boundingBox();
-  const a = await page.getByText("محمد مهندس منتجات في ماجرة.").boundingBox();
+  const a = await answer.boundingBox();
   expect(q!.x + q!.width / 2).toBeGreaterThan(a!.x + a!.width / 2);
 });
 

@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowUp, Bot } from "lucide-react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
 import { experience, projects } from "@/lib/content";
@@ -99,22 +102,27 @@ function KeepTurnInView({
   return null;
 }
 
-/** The bubble's side follows the page's direction; only the text inside
+/** The message's side follows the page's direction; only the text inside
     follows the message's own (`dir="auto"`). Putting `dir` on the bubble
     itself would flip its `ms-auto` margin, sending an Arabic question to the
     wrong side of an English page. */
-function QuestionBubble({ children, dim }: { children: string; dim?: boolean }) {
+function UserMessage({ children, dim }: { children: string; dim?: boolean }) {
   return (
-    <div
-      className={`ms-auto max-w-[85%] rounded-md bg-secondary px-3.5 py-2.5 leading-snug ${dim ? "opacity-70" : ""}`}
-    >
-      <p dir="auto">{children}</p>
-    </div>
+    <Message from="user" className={dim ? "opacity-70" : ""}>
+      <MessageContent className="text-base leading-snug group-[.is-user]:rounded-2xl group-[.is-user]:rounded-ee-md">
+        <p dir="auto">{children}</p>
+      </MessageContent>
+    </Message>
   );
 }
 
-const ANSWER_BUBBLE =
-  "me-auto max-w-[85%] rounded-md border border-rule bg-background px-3.5 py-2.5 text-start leading-relaxed";
+function AssistantMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <Message from="assistant">
+      <MessageContent className="text-base leading-relaxed">{children}</MessageContent>
+    </Message>
+  );
+}
 
 export function Ask() {
   const [value, setValue] = useState("");
@@ -170,37 +178,64 @@ export function Ask() {
     <section id="ask" className="border-b border-rule bg-surface-raised">
       <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
         <Reveal>
-          <h2 className="field-label md:pt-2.5">Ask</h2>
+          <p className="field-label md:pt-2.5">AI chat</p>
         </Reveal>
 
         <div className="max-w-2xl">
           <Reveal delay={80}>
-            <div className="flex h-[min(34rem,70svh)] flex-col overflow-hidden rounded-md border border-rule bg-card">
+            <h2
+              className="font-display text-2xl leading-[1.15] font-semibold tracking-tight text-balance sm:text-4xl"
+              style={{ fontStretch: "88%" }}
+            >
+              Ask my AI assistant about my work.
+            </h2>
+            <p className="mt-3 max-w-prose leading-relaxed text-dim">
+              A chatbot that answers from what I&rsquo;ve written about my
+              roles, projects and tools. Type a question, or tap a suggestion.
+            </p>
+          </Reveal>
+
+          <Reveal delay={160}>
+            <div className="mt-8 flex h-[min(36rem,72svh)] flex-col overflow-hidden rounded-3xl border border-rule bg-card shadow-sm">
+              <div className="flex items-center gap-3 border-b border-rule px-5 py-3.5">
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                >
+                  <Bot className="size-5" />
+                </span>
+                <div className="leading-tight">
+                  <p className="font-semibold">Mohammed&rsquo;s AI assistant</p>
+                  <p className="mt-0.5 text-sm text-dim">
+                    AI chatbot &middot; answers only from his portfolio
+                  </p>
+                </div>
+              </div>
+
               <Conversation className="min-h-0 flex-1" aria-busy={pending !== null}>
-                <ConversationContent className="gap-5 p-4">
-                  {turns.length === 0 && !pending && !failed && (
-                    <div className="my-auto">
-                      <p className="field-label mb-2.5">Try</p>
-                      <ul className="flex flex-wrap gap-1.5">
+                <ConversationContent className="gap-5 p-5">
+                  <AssistantMessage>
+                    <p>
+                      Hi, I&rsquo;m an AI chatbot trained on Mohammed&rsquo;s
+                      portfolio. Ask me about his work.
+                    </p>
+                    {turns.length === 0 && !pending && !failed && (
+                      <Suggestions className="mt-1">
                         {SEEDS.map((seed) => (
-                          <li key={seed}>
-                            <button
-                              type="button"
-                              onClick={() => void ask(seed)}
-                              className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
-                            >
-                              {seed}
-                            </button>
-                          </li>
+                          <Suggestion
+                            key={seed}
+                            suggestion={seed}
+                            onClick={(question) => void ask(question)}
+                          />
                         ))}
-                      </ul>
-                    </div>
-                  )}
+                      </Suggestions>
+                    )}
+                  </AssistantMessage>
 
                   {turns.map((turn) => (
                     <div key={turn.id} id={`turn-${turn.id}`} className="flex flex-col gap-3">
-                      <QuestionBubble>{turn.question}</QuestionBubble>
-                      <div className={ANSWER_BUBBLE}>
+                      <UserMessage>{turn.question}</UserMessage>
+                      <AssistantMessage>
                         <p dir="auto" className={turn.refused ? "text-dim" : ""}>
                           {turn.answer}
                         </p>
@@ -208,7 +243,7 @@ export function Ask() {
                         {turn.sources.length > 0 && (
                           <div className="mt-4">
                             <p className="field-label mb-2">Sources</p>
-                            <ul className="flex flex-wrap gap-1.5">
+                            <ul className="flex flex-wrap gap-2">
                               {turn.sources.map((source) => {
                                 const hasRow = ROW_IDS.has(source.record_id);
                                 return (
@@ -217,13 +252,13 @@ export function Ask() {
                                       <button
                                         type="button"
                                         onClick={() => scrollToRecord(source.record_id)}
-                                        className="cursor-pointer rounded-sm border border-match bg-match/20 px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
+                                        className="cursor-pointer rounded-full border border-match bg-match/20 px-3 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
                                       >
                                         <span aria-hidden="true">&uarr; </span>
                                         {source.title}
                                       </button>
                                     ) : (
-                                      <span className="rounded-sm border border-rule px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
+                                      <span className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
                                         {source.title}
                                       </span>
                                     )}
@@ -233,30 +268,32 @@ export function Ask() {
                             </ul>
                           </div>
                         )}
-                      </div>
+                      </AssistantMessage>
                     </div>
                   ))}
 
                   {pending && (
                     <div className="flex flex-col gap-3">
-                      <QuestionBubble dim>{pending}</QuestionBubble>
-                      <p className={`${ANSWER_BUBBLE} field-label`}>Thinking&hellip;</p>
+                      <UserMessage dim>{pending}</UserMessage>
+                      <AssistantMessage>
+                        <p className="field-label">Thinking&hellip;</p>
+                      </AssistantMessage>
                     </div>
                   )}
 
                   {failed && (
                     <div className="flex flex-col gap-3">
-                      <QuestionBubble dim>{failed.question}</QuestionBubble>
-                      <div className={ANSWER_BUBBLE}>
+                      <UserMessage dim>{failed.question}</UserMessage>
+                      <AssistantMessage>
                         <p className="text-dim">{failed.message}</p>
                         <button
                           type="button"
                           onClick={() => void ask(failed.question)}
-                          className="mt-3 cursor-pointer rounded-sm font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
+                          className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
                         >
                           Try again
                         </button>
-                      </div>
+                      </AssistantMessage>
                     </div>
                   )}
                 </ConversationContent>
@@ -267,11 +304,11 @@ export function Ask() {
                 <ConversationScrollButton />
               </Conversation>
 
-              <form onSubmit={onSubmit} className="border-t border-rule px-4 py-3">
+              <form onSubmit={onSubmit} className="border-t border-rule p-3.5">
                 <label htmlFor="ask-input" className="sr-only">
                   Ask a question about Mohammed&rsquo;s work
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-rule bg-background py-1.5 ps-5 pe-1.5 transition-colors focus-within:border-foreground">
                   <input
                     id="ask-input"
                     ref={inputRef}
@@ -282,21 +319,22 @@ export function Ask() {
                     autoComplete="off"
                     dir="auto"
                     placeholder="Ask about his work&hellip;"
-                    className="w-full bg-transparent text-lg outline-none placeholder:text-dim disabled:opacity-50"
+                    className="w-full bg-transparent py-1.5 text-base outline-none placeholder:text-dim disabled:opacity-50 sm:text-lg"
                   />
                   <button
                     type="submit"
+                    aria-label="Send question"
                     disabled={pending !== null || !value.trim()}
-                    className="field-label shrink-0 cursor-pointer rounded-sm px-1 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Ask
+                    <ArrowUp className="size-5" aria-hidden="true" />
                   </button>
                 </div>
               </form>
             </div>
           </Reveal>
 
-          <Reveal delay={160}>
+          <Reveal delay={240}>
             <p className="mt-4 text-sm leading-relaxed text-dim">
               Answers come only from what Mohammed has written about his own
               work. Anything outside that, it declines.
