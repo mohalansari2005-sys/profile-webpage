@@ -18,7 +18,8 @@ const corpus = {
                    summary: 'He said "hi" — really', tools: ["python"] }],
     projects: [{ id: "proj-b", title: "Thing", org: "Acme", period: "2026",
                  summary: "Built it.", tools: ["python", "agile"], href: "https://x.test",
-                 repo: "https://github.com/x/proj-b" }],
+                 repo: "https://github.com/x/proj-b",
+                 ar: { title: "شيء", summary: "بُني." } }],
     about: [], faq: [],
   },
   records: [
@@ -27,6 +28,7 @@ const corpus = {
       body: "## What I did\n\nProse.", source: "experience/a.md" },
     { id: "proj-b", kind: "projects", title: "Thing", org: "Acme", period: "2026",
       summary: "Built it.", tools: ["python", "agile"], href: "https://x.test",
+      ar: { title: "شيء", summary: "بُني." },
       body: "## Overview\n\nMore prose.", source: "projects/b.md" },
   ],
 };
@@ -63,6 +65,21 @@ test("emits repo only when present", () => {
   assert.match(proj, /repo: "https:\/\/github\.com\/x\/proj-b"/);
   const exp = out.slice(out.indexOf("exp-a"), out.indexOf("proj-b"));
   assert.doesNotMatch(exp, /repo:/);
+});
+
+test("emits Arabic copy to the frontend module when present", () => {
+  const out = renderModule(corpus);
+  assert.match(out, /ar: \{ title: "شيء", summary: "بُني\." \}/);
+  const exp = out.slice(out.indexOf("exp-a"), out.indexOf("proj-b"));
+  assert.doesNotMatch(exp, /ar:/);
+});
+
+test("Arabic copy never reaches the chat corpus JSON", () => {
+  const json = renderCorpusJson(corpus);
+  assert.doesNotMatch(json, /شيء|بُني/);
+  assert.doesNotMatch(json, /"ar"/);
+  // ...while the record itself is still there.
+  assert.match(json, /"proj-b"/);
 });
 
 test("marks the file as generated", () => {

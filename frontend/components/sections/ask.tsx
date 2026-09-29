@@ -10,23 +10,23 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { useI18n } from "@/components/i18n-provider";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
 import { experience, projects } from "@/lib/content";
-import { askChat, MAX_HISTORY, type ChatMessage, type ChatSource } from "@/lib/chat-api";
+import { localize, type Locale } from "@/lib/i18n";
+import {
+  askChat,
+  MAX_HISTORY,
+  type ChatError,
+  type ChatMessage,
+  type ChatSource,
+} from "@/lib/chat-api";
 
 /** Only these records have a row to scroll to. `about-bio` and the faq
     records can be cited but are not rendered anywhere on the page, so their
     chips stay inert rather than pointing at nothing. */
 const ROW_IDS = new Set([...experience, ...projects].map((record) => record.id));
-
-/** Three questions the corpus can actually answer, so the first turn teaches
-    the edges: a role, a project, and an faq that has no row on the page. */
-const SEEDS = [
-  "What did he build at Majara?",
-  "What is Keyraa?",
-  "Is he available for work?",
-];
 
 type Turn = {
   id: number;
@@ -47,6 +47,14 @@ function scrollToRecord(recordId: string) {
   // smooth in CSS and forced to `auto` under prefers-reduced-motion, so
   // inheriting it is what makes the reduced-motion case correct.
   row.scrollIntoView({ block: "center" });
+}
+
+/** The chip shows the record's title in the page's language when the record has
+    a row on the page; records without one (the bio, the FAQ) keep the title the
+    server sent. */
+function sourceTitle(source: ChatSource, locale: Locale): string {
+  const record = [...experience, ...projects].find((r) => r.id === source.record_id);
+  return record ? localize(record, locale).title : source.title;
 }
 
 function historyFrom(turns: Turn[]): ChatMessage[] {
@@ -128,10 +136,11 @@ function AssistantMessage({ children }: { children: React.ReactNode }) {
 }
 
 export function Ask() {
+  const { locale, t } = useI18n();
   const [value, setValue] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState<string | null>(null);
-  const [failed, setFailed] = useState<{ question: string; message: string } | null>(null);
+  const [failed, setFailed] = useState<{ question: string; error: ChatError } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(1);
   // `pending` only disables the input after a re-render, and a seed chip
@@ -154,7 +163,7 @@ export function Ask() {
     inFlight.current = false;
     setPending(null);
     if (!result.ok) {
-      setFailed({ question: trimmed, message: result.message });
+      setFailed({ question: trimmed, error: result.error });
       return;
     }
     const id = nextId.current++;
@@ -181,7 +190,7 @@ export function Ask() {
     <section id="ask" className="border-b border-rule bg-surface-raised">
       <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
         <Reveal>
-          <p className="field-label md:pt-2.5">AI chat</p>
+          <p className="field-label md:pt-2.5">{t.ask.label}</p>
         </Reveal>
 
         <div className="max-w-2xl">
@@ -190,11 +199,10 @@ export function Ask() {
               className="font-display text-2xl leading-[1.15] font-semibold tracking-tight text-balance sm:text-4xl"
               style={{ fontStretch: "88%" }}
             >
-              Ask my AI assistant about my work.
+              {t.ask.heading}
             </h2>
             <p className="mt-3 max-w-prose leading-relaxed text-dim">
-              A chatbot that answers from what I&rsquo;ve written about my
-              roles, projects and tools. Type a question, or tap a suggestion.
+              {t.ask.intro}
             </p>
           </Reveal>
 
@@ -208,9 +216,9 @@ export function Ask() {
                   <Bot className="size-5" />
                 </span>
                 <div className="leading-tight">
-                  <p className="font-semibold">Mohammed&rsquo;s AI assistant</p>
+                  <p className="font-semibold">{t.ask.assistantName}</p>
                   <p className="mt-0.5 text-sm text-dim">
-                    AI chatbot &middot; answers only from his portfolio
+                    {t.ask.assistantTagline}
                   </p>
                 </div>
               </div>
@@ -218,13 +226,10 @@ export function Ask() {
               <Conversation className="min-h-0 flex-1" aria-busy={pending !== null}>
                 <ConversationContent className="gap-5 p-5">
                   <AssistantMessage>
-                    <p>
-                      Hi, I&rsquo;m an AI chatbot trained on Mohammed&rsquo;s
-                      portfolio. Ask me about his work.
-                    </p>
+                    <p>{t.ask.greeting}</p>
                     {turns.length === 0 && !pending && !failed && (
                       <Suggestions className="mt-1">
-                        {SEEDS.map((seed) => (
+                        {t.ask.seeds.map((seed) => (
                           <Suggestion
                             key={seed}
                             suggestion={seed}
@@ -245,10 +250,11 @@ export function Ask() {
 
                         {turn.sources.length > 0 && (
                           <div className="mt-4">
-                            <p className="field-label mb-2">Sources</p>
+                            <p className="field-label mb-2">{t.ask.sources}</p>
                             <ul className="flex flex-wrap gap-2">
                               {turn.sources.map((source) => {
                                 const hasRow = ROW_IDS.has(source.record_id);
+                                const title = sourceTitle(source, locale);
                                 return (
                                   <li key={source.record_id}>
                                     {hasRow ? (
@@ -258,11 +264,11 @@ export function Ask() {
                                         className="cursor-pointer rounded-full border border-match bg-match/20 px-3 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
                                       >
                                         <span aria-hidden="true">&uarr; </span>
-                                        {source.title}
+                                        {title}
                                       </button>
                                     ) : (
                                       <span className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
-                                        {source.title}
+                                        {title}
                                       </span>
                                     )}
                                   </li>
@@ -279,7 +285,7 @@ export function Ask() {
                     <div className="flex flex-col gap-3">
                       <UserMessage dim>{pending}</UserMessage>
                       <AssistantMessage>
-                        <p className="field-label">Thinking&hellip;</p>
+                        <p className="field-label">{t.ask.thinking}</p>
                       </AssistantMessage>
                     </div>
                   )}
@@ -288,13 +294,13 @@ export function Ask() {
                     <div className="flex flex-col gap-3">
                       <UserMessage dim>{failed.question}</UserMessage>
                       <AssistantMessage>
-                        <p className="text-dim">{failed.message}</p>
+                        <p className="text-dim">{t.ask.errors[failed.error]}</p>
                         <button
                           type="button"
                           onClick={() => void ask(failed.question)}
                           className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
                         >
-                          Try again
+                          {t.ask.tryAgain}
                         </button>
                       </AssistantMessage>
                     </div>
@@ -309,7 +315,7 @@ export function Ask() {
 
               <form onSubmit={onSubmit} className="border-t border-rule p-3.5">
                 <label htmlFor="ask-input" className="sr-only">
-                  Ask a question about Mohammed&rsquo;s work
+                  {t.ask.inputLabel}
                 </label>
                 <div className="flex items-center gap-2 rounded-full border border-rule bg-background py-1.5 ps-5 pe-1.5 transition-colors focus-within:border-foreground">
                   <input
@@ -321,12 +327,12 @@ export function Ask() {
                     maxLength={1000}
                     autoComplete="off"
                     dir="auto"
-                    placeholder="Ask about his work&hellip;"
+                    placeholder={t.ask.placeholder}
                     className="w-full bg-transparent py-1.5 text-base outline-none placeholder:text-dim disabled:opacity-50 sm:text-lg"
                   />
                   <button
                     type="submit"
-                    aria-label="Send question"
+                    aria-label={t.ask.send}
                     disabled={pending !== null || !value.trim()}
                     className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -339,8 +345,7 @@ export function Ask() {
 
           <Reveal delay={240}>
             <p className="mt-4 text-sm leading-relaxed text-dim">
-              Answers come only from what Mohammed has written about his own
-              work. Anything outside that, it declines.
+              {t.ask.disclaimer}
             </p>
           </Reveal>
         </div>

@@ -292,3 +292,26 @@ test("rejects a repo that is not a string", () => {
   });
   assert.throws(() => loadCorpus(dir), CorpusError);
 });
+
+test("collects <field>_ar into an ar object, trimming the summary", () => {
+  const dir = fixture({
+    "tools.yml": TOOLS,
+    "experience/a.md": REC.replace("summary: Did things.",
+      "summary: Did things.\ntitle_ar: مهندس\nsummary_ar: '  فعل أشياء.  '"),
+  });
+  const rec = loadCorpus(dir).byKind.experience[0];
+  assert.deepEqual(rec.ar, { title: "مهندس", summary: "فعل أشياء." });
+});
+
+test("a record with no Arabic fields has no ar key", () => {
+  const dir = fixture({ "tools.yml": TOOLS, "experience/a.md": REC });
+  assert.equal("ar" in loadCorpus(dir).byKind.experience[0], false);
+});
+
+test("rejects an Arabic field that is not a string", () => {
+  const dir = fixture({
+    "tools.yml": TOOLS,
+    "experience/a.md": REC.replace("summary: Did things.", "summary: Did things.\ntitle_ar: [1]"),
+  });
+  assert.throws(() => loadCorpus(dir), CorpusError);
+});

@@ -1,13 +1,19 @@
 import { Reveal } from "@/components/reveal";
+import type { Messages } from "@/messages";
 
 /* The GitHub and LinkedIn marks are the Simple Icons paths (simpleicons.org,
    CC0); the envelope is drawn to match them — filled, no stroke — so the three
    read at one weight. None of them carries a brand color: `currentColor` takes
    whatever the label is set to, so they track `--match-ink` and would follow it
    anywhere the token is redefined. */
-const links = [
+const links: {
+  key: "email" | "github" | "linkedin";
+  value: string;
+  href: string;
+  icon: React.ReactNode;
+}[] = [
   {
-    label: "Email",
+    key: "email",
     value: "moh.alansari2005@gmail.com",
     href: "mailto:moh.alansari2005@gmail.com",
     icon: (
@@ -23,7 +29,7 @@ const links = [
     ),
   },
   {
-    label: "GitHub",
+    key: "github",
     value: "github.com/mohalansari2005-sys",
     href: "https://github.com/mohalansari2005-sys",
     icon: (
@@ -38,7 +44,7 @@ const links = [
     ),
   },
   {
-    label: "LinkedIn",
+    key: "linkedin",
     value: "linkedin.com/in/mohammed-m-al-ansari",
     href: "https://www.linkedin.com/in/mohammed-m-al-ansari",
     icon: (
@@ -54,12 +60,12 @@ const links = [
   },
 ];
 
-export function Contact() {
+export function Contact({ t }: { t: Messages["contact"] }) {
   return (
     <footer id="contact">
       <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
         <Reveal>
-          <h2 className="field-label md:pt-2.5">Contact</h2>
+          <h2 className="field-label md:pt-2.5">{t.label}</h2>
         </Reveal>
 
         <div className="max-w-2xl">
@@ -68,21 +74,20 @@ export function Contact() {
               className="font-display text-2xl leading-[1.15] font-semibold tracking-tight text-balance sm:text-4xl"
               style={{ fontStretch: "88%" }}
             >
-              If any of this connects to what you&rsquo;re building, I&rsquo;d
-              like to hear about it.
+              {t.heading}
             </p>
           </Reveal>
 
           <dl className="mt-10">
             {links.map((link, index) => (
-              <Reveal key={link.label} delay={160 + index * 70}>
+              <Reveal key={link.key} delay={160 + index * 70}>
                 <div className="grid gap-1 border-t border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
                   {/* The icon sits in the label column beside the mono label,
                       not inside the link — the visible label and the full URL
                       stay the accessible name, so the glyph is decorative. */}
                   <dt className="field-label flex items-center gap-2 sm:pt-1">
                     {link.icon}
-                    {link.label}
+                    {t[link.key]}
                   </dt>
                   <dd>
                     <a
@@ -98,7 +103,7 @@ export function Contact() {
           </dl>
 
           <p className="mt-12 font-mono text-[0.6875rem] tracking-[0.1em] text-dim uppercase">
-            Mohammed Alansari — 2026
+            {t.footer}
           </p>
         </div>
       </div>

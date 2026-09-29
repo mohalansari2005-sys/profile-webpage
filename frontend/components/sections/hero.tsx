@@ -1,17 +1,11 @@
 import type { CSSProperties } from "react";
-
-/** The record's own fields. Labels are attributes, not decoration. */
-const fields = [
-  { label: "Role", value: "Product Engineer at Majara" },
-  { label: "Focus", value: "Computer Information Systems, King Saud University" },
-  { label: "Based", value: "Riyadh, Saudi Arabia" },
-];
+import type { Messages } from "@/messages";
 
 function stagger(ms: number) {
   return { "--stagger": `${ms}ms` } as CSSProperties;
 }
 
-export function Hero() {
+export function Hero({ t }: { t: Messages["hero"] }) {
   return (
     <section className="border-b border-rule">
       <div className="mx-auto w-full max-w-5xl px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
@@ -28,7 +22,7 @@ export function Hero() {
               className="font-display text-xl font-semibold tracking-tight text-background sm:text-3xl"
               style={{ fontStretch: "88%" }}
             >
-              MA
+              {t.monogram}
             </span>
           </div>
 
@@ -36,9 +30,9 @@ export function Hero() {
             className="field-in font-display text-[clamp(2.75rem,11vw,6.5rem)] leading-[0.86] font-extrabold tracking-[-0.035em]"
             style={{ ...stagger(60), fontStretch: "85%" }}
           >
-            Mohammed
+            {t.nameFirst}
             <br />
-            Alansari
+            {t.nameLast}
           </h1>
         </div>
 
@@ -48,7 +42,7 @@ export function Hero() {
         />
 
         <dl className="grid">
-          {fields.map((field, index) => (
+          {t.fields.map((field, index) => (
             <div
               key={field.label}
               className="field-in grid gap-1 border-b border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-5"
@@ -56,7 +50,7 @@ export function Hero() {
             >
               <dt className="field-label sm:pt-1.5">{field.label}</dt>
               <dd className="text-lg text-balance sm:text-xl">
-                {field.label === "Based" ? (
+                {index === t.fields.length - 1 ? (
                   <span className="flex items-baseline gap-2.5">
                     <span
                       className="size-2 shrink-0 translate-y-[-0.15em] rounded-full bg-signal"
@@ -76,9 +70,7 @@ export function Hero() {
           className="field-in mt-10 max-w-2xl text-lg leading-relaxed text-balance sm:text-xl"
           style={stagger(600)}
         >
-          Computer Information Systems student at King Saud University,
-          building backend systems, data pipelines, and AI-enabled
-          applications.
+          {t.tagline}
         </p>
 
         <div className="field-in mt-9" style={stagger(700)}>
@@ -87,7 +79,7 @@ export function Hero() {
             className="group inline-flex items-center gap-3 rounded-sm bg-foreground px-5 py-3 text-background transition-colors hover:bg-match-ink"
           >
             <span className="font-mono text-xs font-medium tracking-[0.14em] uppercase">
-              See where the work connects
+              {t.cta}
             </span>
             <span
               className="transition-transform group-hover:translate-y-0.5"

@@ -24,20 +24,20 @@ export type ChatAnswer = {
 
 export type ChatResult =
   | { ok: true; data: ChatAnswer }
-  | { ok: false; message: string };
+  | { ok: false; error: ChatError };
 
 /**
- * Everything the reader might see when a request does not produce an answer.
- * A refusal is *not* one of these — a refusal is a successful, grounded
- * "I can't answer that from the corpus" and arrives as `ok: true`.
+ * Why a request did not produce an answer. These are kinds, not sentences: the
+ * UI turns each into copy in the reader's language (messages/*.ts). A refusal
+ * is *not* one of these — a refusal is a successful, grounded "I can't answer
+ * that from the corpus" and arrives as `ok: true`.
  */
-const MESSAGES = {
-  throttled: "Too many questions right now — try again in a minute.",
-  server: "The answer service hit an error. Try again in a moment.",
-  network: "Couldn't reach the answer service.",
-  malformed: "The answer service sent back something unexpected.",
-  unconfigured: "The answer service isn't configured for this build.",
-} as const;
+export type ChatError =
+  | "throttled"
+  | "server"
+  | "network"
+  | "malformed"
+  | "unconfigured";
 
 function isSource(value: unknown): value is ChatSource {
   if (typeof value !== "object" || value === null) return false;
@@ -70,7 +70,7 @@ export async function askChat(input: {
   question: string;
   history: ChatMessage[];
 }): Promise<ChatResult> {
-  if (!CHAT_API_URL) return { ok: false, message: MESSAGES.unconfigured };
+  if (!CHAT_API_URL) return { ok: false, error: "unconfigured" };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -89,18 +89,18 @@ export async function askChat(input: {
     if (response.status === 429) {
       // DRF's own `detail` is machine copy ("Expected available in 42
       // seconds."), so the reader gets ours instead.
-      return { ok: false, message: MESSAGES.throttled };
+      return { ok: false, error: "throttled" };
     }
-    if (!response.ok) return { ok: false, message: MESSAGES.server };
+    if (!response.ok) return { ok: false, error: "server" };
 
     const parsed = parseAnswer(await response.json());
     return parsed
       ? { ok: true, data: parsed }
-      : { ok: false, message: MESSAGES.malformed };
+      : { ok: false, error: "malformed" };
   } catch {
     // A timeout, a CORS rejection, and an offline browser are the same event
     // to the reader: the question did not get through.
-    return { ok: false, message: MESSAGES.network };
+    return { ok: false, error: "network" };
   } finally {
     clearTimeout(timer);
   }
