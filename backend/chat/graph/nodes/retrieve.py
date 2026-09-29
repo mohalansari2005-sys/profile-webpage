@@ -12,7 +12,7 @@ TOP_K = 6
 def retrieve(state: ChatState) -> dict:
     # embed_query is imported into this module's namespace on purpose: that is
     # what lets each node's tests monkeypatch it without touching the network.
-    vector = embed_query(state["condensed"])
+    vector = embed_query(state.get("search_query") or state["condensed"])
     if vector is None:
         return {"retrieved": []}
 

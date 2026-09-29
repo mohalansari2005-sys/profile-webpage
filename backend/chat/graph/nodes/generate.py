@@ -2,7 +2,7 @@ from django.conf import settings
 from pydantic import BaseModel
 
 from chat.graph.state import ChatState
-from chat.language import is_arabic
+from chat.language import NAME_GLOSSARY, is_arabic
 from chat.openai_client import structured
 
 REFUSAL = (
@@ -35,6 +35,8 @@ and technology names in their original Latin spelling.
 - List in used_chunk_ids the exact chunk ids you drew from. Never invent an id.
 - If the context does not contain the answer, set sufficient to false.
 
+{glossary}
+
 Context:
 {context}
 
@@ -63,7 +65,7 @@ def generate(state: ChatState) -> dict:
 
     context = "\n\n".join(f"[{c['chunk_id']}] {c['text']}" for c in retrieved)
     parsed, usage = structured(
-        PROMPT.format(context=context, question=state["condensed"]), Answer
+        PROMPT.format(glossary=NAME_GLOSSARY, context=context, question=state["condensed"]), Answer
     )
 
     if parsed is None:

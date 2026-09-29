@@ -273,3 +273,22 @@ tools: [
   }
   assert.match(err.problems.join("\n"), /tools.yml.*parse/i);
 });
+
+test("passes a project's repo through to the record", () => {
+  const dir = fixture({
+    "tools.yml": TOOLS,
+    "projects/p.md": REC.replace("id: exp-a", "id: proj-p").replace("kind: experience", "kind: projects")
+      .replace("summary: Did things.", "summary: Did things.\nrepo: https://github.com/x/p"),
+  });
+  const rec = loadCorpus(dir).byKind.projects[0];
+  assert.equal(rec.repo, "https://github.com/x/p");
+});
+
+test("rejects a repo that is not a string", () => {
+  const dir = fixture({
+    "tools.yml": TOOLS,
+    "projects/p.md": REC.replace("id: exp-a", "id: proj-p").replace("kind: experience", "kind: projects")
+      .replace("summary: Did things.", "summary: Did things.\nrepo: [1, 2]"),
+  });
+  assert.throws(() => loadCorpus(dir), CorpusError);
+});

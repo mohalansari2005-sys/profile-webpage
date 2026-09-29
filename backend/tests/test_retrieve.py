@@ -107,3 +107,13 @@ def test_records_stay_in_relevance_order(db, three_chunks, record_with_sections,
     assert out["retrieved"][0]["chunk_id"] == "exp-b#summary"
     # every chunk of a matched record appears exactly once
     assert len(set(c["chunk_id"] for c in out["retrieved"])) == len(out["retrieved"])
+
+
+def test_retrieval_embeds_the_english_search_query_when_there_is_one(db, three_chunks, monkeypatch):
+    from chat.graph.nodes import retrieve as node
+
+    seen = []
+    monkeypatch.setattr(node, "embed_query", lambda q: seen.append(q) or [0.0] * 1536)
+    node.retrieve({"condensed": "ما هي Majara؟", "search_query": "What is Majara?"})
+    node.retrieve({"condensed": "What is Majara?"})
+    assert seen == ["What is Majara?", "What is Majara?"]
