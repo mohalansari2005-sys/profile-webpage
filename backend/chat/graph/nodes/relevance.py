@@ -21,8 +21,10 @@ portfolio site. Classify the subject of the visitor's message as exactly one of:
 
 mohammed -- the message asks about Mohammed himself: his work, experience, \
 projects, skills, tools, studies and education, what he is working on now, his \
-background and interests, his availability, what he wants next. Illustrative, \
-not exhaustive.
+background and interests, his availability, what he wants next. The website \
+and chatbot the visitor is using are his project too, so questions about how \
+this site or chatbot was built, its stack, architecture, testing or deployment \
+are mohammed. Illustrative, not exhaustive.
 
 unknown_name -- the message mentions a company, project, product, tool or \
 acronym whose name you do not recognise. Visitors ask this site about things \

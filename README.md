@@ -1,7 +1,8 @@
 # profile-webpage
 
 Personal portfolio for Mohammed Alansari — a static site built with Next.js and
-deployed on Vercel.
+deployed on Vercel, in English (`/`) and Arabic (`/ar`), with an AI chat backed
+by a Django service.
 
 **Live:** https://profile-webpage-liart.vercel.app
 
@@ -32,7 +33,10 @@ from inside `frontend/`.
 - **next/font** — Bricolage Grotesque (display), Source Serif 4 (body),
   JetBrains Mono (labels and data), self-hosted at build time
 
-No UI component library, no animation library, no state management library.
+No animation library and no state management library. The chat uses a few
+copied-in components from shadcn's registry and Vercel's AI Elements
+(`frontend/components/ai-elements/`, `frontend/components/ui/`), trimmed to what
+plain-text answers need.
 
 ## Commands
 
@@ -44,6 +48,9 @@ npm run lint    # ESLint (next/core-web-vitals + TypeScript)
 ```
 
 `npm test` at the repo root runs the corpus and generator unit tests.
+`npm run test:e2e` (in `frontend/`) runs the Playwright suite against the static
+build — run `npm run build` first; CI does. It mocks the chat API, so it needs no
+backend and spends nothing.
 `npm run start` exists but isn't used here — see Deployment below.
 
 The backend runs separately, from the repo root:
@@ -76,13 +83,11 @@ from the client rather than a local API route.
 
 ### Server Components by default
 
-Everything under `frontend/app/` renders at build time and ships no JavaScript. Exactly
-two files opt into the client:
-
-- `frontend/components/sections/work.tsx` — holds the join's state
-- `frontend/components/reveal.tsx` — needs DOM geometry and IntersectionObserver
-
-Everything else — hero, about, contact — is server-rendered and ships zero JS.
+Everything under `frontend/app/` renders at build time. Sections with no
+interactivity (hero, about, contact) are server components and ship no
+JavaScript. Client components are the ones that hold state or touch the DOM:
+the tool join (`work.tsx`, `join-context.tsx`), the chat (`ask.tsx`), scroll
+reveal (`reveal.tsx`), the theme and language toggles, and the i18n provider.
 
 ### The corpus lives in `content/`, generated into `frontend/lib/content.ts`
 
@@ -181,8 +186,10 @@ handles the JS-disabled case. All three parts are load-bearing.
 ## The chat backend
 
 `POST /api/chat/` answers questions about my work using only the `content/`
-corpus, and refuses anything it cannot ground. It is local-only for now — no
-VPS, no domain, no TLS.
+corpus, and refuses anything it cannot ground. It runs locally with Docker
+Compose, and in production on a VPS behind Caddy (see `DEPLOYMENT.md`); a GitHub
+Actions workflow redeploys it, re-running migrations and `ingest_content`, on
+every push to `main` that touches the backend.
 
 A request runs through a five-node LangGraph: `condense → relevance → retrieve
 → generate → log`. Retrieval is pgvector cosine distance over 1536-dimension
@@ -202,9 +209,8 @@ checks.
 ## The Ask section
 
 The chat UI is `frontend/components/sections/ask.tsx`, and it renders **only
-when `NEXT_PUBLIC_CHAT_API_URL` is set at build time**. Production does not set
-it, so the live site's markup and behaviour are unchanged until a deployed
-backend exists. (The gate is on rendering, not bundling — Turbopack keeps the
+when `NEXT_PUBLIC_CHAT_API_URL` is set at build time**; set it in Vercel to
+enable the section, leave it unset and the site renders without it. (The gate is on rendering, not bundling — Turbopack keeps the
 module in a chunk either way, where it is unreachable dead code with no URL to
 talk to.)
 
@@ -224,6 +230,28 @@ as an inert chip and dims nothing.
 There is **one active join at a time**, owned by `frontend/components/join-context.tsx`:
 asking a question releases a pinned tool, picking a tool releases the citation,
 and hovering a tool previews over either without destroying it.
+
+## Languages and theme
+
+English is served at `/` and Arabic at `/ar`. Each is its own root layout
+(`frontend/app/(en)`, `frontend/app/(ar)`), so `lang` and `dir` are in the first
+byte of HTML; static export has no redirects, which is why English stays at the
+root rather than moving to `/en`. UI copy is in `frontend/messages/en.ts` and
+`ar.ts` (the Arabic file is typed against the English one, so a missing key
+fails `tsc`). Record text can carry Arabic in `*_ar` frontmatter fields, which
+reach the site but are stripped from `backend/corpus.json`. Layout uses logical
+CSS properties so it mirrors right to left.
+
+Dark mode follows the OS, with a toggle; a script in `<head>` sets the theme
+before first paint.
+
+## Testing and CI
+
+`.github/workflows/ci.yml` runs on every pull request: lint, build and the
+Playwright suite for the frontend; the content-pipeline tests and
+`content:check`; and the backend `pytest` suite against real PostgreSQL
+(pgvector) and Redis containers. The live-model prompt evaluations
+(`pytest -m eval`) are opt-in because they spend API credit.
 
 ## Deployment
 

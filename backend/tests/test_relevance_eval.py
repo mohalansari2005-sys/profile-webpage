@@ -57,6 +57,19 @@ IN_SCOPE_TOPICS = [
     "What did he build at Majara?",
 ]
 
+# The site and chatbot the visitor is using are one of Mohammed's projects.
+# A gate that reads "this website" as general knowledge would refuse them.
+IN_SCOPE_THIS_SITE = [
+    "How was this website built?",
+    "What stack does this site use?",
+    "How does the chatbot work?",
+    "What is his portfolio website project?",
+    "How is this chatbot tested and deployed?",
+    "Is the code for this site public?",
+    "كيف بُني هذا الموقع؟",
+    "ما هي التقنيات المستخدمة في هذا الموقع؟",
+]
+
 # The same judgment in Arabic. Names arrive in Arabic script (ماجرة, صيت), which
 # the gate must treat like their Latin spelling.
 IN_SCOPE_ARABIC = [
@@ -85,7 +98,8 @@ OUT_OF_SCOPE = [
 
 @pytest.mark.parametrize(
     "question",
-    IN_SCOPE_ENTITIES + IN_SCOPE_BUT_UNANSWERABLE + IN_SCOPE_TOPICS + IN_SCOPE_ARABIC,
+    IN_SCOPE_ENTITIES + IN_SCOPE_BUT_UNANSWERABLE + IN_SCOPE_TOPICS + IN_SCOPE_ARABIC
+    + IN_SCOPE_THIS_SITE,
 )
 def test_questions_about_mohammed_reach_retrieval(question):
     from chat.graph.nodes.relevance import relevance

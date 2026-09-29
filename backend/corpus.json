@@ -37,6 +37,46 @@
       "group": "Build"
     },
     {
+      "id": "typescript",
+      "label": "TypeScript",
+      "group": "Build"
+    },
+    {
+      "id": "react",
+      "label": "React",
+      "group": "Build"
+    },
+    {
+      "id": "nextjs",
+      "label": "Next.js",
+      "group": "Build"
+    },
+    {
+      "id": "tailwind",
+      "label": "Tailwind CSS",
+      "group": "Build"
+    },
+    {
+      "id": "django",
+      "label": "Django",
+      "group": "Build"
+    },
+    {
+      "id": "openai-api",
+      "label": "OpenAI API",
+      "group": "Build"
+    },
+    {
+      "id": "langgraph",
+      "label": "LangGraph",
+      "group": "Build"
+    },
+    {
+      "id": "rag",
+      "label": "RAG",
+      "group": "Build"
+    },
+    {
       "id": "postgres",
       "label": "PostgreSQL",
       "group": "Data & infrastructure"
@@ -59,6 +99,21 @@
     {
       "id": "pytest",
       "label": "pytest",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "pgvector",
+      "label": "pgvector",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright",
+      "group": "Data & infrastructure"
+    },
+    {
+      "id": "github-actions",
+      "label": "GitHub Actions",
       "group": "Data & infrastructure"
     },
     {
@@ -135,6 +190,35 @@
       "repo": "https://github.com/mohalansari2005-sys/keyraa-hotel-booking",
       "body": "## What the work actually involved\n\nKeyraa is a corporate hotel booking platform, and what I built was its backend. It began as a proof of concept for a B2B corporate housing product designed to solve a largely operational problem: companies often need to arrange accommodation for groups of employees, but the process can end up being handled manually by HR teams, project managers, or relocation staff. They may need to find suitable properties, negotiate with multiple suppliers, coordinate individual employee stays, track availability and costs, handle changes in headcount, and reconcile multiple bookings and invoices. As the number of employees grows, this becomes a time-consuming administrative job rather than something the company should have to manage manually.\n\nThe product was designed to centralize that process. Instead of a project manager coordinating dozens of accommodation arrangements separately, a company could manage its housing requirements through one platform, with bulk booking workflows, centralized booking information, and a single view of occupancy and accommodation costs. The broader business model was aimed at organizations such as consulting and contracting companies housing project teams, large HR departments managing relocation and housing, and recruitment companies arranging accommodation for incoming employees.\n\nThe backend I built was responsible for turning that product workflow into an actual system. I worked independently on the core FastAPI services, including REST APIs for hotel search, booking workflows, bulk operations, and related application logic. PostgreSQL stored tenant, traveler, and booking state, with SQLAlchemy providing the database layer and Alembic handling schema migrations.\n\nA major part of the problem was connecting the platform to Amadeus for hotel availability and booking. The purpose of the integration was not simply to expose another API to users; it was to automate work that would otherwise require a person to search for and coordinate accommodation. That meant the integration had to be reliable enough to operate as part of a larger workflow.\n\nAmadeus introduced constraints that shaped the architecture. Requests could be slow, rate-limited, or fail temporarily, and the application couldn't control those conditions. I therefore used Celery workers backed by Redis to process search and booking operations asynchronously where appropriate, keeping long-running external API work out of the main request/response cycle. The worker layer also provided a place to implement retries and exponential backoff rather than immediately failing a workflow when an external service experienced a transient problem.\n\nBooking required an additional reliability guarantee: **retrying an operation could never accidentally create a duplicate booking**. For example, a request might time out after the external provider had actually processed it. Retrying blindly could then result in two reservations for the same traveler. I treated idempotency as a core requirement, using idempotency keys and designing the application-side write path so that repeating the same operation would not create duplicate bookings or duplicate state.\n\nThe system was also designed for multiple corporate customers sharing the same platform. Each company needed its travelers, requests, and bookings isolated from every other company, so tenant context was incorporated into the application and used to scope the relevant data. This allowed the platform to support a B2B SaaS-style model without requiring a separate deployment for every customer.\n\nBulk operations were particularly important because they mapped directly to the underlying business pain. The goal wasn't simply to make it easier to book one hotel room. It was to reduce the amount of repetitive coordination required when a company needed accommodation for an entire project team. That meant the system had to account for multiple operations happening together, including partial failures, retries, changes in employee requirements, and the possibility that some bookings succeeded while others did not.\n\nThe workflow could also trigger confirmation emails once bookings cleared the relevant process, keeping communication downstream from the booking operation rather than making email delivery part of the critical transaction.\n\nThe project ultimately did not reach production. It was shelved after changes in industry regulations affected the booking model the product was built around. That was a business and regulatory change rather than a technical failure.\n\nWhat made the project valuable from an engineering perspective was the connection between the **business problem and the architecture**. The system wasn't complex simply because it used FastAPI, Celery, Redis, or PostgreSQL. Each major technical decision existed because of a real constraint: bulk workflows addressed the repetitive work handled by HR and project managers; asynchronous processing addressed slow and rate-limited external APIs; idempotency protected against duplicate bookings; and tenant isolation supported multiple corporate customers on the same platform.\n\nThe project gave me experience going beyond implementing isolated API endpoints and instead thinking about how a real business workflow should behave when it encounters unreliable dependencies, multiple users, changing requirements, and failure.",
       "source": "projects/keyraa.md"
+    },
+    {
+      "id": "proj-profile-webpage",
+      "kind": "projects",
+      "title": "Portfolio website with an AI chat",
+      "org": "Personal project",
+      "period": "2026",
+      "summary": "This website: a statically exported Next.js and TypeScript front end whose content is a validated Markdown corpus, plus a Django and LangGraph chatbot that answers questions about my work by retrieving over pgvector with OpenAI models, and refuses anything it cannot ground in that corpus. English and Arabic (right-to-left), dark mode, CI with Playwright, and a backend that deploys itself to a VPS.",
+      "tools": [
+        "typescript",
+        "react",
+        "nextjs",
+        "tailwind",
+        "python",
+        "django",
+        "langgraph",
+        "openai-api",
+        "rag",
+        "postgres",
+        "pgvector",
+        "redis",
+        "docker",
+        "pytest",
+        "playwright",
+        "github-actions"
+      ],
+      "repo": "https://github.com/mohalansari2005-sys/profile-webpage",
+      "body": "## What it is\n\nThis project is the website you are on right now: my portfolio, built as a\nsmall system rather than a template. The page is a set of typed records (roles\nand projects with a title, an organisation, a period, a summary and a list of\ntools), and the tool strip above them is a join. Hovering or focusing a tool\nlights every record that used it and dims the rest, which answers the question a\nreader actually has: not \"what does he know?\" but \"where did he actually use\nit?\".\n\nOn top of that sits an AI chatbot that answers questions about my work using\nonly what I have written down, and a full Arabic version of the site, with the\nlayout mirrored right to left. The source is public at\ngithub.com/mohalansari2005-sys/profile-webpage.\n\n## How the site is built\n\nThe front end is Next.js 16 with the App Router, React 19, TypeScript and\nTailwind CSS v4, exported as plain static files (`output: \"export\"`) and served\nby Vercel. Static export is the central constraint: there is no server at\nruntime, so no API routes, no middleware and no `redirects` in the Next config,\nand anything that needs a backend has to be called from the browser. Most of the\npage is server-rendered at build time and ships no JavaScript; only the parts\nthat hold state (the tool join, the chat, the theme and language toggles, the\nscroll-reveal) are client components.\n\nDesign tokens live once in CSS custom properties and map to Tailwind utilities.\nThree colours carry meaning: green marks structure, amber marks a matched row\nand appears nowhere else, and a dim grey is for secondary text. Motion is\nkept to a few deliberate moments and is switched off under `prefers-reduced-motion`.\n\n## The content pipeline\n\nEverything on the page and everything the chatbot knows comes from one place:\nMarkdown files in `content/`. Each record has frontmatter (title, organisation,\nperiod, tools, summary) and a body of longer prose. A single Node loader\nvalidates the whole corpus once and generates two committed artifacts: a\nTypeScript module for the site, which contains only the frontmatter fields, and\na JSON file for the chatbot's backend, which also contains each record's prose.\nBecause one loader feeds both, the page and the bot cannot disagree about what a\nrecord says.\n\nValidation is strict on purpose. A tool id in a record must match a declared\ntool, because that string is the join key the tool strip filters on; a typo used\nto render nothing silently and is now a build error naming the record and the\nunknown tool. Arabic display text lives in separate `*_ar` fields that go to the\nsite but are stripped from the chatbot's corpus, and a test enforces that.\n\n## The chatbot\n\nThe chat backend is a Django and Django REST Framework service. Each question\nruns through a five-node LangGraph: condense, relevance, retrieve, generate,\nlog. Condense rewrites a follow-up into a standalone question, and for Arabic\nquestions it also produces an English search query, because the corpus is in\nEnglish. Relevance is a scope gate that classifies what the question is about.\nRetrieve embeds the query with OpenAI's text-embedding-3-small (1536\ndimensions), finds the nearest chunks with pgvector cosine distance in\nPostgreSQL, and expands each hit to its whole record so the answer can carry the\ndetail. Generate answers from that context in the language of the question,\nnaming the chunks it used. Log writes a row for every turn.\n\nA record is split into a summary chunk plus one chunk per section heading. The\ningest command is idempotent: it hashes each chunk's text together with the\nembedding model name and only re-embeds what changed, so re-running it costs\nnothing when the corpus has not moved, and changing the embedding model\nre-embeds everything instead of leaving stale vectors behind.\n\n## Guardrails and cost\n\nGrounding is enforced in Python, not requested in a prompt. The generate step\nreturns schema-validated JSON with the chunk ids it used; if those are not a\nsubset of what retrieval returned, or the model says the context was\ninsufficient, the answer is thrown away and replaced with a refusal before it\nleaves the server. The scope gate fails closed: a response it cannot parse is a\nrefusal.\n\nTwo models split the work. A small, fast model (gpt-4.1-nano) runs condense and\nrelevance, and gpt-4.1-mini writes the answer. OpenAI serves both generation and\nembeddings; Groq was tried first for its free tier and rejected because it has\nno embeddings endpoint, which would have needed a second provider and key.\n\nThe API key never reaches the browser, which is the reason the backend exists at\nall. Requests are rate limited per IP (10 a minute by default) with a global\ndaily cap that acts as the spend limit, both counted in Redis. Chat logs store a\nsalted SHA-256 of the client address, never the address itself.\n\n## Testing and CI\n\nThe backend test suite stubs every OpenAI call, so it needs no key and costs\nnothing. A separate opt-in set of evaluation tests calls the real fast model to\ncheck something stubs cannot: whether the prompts judge correctly. They exist\nbecause a scope gate once refused \"What is Majara?\", treating my own employer as\nunrelated to me, while the whole green suite passed, since every other test only\nproved the wiring.\n\nThe front end has Playwright end-to-end tests that run against the static build\nwith the chat API mocked, covering the chat, dark mode, the projects carousel,\nright-to-left layout and the Arabic pages. The content pipeline has its own Node\ntests. A GitHub Actions workflow runs lint, build, the Playwright suite, the\ncontent tests and the backend tests (against real PostgreSQL with pgvector and\nRedis service containers) on every pull request, and work is done on a branch\nper unit of work with a review before merging.\n\n## Deployment\n\nThe front end deploys to Vercel from the main branch. The backend runs with\nDocker Compose on a Hetzner VPS, behind Caddy for automatic HTTPS, with\nPostgreSQL and Redis in their own containers and Django never exposed directly.\nA GitHub Actions workflow deploys it on every push to main that touches the\nbackend: it pulls, rebuilds the containers, runs the migrations and re-ingests\nthe content, so the chatbot's knowledge updates when the corpus does.\n\n## Languages, theme and accessibility\n\nThe site has a full Arabic version at `/ar`, with English at `/`. Each language\nis its own root layout so the `lang` and `dir` attributes are in the first byte\nof HTML, the layout mirrors right to left, Arabic uses IBM Plex Sans Arabic\nloaded only on that page, and a language toggle remembers the reader's choice.\nDark mode follows the operating system with a toggle to override it, and a small\nscript sets the theme before first paint so there is no flash. Colours were\nchecked for contrast, motion respects reduced-motion settings, and the scroll\nreveal has a fallback so content is never stuck invisible for readers without\nJavaScript.\n\n## Why it is built this way\n\nThe AI chat was a deliberate learning exercise: retrieval, agent orchestration\nand running my own backend are heavier than a portfolio strictly needs, and I\nchose them on purpose to learn them properly. Each feature was written up as a\nshort spec, and larger ones as a plan, in the repository's `docs/` folder before\nany code, and merged only after tests, a review and a manual check in the\nbrowser. The bugs that taught me the most were the ones tests missed: the\nover-eager scope gate, Arabic questions being searched directly against an\nEnglish corpus (where a transliterated company name means nothing to the\nsearch), and CSS that only worked left to right.",
+      "source": "projects/profile-webpage.md"
     },
     {
       "id": "about-bio",
