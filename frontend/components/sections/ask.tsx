@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
 import { experience, projects } from "@/lib/content";
@@ -48,6 +54,49 @@ function historyFrom(turns: Turn[]): ChatMessage[] {
     ])
     .slice(-MAX_HISTORY);
 }
+
+/** When the newest turn fits the box, StickToBottom already lands on its end.
+    A turn taller than the box would land past its start instead, so pin the
+    top of it — the question and the first lines of the answer — in view. Only
+    the box scrolls: scrollTo on the scroller, never scrollIntoView, which
+    would also move the page. */
+function KeepTurnInView({ turnId }: { turnId: number | undefined }) {
+  const { scrollRef, stopScroll } = useStickToBottomContext();
+
+  useEffect(() => {
+    if (turnId === undefined) return;
+    const scroller = scrollRef.current;
+    const turn = document.getElementById(`turn-${turnId}`);
+    if (!scroller || !turn || turn.offsetHeight <= scroller.clientHeight) return;
+
+    stopScroll();
+    const top =
+      turn.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollTo({ top: top - 16, behavior: reduced ? "auto" : "smooth" });
+  }, [turnId, scrollRef, stopScroll]);
+
+  return null;
+}
+
+/** The bubble's side follows the page's direction; only the text inside
+    follows the message's own (`dir="auto"`). Putting `dir` on the bubble
+    itself would flip its `ms-auto` margin, sending an Arabic question to the
+    wrong side of an English page. */
+function QuestionBubble({ children, dim }: { children: string; dim?: boolean }) {
+  return (
+    <div
+      className={`ms-auto max-w-[85%] rounded-md bg-secondary px-3.5 py-2.5 leading-snug ${dim ? "opacity-70" : ""}`}
+    >
+      <p dir="auto">{children}</p>
+    </div>
+  );
+}
+
+const ANSWER_BUBBLE =
+  "me-auto max-w-[85%] rounded-md border border-rule bg-background px-3.5 py-2.5 text-start leading-relaxed";
 
 export function Ask() {
   const [value, setValue] = useState("");
@@ -108,31 +157,122 @@ export function Ask() {
 
         <div className="max-w-2xl">
           <Reveal delay={80}>
-            <form onSubmit={onSubmit}>
-              <label htmlFor="ask-input" className="sr-only">
-                Ask a question about Mohammed&rsquo;s work
-              </label>
-              <div className="flex items-center gap-3 border-b border-foreground pb-3">
-                <input
-                  id="ask-input"
-                  ref={inputRef}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                  disabled={pending !== null}
-                  maxLength={1000}
-                  autoComplete="off"
-                  placeholder="Ask about his work&hellip;"
-                  className="w-full bg-transparent text-lg outline-none placeholder:text-dim disabled:opacity-50 sm:text-xl"
-                />
-                <button
-                  type="submit"
-                  disabled={pending !== null || !value.trim()}
-                  className="field-label shrink-0 cursor-pointer rounded-sm px-1 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Ask
-                </button>
-              </div>
-            </form>
+            <div className="flex h-[min(34rem,70svh)] flex-col overflow-hidden rounded-md border border-rule bg-card">
+              <Conversation className="min-h-0 flex-1" aria-busy={pending !== null}>
+                <ConversationContent className="gap-5 p-4">
+                  {turns.length === 0 && !pending && !failed && (
+                    <div className="my-auto">
+                      <p className="field-label mb-2.5">Try</p>
+                      <ul className="flex flex-wrap gap-1.5">
+                        {SEEDS.map((seed) => (
+                          <li key={seed}>
+                            <button
+                              type="button"
+                              onClick={() => void ask(seed)}
+                              className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
+                            >
+                              {seed}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {turns.map((turn) => (
+                    <div key={turn.id} id={`turn-${turn.id}`} className="flex flex-col gap-3">
+                      <QuestionBubble>{turn.question}</QuestionBubble>
+                      <div className={ANSWER_BUBBLE}>
+                        <p dir="auto" className={turn.refused ? "text-dim" : ""}>
+                          {turn.answer}
+                        </p>
+
+                        {turn.sources.length > 0 && (
+                          <div className="mt-4">
+                            <p className="field-label mb-2">Sources</p>
+                            <ul className="flex flex-wrap gap-1.5">
+                              {turn.sources.map((source) => {
+                                const hasRow = ROW_IDS.has(source.record_id);
+                                return (
+                                  <li key={source.record_id}>
+                                    {hasRow ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => scrollToRecord(source.record_id)}
+                                        className="cursor-pointer rounded-sm border border-match bg-match/20 px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
+                                      >
+                                        <span aria-hidden="true">&uarr; </span>
+                                        {source.title}
+                                      </button>
+                                    ) : (
+                                      <span className="rounded-sm border border-rule px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
+                                        {source.title}
+                                      </span>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {pending && (
+                    <div className="flex flex-col gap-3">
+                      <QuestionBubble dim>{pending}</QuestionBubble>
+                      <p className={`${ANSWER_BUBBLE} field-label`}>Thinking&hellip;</p>
+                    </div>
+                  )}
+
+                  {failed && (
+                    <div className="flex flex-col gap-3">
+                      <QuestionBubble dim>{failed.question}</QuestionBubble>
+                      <div className={ANSWER_BUBBLE}>
+                        <p className="text-dim">{failed.message}</p>
+                        <button
+                          type="button"
+                          onClick={() => void ask(failed.question)}
+                          className="mt-3 cursor-pointer rounded-sm font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </ConversationContent>
+                <KeepTurnInView turnId={turns[turns.length - 1]?.id} />
+                <ConversationScrollButton />
+              </Conversation>
+
+              <form onSubmit={onSubmit} className="border-t border-rule px-4 py-3">
+                <label htmlFor="ask-input" className="sr-only">
+                  Ask a question about Mohammed&rsquo;s work
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="ask-input"
+                    ref={inputRef}
+                    value={value}
+                    onChange={(event) => setValue(event.target.value)}
+                    disabled={pending !== null}
+                    maxLength={1000}
+                    autoComplete="off"
+                    dir="auto"
+                    placeholder="Ask about his work&hellip;"
+                    className="w-full bg-transparent text-lg outline-none placeholder:text-dim disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={pending !== null || !value.trim()}
+                    className="field-label shrink-0 cursor-pointer rounded-sm px-1 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Ask
+                  </button>
+                </div>
+              </form>
+            </div>
           </Reveal>
 
           <Reveal delay={160}>
@@ -141,114 +281,6 @@ export function Ask() {
               work. Anything outside that, it declines.
             </p>
           </Reveal>
-
-          {turns.length === 0 && !pending && (
-            <Reveal delay={240}>
-              <div className="mt-6">
-                <p className="field-label mb-2.5">Try</p>
-                <ul className="flex flex-wrap gap-1.5">
-                  {SEEDS.map((seed) => (
-                    <li key={seed}>
-                      <button
-                        type="button"
-                        onClick={() => void ask(seed)}
-                        className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
-                      >
-                        {seed}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-          )}
-
-          {/* One live region for the whole transcript: the answer is what a
-              screen reader needs announced, and `aria-busy` says the question
-              is in flight without a spinner having to carry that alone. */}
-          <div
-            aria-live="polite"
-            aria-busy={pending !== null}
-            className="mt-10 empty:mt-0"
-          >
-            {turns.map((turn, index) => (
-              <article
-                key={turn.id}
-                className="grid gap-2 border-t border-rule py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6"
-              >
-                <p className="field-label sm:pt-1">
-                  {`Q.${String(index + 1).padStart(2, "0")}`}
-                </p>
-                <div>
-                  <h3 className="text-lg leading-snug font-semibold text-balance">
-                    {turn.question}
-                  </h3>
-                  <p
-                    className={`mt-3 leading-relaxed ${turn.refused ? "text-dim" : ""}`}
-                  >
-                    {turn.answer}
-                  </p>
-
-                  {turn.sources.length > 0 && (
-                    <div className="mt-4">
-                      <p className="field-label mb-2">Sources</p>
-                      <ul className="flex flex-wrap gap-1.5">
-                        {turn.sources.map((source) => {
-                          const hasRow = ROW_IDS.has(source.record_id);
-                          return (
-                            <li key={source.record_id}>
-                              {hasRow ? (
-                                <button
-                                  type="button"
-                                  onClick={() => scrollToRecord(source.record_id)}
-                                  className="cursor-pointer rounded-sm border border-match bg-match/20 px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
-                                >
-                                  <span aria-hidden="true">&uarr; </span>
-                                  {source.title}
-                                </button>
-                              ) : (
-                                <span className="rounded-sm border border-rule px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
-                                  {source.title}
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))}
-
-            {pending && (
-              <article className="grid gap-2 border-t border-rule py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
-                <p className="field-label sm:pt-1">Thinking&hellip;</p>
-                <h3 className="text-lg leading-snug font-semibold text-balance opacity-50">
-                  {pending}
-                </h3>
-              </article>
-            )}
-
-            {failed && (
-              <article className="grid gap-2 border-t border-rule py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
-                <p className="field-label sm:pt-1">Failed</p>
-                <div>
-                  <h3 className="text-lg leading-snug font-semibold text-balance opacity-50">
-                    {failed.question}
-                  </h3>
-                  <p className="mt-3 leading-relaxed text-dim">{failed.message}</p>
-                  <button
-                    type="button"
-                    onClick={() => void ask(failed.question)}
-                    className="mt-3 cursor-pointer rounded-sm font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
-                  >
-                    Try again
-                  </button>
-                </div>
-              </article>
-            )}
-          </div>
         </div>
       </div>
     </section>
