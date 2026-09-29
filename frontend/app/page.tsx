@@ -3,6 +3,7 @@ import { About } from "@/components/sections/about";
 import { Work } from "@/components/sections/work";
 import { Ask } from "@/components/sections/ask";
 import { Contact } from "@/components/sections/contact";
+import { TopBar } from "@/components/top-bar";
 import { JoinProvider } from "@/components/join-context";
 
 // Inlined at build time. Unset — which is production today — means the section
@@ -17,7 +18,8 @@ const chatEnabled = Boolean(process.env.NEXT_PUBLIC_CHAT_API_URL);
 
 export default function Home() {
   return (
-    <main>
+    <main className="relative">
+      <TopBar />
       <Hero />
       <About />
       <JoinProvider>

@@ -93,9 +93,11 @@
   /* 4px, not 0 — keeps the hairline rules reading as table structure
      rather than newsprint. */
   --radius: 0.25rem;
+  color-scheme: light;
 }
 
 .dark {
+  color-scheme: dark;
   --paper: #0f1626;
   --ink: #e7eaf0;
   --signal: #4bbd8e;
@@ -104,11 +106,9 @@
   --dim: #7b8598;
   --rule: #26304399;
 
-  /* Dormant — no `.dark` class is applied anywhere. Kept in step so enabling
-     it later can't leak a near-white band into a dark page. */
   --surface-base: #0f1626;
   --surface-raised: #151d31;
-  --surface-deep: #0f1626;
+  --surface-deep: #151d31;
 
   --background: var(--surface-base);
   --foreground: var(--ink);
@@ -128,6 +128,45 @@
   --border: var(--rule);
   --input: var(--rule);
   --ring: var(--signal);
+}
+
+/* Same tokens for visitors whose script never ran (no-JS, blocked): follow the
+   OS. `.light` is set by the head script only when the reader chose light, so
+   it wins over this. Keep in step with `.dark` above. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --paper: #0f1626;
+    --ink: #e7eaf0;
+    --signal: #4bbd8e;
+    --match: #f0b558;
+    --match-ink: #c8861e;
+    --dim: #7b8598;
+    --rule: #26304399;
+
+    --surface-base: #0f1626;
+    --surface-raised: #151d31;
+    --surface-deep: #151d31;
+
+    --background: var(--surface-base);
+    --foreground: var(--ink);
+    --card: #151d31;
+    --card-foreground: var(--ink);
+    --popover: #151d31;
+    --popover-foreground: var(--ink);
+    --primary: var(--signal);
+    --primary-foreground: #08120d;
+    --secondary: #1b2438;
+    --secondary-foreground: var(--ink);
+    --muted: #1b2438;
+    --muted-foreground: var(--dim);
+    --accent: #1b2438;
+    --accent-foreground: var(--ink);
+    --destructive: #e0725c;
+    --border: var(--rule);
+    --input: var(--rule);
+    --ring: var(--signal);
+  }
 }
 
 @layer base {
