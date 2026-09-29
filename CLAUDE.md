@@ -5,9 +5,9 @@ feature — they reflect how I want to work generally, not one-off instructions.
  
 ## How to work with me
  
-- I want an interactive workflow, not autonomous execution. Explain what you're about to
-  change and why *before* changing it, especially for anything touching multiple files or
-  architecture.
+- Work autonomously through an approved plan. Explain what you're about to change and why
+  in your updates, but don't stop for approval between steps or between branches once the
+  plan is agreed. Stop and ask only for the cases under "When to stop and ask".
 - IMPORTANT: If anything is unclear or ambiguous, ASK ME. Do not guess at what I meant or
   fill gaps with assumptions — I would rather answer a question than review a change based
   on a wrong assumption.
@@ -18,10 +18,26 @@ feature — they reflect how I want to work generally, not one-off instructions.
   hit, etc.) — tell me how to verify it myself.
 ## Branching
  
-- One branch per unit of work (a "tier," a bug fix, a feature). Do not merge to `main`
-  until I've reviewed the diff and explicitly confirmed.
+- One branch per unit of work (a "tier," a bug fix, a feature).
+- Every branch goes through: PR -> CI green -> `/code-review` -> manual QA (Playwright plus
+  Claude in Chrome) -> fix anything found -> re-test. Repeat until nothing threatens the
+  live site. Post CI/review/QA results as a PR comment.
+- Once that is clean, merge to `main` yourself and move to the next branch; don't wait for
+  my sign-off. `main` deploys to the live site, so never merge with failing CI, an
+  unresolved review finding, or a QA issue that could affect live.
 - If a branch's work goes sideways or blows its time budget, it gets discarded — `main`
   should never see broken or half-finished work.
+- Report honestly: say exactly what was and wasn't verified. Never claim "100% works".
+
+## When to stop and ask
+
+- Anything ambiguous or unclear (see above).
+- New colors, fonts or frameworks (say why and wait); new dependencies (say why, then proceed).
+- Anything destructive or hard to reverse outside the normal branch flow: force-push,
+  deleting branches or data, changing repo/deploy settings, secrets.
+- Anything needing my credentials or a login (e.g. Vercel-protected previews).
+- Content I must proofread (e.g. Arabic copy): merge once tests pass, then list what I
+  should proofread.
 ## After any meaningful change
  
 Tell me:
