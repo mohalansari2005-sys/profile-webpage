@@ -7,7 +7,7 @@ const CHAT_API = "http://chat.test/api/chat/";
 test("renders every section", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
-  for (const name of ["About", "Experience", "Projects", "Ask", "Contact"]) {
+  for (const name of ["About", "Experience", "Projects", "Ask my AI assistant about my work.", "Contact"]) {
     await expect(
       page.getByRole("heading", { level: 2, name, exact: true }),
     ).toBeVisible();
@@ -26,6 +26,6 @@ test("chat round-trip shows the mocked answer", async ({ page }) => {
   );
   await page.goto("/");
   await page.locator("#ask-input").fill("What does he do?");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await page.getByRole("button", { name: "Send question" }).click();
   await expect(page.getByText("Mocked answer about Mohammed.")).toBeVisible();
 });
