@@ -72,7 +72,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => choose(next)}
       aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[next]}.`}
-      className="field-label cursor-pointer rounded-sm px-1 transition-colors hover:text-foreground"
+      className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground transition-colors duration-200 hover:border-foreground"
     >
       Theme: {LABEL[theme]}
     </button>
