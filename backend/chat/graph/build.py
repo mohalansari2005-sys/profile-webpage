@@ -7,6 +7,7 @@ from chat.graph.nodes.log import log
 from chat.graph.nodes.relevance import relevance, route
 from chat.graph.nodes.retrieve import retrieve
 from chat.graph.state import ChatState
+from chat.language import is_arabic
 
 REFUSAL_OUT_OF_SCOPE = (
     "I only answer questions about Mohammed's work — his roles, the projects "
@@ -14,10 +15,18 @@ REFUSAL_OUT_OF_SCOPE = (
 )
 
 
+REFUSAL_OUT_OF_SCOPE_AR = (
+    "أجيب فقط عن الأسئلة المتعلقة بعمل محمد — أدواره الوظيفية والمشاريع التي "
+    "بناها والأدوات التي يستخدمها. اسألني عن أحدها."
+)
+
+
 def _mark_refused(state: ChatState) -> dict:
     """The not_in_scope edge skips generate, so the refusal text is set here
     rather than in log -- a logging node should not own user-facing copy."""
-    return {"answer": REFUSAL_OUT_OF_SCOPE, "refused": True, "sources": [],
+    answer = (REFUSAL_OUT_OF_SCOPE_AR if is_arabic(state.get("question", ""))
+              else REFUSAL_OUT_OF_SCOPE)
+    return {"answer": answer, "refused": True, "sources": [],
             "used_chunk_ids": [], "model": settings.OPENAI_FAST_MODEL}
 
 
