@@ -40,7 +40,7 @@ function RecordRow({
         {/* The match marker — the only place amber appears. */}
         <span
           aria-hidden="true"
-          className="absolute top-0 bottom-0 -left-4 w-0.5 origin-top scale-y-0 bg-match opacity-0 transition duration-200 group-data-[state=lit]:scale-y-100 group-data-[state=lit]:opacity-100 sm:-left-6"
+          className="absolute top-0 bottom-0 -start-4 w-0.5 origin-top scale-y-0 bg-match opacity-0 transition duration-200 group-data-[state=lit]:scale-y-100 group-data-[state=lit]:opacity-100 sm:-start-6"
         />
 
         <div className="grid gap-2 py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-7">
@@ -111,7 +111,7 @@ function Chevron({ direction }: { direction: "left" | "right" }) {
 
 /** One project as a rounded card in the horizontal rail. State styling mirrors
     RecordRow (lit on a tool/citation match, dim otherwise); the card border
-    stands in for RecordRow's left-edge marker, which would be clipped by the
+    stands in for RecordRow's start-edge marker, which would be clipped by the
     rail's overflow. */
 function ProjectCard({
   record,
@@ -287,8 +287,11 @@ export function Work() {
   const syncEdges = useCallback(() => {
     const el = stripRef.current;
     if (!el) return;
-    const atStart = el.scrollLeft <= 1;
-    const atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
+    // scrollLeft is 0 at the start and grows negative going toward the end in
+    // RTL, so measure distance travelled, not its sign.
+    const travelled = Math.abs(el.scrollLeft);
+    const atStart = travelled <= 1;
+    const atEnd = travelled >= el.scrollWidth - el.clientWidth - 1;
     setEdge(
       atStart && atEnd ? "none" : atStart ? "end" : atEnd ? "start" : "both",
     );
