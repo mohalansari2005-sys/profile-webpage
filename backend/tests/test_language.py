@@ -55,3 +55,41 @@ def test_condense_prompt_forbids_translating():
     from chat.graph.nodes.condense import PROMPT
 
     assert "never translate" in PROMPT
+
+
+# --- Arabic spellings of the site's names -------------------------------------
+
+from chat.language import NAME_GLOSSARY, normalize_names  # noqa: E402
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("ما هي ماجرة؟", "ما هي Majara؟"),
+    ("ماذا فعل محمد في صيت؟", "ماذا فعل محمد في SEET؟"),
+    ("ما هو مشروع كيرا؟", "ما هو مشروع Keyraa؟"),
+    ("ماذا يعمل في ماجرة وفي صيت", "ماذا يعمل في Majara وفي SEET"),
+    ("هل عمل بماجرة؟", "هل عمل ب Majara؟"),  # one-letter prefix is kept
+    ("What is Majara?", "What is Majara?"),  # already Latin: untouched
+])
+def test_known_names_are_mapped_to_latin(text, expected):
+    assert normalize_names(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "ماذا ماجرى في الاجتماع؟",  # "what happened": looks like ماجرة, is not
+    "أين تقع المجرة؟",  # "the galaxy"
+    "",
+])
+def test_look_alike_arabic_words_are_left_alone(text):
+    assert normalize_names(text) == text
+
+
+def test_the_glossary_names_all_three():
+    for name in ("Majara", "SEET", "Keyraa"):
+        assert name in NAME_GLOSSARY
+
+
+def test_prompts_carry_the_glossary():
+    from chat.graph.nodes import condense, generate, relevance
+
+    for module in (condense, generate, relevance):
+        assert "{glossary}" in module.PROMPT

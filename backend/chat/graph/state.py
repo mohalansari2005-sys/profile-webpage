@@ -10,6 +10,8 @@ class ChatState(TypedDict, total=False):
 
     # condense
     condensed: str
+    # English text to embed for retrieval; falls back to `condensed`.
+    search_query: str
 
     # relevance
     in_scope: bool
