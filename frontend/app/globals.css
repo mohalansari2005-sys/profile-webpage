@@ -233,6 +233,10 @@
   animation-delay: var(--stagger, 0ms);
 }
 
+[dir="rtl"] .rule-draw {
+  transform-origin: right;
+}
+
 .reveal {
   opacity: 0;
   transform: translateY(1rem);
@@ -292,6 +296,25 @@
     #000 calc(100% - 3rem),
     transparent
   );
+}
+
+/* In RTL the strip's "end" is on the left, so the fades swap sides. "both"
+   is symmetric and needs nothing. */
+[dir="rtl"] .tool-strip[data-edge="end"] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+}
+
+[dir="rtl"] .tool-strip[data-edge="start"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+}
+
+/* Arabic letters join, so any letter-spacing (the mono labels' 0.14em, the
+   hero's negative tracking, chip tracking) pulls words apart. */
+:lang(ar) .field-label,
+:lang(ar) [class*="tracking-"] {
+  letter-spacing: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
