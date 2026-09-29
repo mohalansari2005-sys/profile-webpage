@@ -108,7 +108,7 @@ function KeepTurnInView({
     wrong side of an English page. */
 function UserMessage({ children, dim }: { children: string; dim?: boolean }) {
   return (
-    <Message from="user" className={dim ? "opacity-70" : ""}>
+    <Message from="user" className={`max-w-[85%] ${dim ? "opacity-70" : ""}`}>
       <MessageContent className="text-base leading-snug group-[.is-user]:rounded-2xl group-[.is-user]:rounded-ee-md">
         <p dir="auto">{children}</p>
       </MessageContent>
@@ -116,10 +116,13 @@ function UserMessage({ children, dim }: { children: string; dim?: boolean }) {
   );
 }
 
+/** Answers get a bordered bubble too, so both sides read as a conversation. */
 function AssistantMessage({ children }: { children: React.ReactNode }) {
   return (
-    <Message from="assistant">
-      <MessageContent className="text-base leading-relaxed">{children}</MessageContent>
+    <Message from="assistant" className="max-w-[85%]">
+      <MessageContent className="rounded-2xl rounded-es-md border border-rule bg-background px-4 py-3 text-base leading-relaxed">
+        {children}
+      </MessageContent>
     </Message>
   );
 }
