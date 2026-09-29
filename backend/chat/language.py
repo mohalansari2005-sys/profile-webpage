@@ -37,8 +37,8 @@ def is_arabic(text: str) -> bool:
 # and a model can read it as a similar-looking Arabic word. Mapping the known
 # spellings back to the Latin names is deterministic and needs no model call.
 NAME_ALIASES = {
-    "Majara": ("ماجرة", "ماجراة", "ماجارا", "ماجرا"),
-    "SEET": ("صيت", "سيت"),
+    "Majara": ("ماجرة", "ماجراة", "ماجارا"),
+    "SEET": ("صيت",),
     "Keyraa": ("كيرا", "كايرا", "كيرآ"),
 }
 
@@ -51,11 +51,12 @@ NAME_GLOSSARY = (
 )
 
 _ARABIC_LETTER = "\u0621-\u064a"
-# Optional one-letter or definite-article prefix (in/by/for/like/and, "al-"),
-# kept in the output so the sentence still reads.
+# Optional prefix, kept in the output so the sentence still reads: and/so
+# (و ف), then in-with/like/for (ب ك ل) optionally fused with "al-" (ال), or
+# "lil-" (لل). Stacks such as والماجرة, بالماجرة, للماجرة and وللماجرة.
 _ALIAS = [
     (re.compile(
-        rf"(?<![{_ARABIC_LETTER}])((?:[وبلكف]|ال)?)(?:{'|'.join(map(re.escape, spellings))})(?![{_ARABIC_LETTER}])"
+        rf"(?<![{_ARABIC_LETTER}])((?:[وف]?(?:[بكل]?ال|لل|[بكل])?))(?:{'|'.join(map(re.escape, spellings))})(?![{_ARABIC_LETTER}])"
     ), name)
     for name, spellings in NAME_ALIASES.items()
 ]

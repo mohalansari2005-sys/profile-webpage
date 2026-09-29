@@ -86,3 +86,15 @@ def test_an_english_first_turn_still_short_circuits_and_has_no_search_query(monk
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
     out = node.condense({"question": "What is Majara?", "history": []})
     assert out == {"condensed": "What is Majara?"}
+
+
+def test_a_short_arabic_question_is_still_detected_after_normalization(monkeypatch):
+    """"ما ماجرة؟" normalizes to "ما Majara؟", which is half Latin; detection must
+    use the original words or the English query is silently skipped."""
+    from chat.graph.nodes import condense as node
+    from chat.graph.nodes.condense import Standalone
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (
+        Standalone(standalone_question="ما Majara؟", english_query="What is Majara?"), {}))
+    out = node.condense({"question": "ما ماجرة؟", "history": []})
+    assert out["search_query"] == "What is Majara?"

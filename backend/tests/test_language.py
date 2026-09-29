@@ -68,7 +68,13 @@ from chat.language import NAME_GLOSSARY, normalize_names  # noqa: E402
     ("ما هو مشروع كيرا؟", "ما هو مشروع Keyraa؟"),
     ("ماذا يعمل في ماجرة وفي صيت", "ماذا يعمل في Majara وفي SEET"),
     ("هل عمل بماجرة؟", "هل عمل ب Majara؟"),  # one-letter prefix is kept
+    ("ما هي ماجارا؟", "ما هي Majara؟"),
     ("What is Majara?", "What is Majara?"),  # already Latin: untouched
+    # Stacked prefixes: and-the, with-the, to-the, and-to-the
+    ("عمل والماجرة", "عمل وال Majara"),
+    ("عمل بالماجرة", "عمل بال Majara"),
+    ("ذهب للماجرة", "ذهب لل Majara"),
+    ("ذهب وللماجرة", "ذهب ولل Majara"),
 ])
 def test_known_names_are_mapped_to_latin(text, expected):
     assert normalize_names(text) == expected
@@ -77,6 +83,8 @@ def test_known_names_are_mapped_to_latin(text, expected):
 @pytest.mark.parametrize("text", [
     "ماذا ماجرى في الاجتماع؟",  # "what happened": looks like ماجرة, is not
     "أين تقع المجرة؟",  # "the galaxy"
+    "ما ماجرا الفيلم؟",  # "the film's incident": ماجرا is an ordinary word
+    "كم سيت في الطاولة؟",  # سيت ("set") is an ordinary word
     "",
 ])
 def test_look_alike_arabic_words_are_left_alone(text):

@@ -8,7 +8,7 @@ Asked "ما هي ماجرة؟" ("What is Majara?"), the chat answered a differen
 2. No node knew what "ماجرة" refers to, so a model could read it as a look-alike Arabic word.
 
 ## Fix
-- `chat/language.py::normalize_names`: deterministic map of the known Arabic spellings (ماجرة/ماجرا/ماجارا -> Majara, صيت/سيت -> SEET, كيرا/كايرا -> Keyraa), keeping a one-letter prefix, applied to the question before any node reads it. Look-alikes (ماجرى "what happened", المجرة "the galaxy") are left alone by Arabic-letter boundaries.
+- `chat/language.py::normalize_names`: deterministic map of the known Arabic spellings (ماجرة/ماجارا -> Majara, صيت -> SEET, كيرا/كايرا -> Keyraa), keeping a one-letter prefix, applied to the question before any node reads it. Look-alikes (ماجرى "what happened", المجرة "the galaxy") are left alone by Arabic-letter boundaries.
 - `condense` now runs for an Arabic question even with no history, and also returns `english_query` (the question in English, names in Latin). It is stored as `search_query`; `retrieve` embeds `search_query or condensed`. `condensed` stays in the user's language, so `generate` still answers in it. Failure falls back to the normalized question.
 - `NAME_GLOSSARY` in the `condense`, `relevance` and `generate` prompts, so a spelling not in the table is still recognised.
 - Cost: one extra fast-model (nano) call, only for Arabic questions.

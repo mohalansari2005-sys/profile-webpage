@@ -30,11 +30,14 @@ class Standalone(BaseModel):
 def condense(state: ChatState) -> dict:
     # Known names first, deterministically: every later node then reads
     # "Majara", not a transliteration it might take for another word.
+    # Detected on the visitor's own words: normalizing first can leave a short
+    # Arabic question mostly Latin ("ما ماجرة؟" -> "ما Majara؟") and skip the call.
+    arabic = is_arabic(state["question"])
     question = normalize_names(state["question"])
     history = state.get("history") or []
     # An Arabic question needs the model even on a first turn: the portfolio is
     # English, and searching it with Arabic text retrieves poorly.
-    if not history and not is_arabic(question):
+    if not history and not arabic:
         # Most first turns. No model call, no quota spent, no latency.
         return {"condensed": question}
 
