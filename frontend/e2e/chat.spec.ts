@@ -90,6 +90,9 @@ test("Arabic text gets its own direction", async ({ page }) => {
   await page.goto("/");
   await ask(page, "ما هي ماجرة؟");
   const answer = page.getByText("محمد مهندس منتجات في ماجرة.");
+  // Wait for the mocked reply to render first; under a busy parallel run the
+  // default 5s can pass before the fetch resolves.
+  await expect(answer).toBeVisible({ timeout: 15_000 });
   await expect(answer).toHaveAttribute("dir", "auto");
   expect(await answer.evaluate((el) => getComputedStyle(el).direction)).toBe("rtl");
 });

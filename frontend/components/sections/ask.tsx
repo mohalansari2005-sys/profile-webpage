@@ -188,9 +188,9 @@ export function Ask() {
 
   return (
     <section id="ask" className="border-b border-rule bg-surface-raised">
-      <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
+      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-8 gutter py-20 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-28">
         <Reveal>
-          <p className="field-label md:pt-2.5">{t.ask.label}</p>
+          <p className="field-label sm:pt-2.5">{t.ask.label}</p>
         </Reveal>
 
         <div className="max-w-2xl">
@@ -207,7 +207,7 @@ export function Ask() {
           </Reveal>
 
           <Reveal delay={160}>
-            <div className="mt-8 flex h-[min(36rem,72svh)] flex-col overflow-hidden rounded-3xl border border-rule bg-card shadow-sm">
+            <div className="mt-8 flex h-[min(34rem,72svh)] sm:h-[min(42rem,64svh)] lg:h-[min(36rem,72svh)] flex-col overflow-hidden rounded-3xl border border-rule bg-card shadow-sm">
               <div className="flex items-center gap-3 border-b border-rule px-5 py-3.5">
                 <span
                   aria-hidden="true"
@@ -228,11 +228,12 @@ export function Ask() {
                   <AssistantMessage>
                     <p>{t.ask.greeting}</p>
                     {turns.length === 0 && !pending && !failed && (
-                      <Suggestions className="mt-1">
+                      <Suggestions className="mt-1 w-auto flex-wrap">
                         {t.ask.seeds.map((seed) => (
                           <Suggestion
                             key={seed}
                             suggestion={seed}
+                            className="h-auto py-1.5 text-start whitespace-normal pointer-coarse:py-2.5"
                             onClick={(question) => void ask(question)}
                           />
                         ))}
@@ -261,7 +262,7 @@ export function Ask() {
                                       <button
                                         type="button"
                                         onClick={() => scrollToRecord(source.record_id)}
-                                        className="cursor-pointer rounded-full border border-match bg-match/20 px-3 py-1.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
+                                        className="cursor-pointer rounded-full border border-match bg-match/20 px-3 py-1.5 pointer-coarse:py-2.5 font-mono text-xs tracking-[0.04em] transition-colors duration-200 hover:border-foreground"
                                       >
                                         <span aria-hidden="true">&uarr; </span>
                                         {title}
@@ -334,7 +335,7 @@ export function Ask() {
                     type="submit"
                     aria-label={t.ask.send}
                     disabled={pending !== null || !value.trim()}
-                    className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full pointer-coarse:size-11 bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <ArrowUp className="size-5" aria-hidden="true" />
                   </button>

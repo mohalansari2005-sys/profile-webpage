@@ -63,9 +63,9 @@ const links: {
 export function Contact({ t }: { t: Messages["contact"] }) {
   return (
     <footer id="contact">
-      <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
+      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-8 gutter py-20 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-28">
         <Reveal>
-          <h2 className="field-label md:pt-2.5">{t.label}</h2>
+          <h2 className="field-label sm:pt-2.5">{t.label}</h2>
         </Reveal>
 
         <div className="max-w-2xl">
@@ -81,7 +81,7 @@ export function Contact({ t }: { t: Messages["contact"] }) {
           <dl className="mt-10">
             {links.map((link, index) => (
               <Reveal key={link.key} delay={160 + index * 70}>
-                <div className="grid gap-1 border-t border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
+                <div className="grid grid-cols-1 gap-1 border-t border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
                   {/* The icon sits in the label column beside the mono label,
                       not inside the link — the visible label and the full URL
                       stay the accessible name, so the glyph is decorative. */}
@@ -92,7 +92,7 @@ export function Contact({ t }: { t: Messages["contact"] }) {
                   <dd>
                     <a
                       href={link.href}
-                      className="rounded-sm underline decoration-rule decoration-1 underline-offset-4 transition-colors hover:decoration-match-ink hover:text-match-ink"
+                      className="rounded-sm [overflow-wrap:anywhere] underline decoration-rule decoration-1 underline-offset-4 transition-colors hover:decoration-match-ink hover:text-match-ink"
                     >
                       {link.value}
                     </a>

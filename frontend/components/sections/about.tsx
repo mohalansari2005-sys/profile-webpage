@@ -4,9 +4,9 @@ import type { Messages } from "@/messages";
 export function About({ t }: { t: Messages["about"] }) {
   return (
     <section id="about" className="border-b border-rule bg-surface-raised">
-      <div className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-20 sm:py-28 md:grid-cols-[7.5rem_1fr] md:gap-6">
+      <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-8 gutter py-20 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-28">
         <Reveal>
-          <h2 className="field-label md:pt-2.5">{t.label}</h2>
+          <h2 className="field-label sm:pt-2.5">{t.label}</h2>
         </Reveal>
 
         <div className="max-w-2xl">

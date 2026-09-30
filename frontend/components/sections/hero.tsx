@@ -8,7 +8,7 @@ function stagger(ms: number) {
 export function Hero({ t }: { t: Messages["hero"] }) {
   return (
     <section className="border-b border-rule">
-      <div className="mx-auto w-full max-w-5xl px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
+      <div className="mx-auto w-full max-w-5xl gutter pt-24 pb-20 sm:pt-32 sm:pb-28">
         <div className="flex items-start gap-5 sm:gap-7">
           {/* The monogram is the record's key. TODO: to use a photo instead,
               drop profile.jpg in /public and replace this div with:
@@ -45,7 +45,7 @@ export function Hero({ t }: { t: Messages["hero"] }) {
           {t.fields.map((field, index) => (
             <div
               key={field.label}
-              className="field-in grid gap-1 border-b border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-5"
+              className="field-in grid grid-cols-1 gap-1 border-b border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-5"
               style={stagger(300 + index * 90)}
             >
               <dt className="field-label sm:pt-1.5">{field.label}</dt>

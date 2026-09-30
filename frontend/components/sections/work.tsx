@@ -47,7 +47,7 @@ function RecordRow({
           className="absolute top-0 bottom-0 -start-4 w-0.5 origin-top scale-y-0 bg-match opacity-0 transition duration-200 group-data-[state=lit]:scale-y-100 group-data-[state=lit]:opacity-100 sm:-start-6"
         />
 
-        <div className="grid gap-2 py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-7">
+        <div className="grid grid-cols-1 gap-2 py-6 sm:grid-cols-[7.5rem_1fr] sm:gap-6 sm:py-7">
           {/* The period is the record's key, in the same label column the hero
               fields and the contact links use. */}
           <p className="field-label sm:pt-2">{text.period}</p>
@@ -147,7 +147,7 @@ function ProjectCard({
               rel="noopener noreferrer"
               aria-label={format(t.work.onGithub, { title: text.title })}
               title={t.work.viewOnGithub}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground pointer-coarse:size-11"
             >
               <GithubIcon className="size-4" />
             </a>
@@ -231,7 +231,7 @@ function ProjectRail({
   }
 
   const chevron =
-    "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule";
+    "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule pointer-coarse:size-11";
 
   return (
     <>
@@ -265,7 +265,7 @@ function ProjectRail({
         ref={railRef}
         data-project-rail=""
         onScroll={sync}
-        className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="gutter-bleed flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {projects.map((record, index) => (
           <ProjectCard
@@ -347,12 +347,12 @@ export function Work() {
           shape as the strip's own, so at 85% they read through as a double
           render rather than as depth. */}
       <div className="sticky top-0 z-20 border-b border-rule bg-background/95 backdrop-blur-md">
-        <div className="mx-auto w-full max-w-5xl px-6 py-3.5">
+        <div className="mx-auto w-full max-w-5xl gutter py-3.5">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="field-label">{t.work.builtWith}</h2>
+            <h2 className="field-label shrink-0 whitespace-nowrap">{t.work.builtWith}</h2>
             <p
               aria-live="polite"
-              className="font-mono text-xs tracking-[0.1em] text-dim"
+              className="min-w-0 truncate font-mono text-xs tracking-[0.1em] text-dim"
             >
               {activeLabel
                 ? format(t.work.toolMatch, {
@@ -373,7 +373,7 @@ export function Work() {
             ref={stripRef}
             onScroll={syncEdges}
             data-edge={edge}
-            className="tool-strip -mx-6 mt-2.5 overflow-x-auto px-6 pb-1"
+            className="tool-strip gutter-bleed mt-2.5 overflow-x-auto pb-1"
           >
             <ul className="flex w-max items-center gap-1.5">
               {groupOrder.map((group, groupIndex) => (
@@ -400,7 +400,7 @@ export function Work() {
                           onBlur={() => setHoveredTool(null)}
                           onClick={() => toggleTool(tool.id)}
                           className={cn(
-                            "shrink-0 cursor-pointer rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200",
+                            "shrink-0 cursor-pointer rounded-sm border px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap transition-colors duration-200 pointer-coarse:py-2.5",
                             isActive
                               ? "border-match bg-match/20 text-foreground"
                               : activeTool
@@ -424,7 +424,7 @@ export function Work() {
                   <button
                     type="button"
                     onClick={clear}
-                    className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink"
+                    className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink pointer-coarse:py-2.5"
                   >
                     {t.work.clear}
                   </button>
@@ -436,7 +436,7 @@ export function Work() {
       </div>
 
       <section className="border-b border-rule">
-        <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+        <div className="mx-auto w-full max-w-5xl gutter py-16 sm:py-20">
           <Reveal>
             <h2 className="field-label mb-2">{t.work.experience}</h2>
           </Reveal>
@@ -453,7 +453,7 @@ export function Work() {
       </section>
 
       <section className="on-deep border-b border-rule bg-surface-deep">
-        <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+        <div className="mx-auto w-full max-w-5xl gutter py-16 sm:py-20">
           <ProjectRail rowState={rowState} activeTool={activeTool} />
         </div>
       </section>
