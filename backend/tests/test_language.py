@@ -70,6 +70,11 @@ from chat.language import NAME_GLOSSARY, normalize_names  # noqa: E402
     ("هل عمل بماجرة؟", "هل عمل ب Majara؟"),  # one-letter prefix is kept
     ("ما هي ماجارا؟", "ما هي Majara؟"),
     ("What is Majara?", "What is Majara?"),  # already Latin: untouched
+    # The current spelling, with ة or the ه people type on a phone
+    ("ما هي مجرة؟", "ما هي Majara؟"),
+    ("وش سوّى محمد في مجره؟", "وش سوّى محمد في Majara؟"),
+    ("هل اشتغل بمجرة؟", "هل اشتغل ب Majara؟"),
+    ("وش هي ماجره؟", "وش هي Majara؟"),  # old spelling, ه
     # Stacked prefixes: and-the, with-the, to-the, and-to-the
     ("عمل والماجرة", "عمل وال Majara"),
     ("عمل بالماجرة", "عمل بال Majara"),
@@ -83,6 +88,11 @@ def test_known_names_are_mapped_to_latin(text, expected):
 @pytest.mark.parametrize("text", [
     "ماذا ماجرى في الاجتماع؟",  # "what happened": looks like ماجرة, is not
     "أين تقع المجرة؟",  # "the galaxy"
+    # مجرة is also the ordinary word "galaxy": only a bare proper noun is Majara
+    "أين تقع المجرة؟",
+    "ما هي المجرة؟",
+    "كم عدد نجوم المجرة؟",
+    "ذهب للمجرة",
     "ما ماجرا الفيلم؟",  # "the film's incident": ماجرا is an ordinary word
     "كم سيت في الطاولة؟",  # سيت ("set") is an ordinary word
     "",
@@ -101,3 +111,60 @@ def test_prompts_carry_the_glossary():
 
     for module in (condense, generate, relevance):
         assert "{glossary}" in module.PROMPT
+
+
+# --- Saudi white dialect for Arabic questions -----------------------------------
+
+def _captured_prompt(monkeypatch, question):
+    from chat.graph.nodes import generate as node
+
+    seen = {}
+
+    def fake(prompt, schema, *, fast=False):
+        seen["prompt"] = prompt
+        return node.Answer(answer="a", used_chunk_ids=[], sufficient=False), {}
+
+    monkeypatch.setattr(node, "structured", fake)
+    node.generate({
+        "question": question, "condensed": question,
+        "retrieved": [{"chunk_id": "c#s", "record_id": "c", "title": "t", "text": "x"}],
+    })
+    return seen["prompt"]
+
+
+def test_an_arabic_question_asks_for_saudi_white_dialect(monkeypatch):
+    prompt = _captured_prompt(monkeypatch, "وش سوّى محمد في مجرة؟")
+    assert "Saudi white dialect" in prompt
+    assert "Modern Standard Arabic" in prompt  # told NOT to use it
+    assert "Majara is مجرة" in prompt  # company written in Arabic script
+
+
+def test_an_english_question_gets_no_dialect_instruction(monkeypatch):
+    prompt = _captured_prompt(monkeypatch, "What did he build at Majara?")
+    assert "Saudi" not in prompt
+    assert "Style for this Arabic answer" not in prompt
+
+
+def test_the_dialect_follows_the_original_question_not_the_rewrite(monkeypatch):
+    """A follow-up is condensed to a standalone question; the dialect must key off
+    what the visitor actually wrote."""
+    from chat.graph.nodes import generate as node
+
+    seen = {}
+    monkeypatch.setattr(node, "structured", lambda prompt, *a, **k: (
+        seen.setdefault("p", prompt) and None, {}))
+    node.generate({
+        "question": "وش سوّى هناك؟", "condensed": "What did he build at Majara?",
+        "retrieved": [{"chunk_id": "c#s", "record_id": "c", "title": "t", "text": "x"}],
+    })
+    assert "Saudi white dialect" in seen["p"]
+
+
+def test_the_arabic_refusals_are_colloquial_not_formal():
+    from chat.graph import build
+    from chat.graph.nodes import generate as node
+
+    for text in (node.REFUSAL_AR, build.REFUSAL_OUT_OF_SCOPE_AR):
+        assert "أجاوب" in text  # spoken "I answer", not the formal "أجيب"
+        assert "أجيب" not in text
+    assert "مجرة" in NAME_GLOSSARY and "galaxy" in NAME_GLOSSARY
