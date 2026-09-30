@@ -32,33 +32,56 @@ def is_arabic(text: str) -> bool:
     return sum(1 for w in words if _has_arabic(w)) * 2 > len(words)
 
 
-# How visitors write this site's names in Arabic script. "ماجرة" is a
-# transliteration, not a word, so an English-only corpus embeds nowhere near it
-# and a model can read it as a similar-looking Arabic word. Mapping the known
+# How visitors write this site's names in Arabic script. The companies are
+# transliterations, so an English-only corpus embeds nowhere near them and a
+# model can read them as similar-looking Arabic words. Mapping the known
 # spellings back to the Latin names is deterministic and needs no model call.
+#
+# Spellings that are only ever this name. "ماجرة" is an older spelling of
+# Majara; the current one is "مجرة" (below).
 NAME_ALIASES = {
-    "Majara": ("ماجرة", "ماجراة", "ماجارا"),
+    "Majara": ("ماجرة", "ماجره", "ماجراة", "ماجارا"),
     "SEET": ("صيت",),
     "Keyraa": ("كيرا", "كايرا", "كيرآ"),
 }
 
-# Told to the models that read the question, so a spelling not in the table
+# Spellings that are also ordinary words: "مجرة" (also typed "مجره") is Majara,
+# and also the Arabic word for "galaxy". These are read as the company only
+# when they stand alone as a proper noun: no definite article ("المجرة", "the
+# galaxy") and no "lil-" ("للمجرة", "to the galaxy"), and at most a one-letter
+# and/in/for prefix ("في مجرة", "بمجرة", "ولمجرة").
+AMBIGUOUS_ALIASES = {
+    "Majara": ("مجرة", "مجره"),
+}
+
+# Told to the models that read the question, so a spelling not in the tables
 # above is still recognised.
 NAME_GLOSSARY = (
-    "Names written in Arabic script: ماجرة is Majara (Mohammed's employer, a "
-    "company), صيت is SEET (a company he worked at), كيرا is Keyraa (a hotel "
+    "Names written in Arabic script: مجرة (also written مجره, and formerly "
+    "ماجرة) is Majara, Mohammed's employer, a company, and not the Arabic word "
+    "for galaxy; صيت is SEET (a company he worked at); كيرا is Keyraa (a hotel "
     "booking project). They are names, not ordinary Arabic words."
 )
 
 _ARABIC_LETTER = "\u0621-\u064a"
+
+
+def _alias_pattern(spellings: tuple[str, ...], prefix: str) -> re.Pattern:
+    words = "|".join(map(re.escape, spellings))
+    return re.compile(
+        rf"(?<![{_ARABIC_LETTER}])({prefix})(?:{words})(?![{_ARABIC_LETTER}])"
+    )
+
+
 # Optional prefix, kept in the output so the sentence still reads: and/so
 # (و ف), then in-with/like/for (ب ك ل) optionally fused with "al-" (ال), or
 # "lil-" (لل). Stacks such as والماجرة, بالماجرة, للماجرة and وللماجرة.
+_ANY_PREFIX = "[وف]?(?:[بكل]?ال|لل|[بكل])?"
+_ONE_LETTER_PREFIX = "[وف]?[بكل]?"
+
 _ALIAS = [
-    (re.compile(
-        rf"(?<![{_ARABIC_LETTER}])((?:[وف]?(?:[بكل]?ال|لل|[بكل])?))(?:{'|'.join(map(re.escape, spellings))})(?![{_ARABIC_LETTER}])"
-    ), name)
-    for name, spellings in NAME_ALIASES.items()
+    *((_alias_pattern(sp, _ANY_PREFIX), name) for name, sp in NAME_ALIASES.items()),
+    *((_alias_pattern(sp, _ONE_LETTER_PREFIX), name) for name, sp in AMBIGUOUS_ALIASES.items()),
 ]
 
 

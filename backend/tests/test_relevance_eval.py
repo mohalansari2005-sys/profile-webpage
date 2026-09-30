@@ -73,7 +73,9 @@ IN_SCOPE_THIS_SITE = [
 # The same judgment in Arabic. Names arrive in Arabic script (ماجرة, صيت), which
 # the gate must treat like their Latin spelling.
 IN_SCOPE_ARABIC = [
-    "ما هي ماجرة؟",
+    "ما هي مجرة؟",
+    "وش هي مجره؟",
+    "وش سوّى محمد في صيت؟",
     "ماذا فعل محمد في صيت؟",
     "ما هو مشروع كيرا؟",
     "ما هي الأدوات التي يستخدمها محمد؟",
