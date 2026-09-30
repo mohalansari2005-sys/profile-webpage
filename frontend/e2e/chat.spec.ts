@@ -86,10 +86,10 @@ test("a short answer after a long one is still brought into view", async ({ page
 });
 
 test("Arabic text gets its own direction", async ({ page }) => {
-  await mock(page, "محمد مهندس منتجات في ماجرة.");
+  await mock(page, "محمد يشتغل مهندس منتجات في مجرة.");
   await page.goto("/");
-  await ask(page, "ما هي ماجرة؟");
-  const answer = page.getByText("محمد مهندس منتجات في ماجرة.");
+  await ask(page, "وش هي مجرة؟");
+  const answer = page.getByText("محمد يشتغل مهندس منتجات في مجرة.");
   // Wait for the mocked reply to render first; under a busy parallel run the
   // default 5s can pass before the fetch resolves.
   await expect(answer).toBeVisible({ timeout: 15_000 });
@@ -98,12 +98,12 @@ test("Arabic text gets its own direction", async ({ page }) => {
 });
 
 test("an Arabic question stays on the question side of an English page", async ({ page }) => {
-  await mock(page, "محمد مهندس منتجات في ماجرة.");
+  await mock(page, "محمد يشتغل مهندس منتجات في مجرة.");
   await page.goto("/");
-  await ask(page, "ما هي ماجرة؟");
-  const answer = page.getByText("محمد مهندس منتجات في ماجرة.");
+  await ask(page, "وش هي مجرة؟");
+  const answer = page.getByText("محمد يشتغل مهندس منتجات في مجرة.");
   await expect(answer).toBeVisible();
-  const q = await page.getByText("ما هي ماجرة؟").last().boundingBox();
+  const q = await page.getByText("وش هي مجرة؟").last().boundingBox();
   const a = await answer.boundingBox();
   expect(q!.x + q!.width / 2).toBeGreaterThan(a!.x + a!.width / 2);
 });
@@ -114,6 +114,13 @@ test("a source chip still jumps to its record", async ({ page }) => {
   ]);
   await page.goto("/");
   await ask(page, "What is Keyraa?");
-  await page.getByRole("button", { name: /Keyraa/ }).click();
-  await expect(page.locator("#record-proj-keyraa")).toBeFocused();
+  // The chat box may still be smooth-scrolling to the new answer when the chip
+  // first becomes clickable; under a busy parallel run a click can land on the
+  // moving box instead. Retry click + focus together rather than assume the
+  // first click hit (it passes 60/60 when the machine is not saturated).
+  const card = page.locator("#record-proj-keyraa");
+  await expect(async () => {
+    await page.getByRole("button", { name: /Keyraa/ }).click();
+    await expect(card).toBeFocused({ timeout: 1500 });
+  }).toPass({ timeout: 15_000 });
 });

@@ -7,9 +7,9 @@ period: "Nov 2025 — Present"
 tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"]
 summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software."
 title_ar: "متدرب هندسة منتجات"
-org_ar: "ماجرة — الرياض، عمل هجين"
-period_ar: "نوفمبر 2025 — الآن"
-summary_ar: "عملتُ في تطوير البرمجيات المتكاملة وتطوير المنتجات، محوّلًا المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات منتج، من الفكرة حتى برمجية تعمل."
+org_ar: "مجرة — الرياض، شغل هجين"
+period_ar: "نوفمبر 2025 — الحين"
+summary_ar: "اشتغلت على تطوير البرامج المتكاملة وتطوير المنتجات، وكنت أحوّل المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات للمنتج، من الفكرة لين تصير برنامج شغّال."
 ---
 
 ## What the work actually involved

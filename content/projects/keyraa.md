@@ -7,8 +7,8 @@ period: "2026"
 repo: "https://github.com/mohalansari2005-sys/keyraa-hotel-booking"
 tools: ["python", "fastapi", "sqlalchemy", "postgres", "redis", "celery", "docker", "rest-apis", "pytest"]
 summary: "Keyraa, a corporate hotel booking platform: a FastAPI backend that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed."
-org_ar: "ماجرة"
-summary_ar: "Keyraa منصة حجز فنادق للشركات: خلفية FastAPI تحوّل طلبات سفر الموظفين الجماعية إلى حجوزات فنادق مؤكدة، عبر بحث Amadeus والحجز الجماعي بواسطة عمّال Celery ورسائل التأكيد بالبريد. بنيتُ التدفقات الأساسية بمفردي: متعددة المستأجرين وآمنة التكرار، مع إعادة المحاولة والتراجع حول واجهة خارجية محدودة المعدل. أُوقف المشروع قبل الإطلاق بعد تغيّر أنظمة القطاع."
+org_ar: "مجرة"
+summary_ar: "Keyraa منصة حجز فنادق للشركات: خلفية FastAPI تحوّل طلبات سفر الموظفين الجماعية إلى حجوزات فنادق مؤكدة، عن طريق بحث Amadeus والحجز الجماعي بعمّال Celery ورسائل التأكيد بالإيميل. بنيت الأجزاء الأساسية بروحي: متعددة المستأجرين وما تتكرر فيها العمليات بالغلط، مع إعادة محاولة وتراجع حول واجهة خارجية لها حد على الطلبات. وقفنا المشروع قبل الإطلاق لأن أنظمة القطاع تغيّرت."
 ---
 
 ## What the work actually involved

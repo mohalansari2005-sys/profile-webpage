@@ -71,7 +71,7 @@ export const experience: WorkRecord[] = [
     period: "Nov 2025 — Present",
     summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software.",
     tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"],
-    ar: { title: "متدرب هندسة منتجات", org: "ماجرة — الرياض، عمل هجين", period: "نوفمبر 2025 — الآن", summary: "عملتُ في تطوير البرمجيات المتكاملة وتطوير المنتجات، محوّلًا المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات منتج، من الفكرة حتى برمجية تعمل." },
+    ar: { title: "متدرب هندسة منتجات", org: "مجرة — الرياض، شغل هجين", period: "نوفمبر 2025 — الحين", summary: "اشتغلت على تطوير البرامج المتكاملة وتطوير المنتجات، وكنت أحوّل المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات للمنتج، من الفكرة لين تصير برنامج شغّال." },
   },
   {
     id: "exp-seet",
@@ -80,7 +80,7 @@ export const experience: WorkRecord[] = [
     period: "Feb — Apr 2025",
     summary: "Worked backward from client objectives to concrete proposals — client meetings, sales pitches, and ongoing relationships. It taught me to translate a loosely defined problem into a solution that's actually useful and deliverable, the same skill that scopes a good engineering requirement.",
     tools: [],
-    ar: { title: "متدرب تطوير أعمال", org: "صيت — وكالة حلول تسويقية، الرياض", period: "فبراير — أبريل 2025", summary: "كنتُ أنطلق من أهداف العميل إلى مقترحات ملموسة: اجتماعات مع العملاء وعروض مبيعات وعلاقات مستمرة. علّمني ذلك أن أحوّل مشكلة غير محددة إلى حل مفيد وقابل للتسليم، وهي المهارة نفسها التي تصنع متطلبات هندسية جيدة." },
+    ar: { title: "متدرب تطوير أعمال", org: "صيت — وكالة حلول تسويقية، الرياض", period: "فبراير — أبريل 2025", summary: "كنت أبدأ من أهداف العميل وأوصل لمقترحات واضحة: اجتماعات مع العملاء وعروض مبيعات وعلاقات مستمرة. وتعلمت منها كيف أحوّل مشكلة مو محددة لحل مفيد وقابل للتسليم، وهي نفس المهارة اللي تطلّع متطلبات هندسية زينة." },
   },
 ];
 
@@ -93,7 +93,7 @@ export const projects: WorkRecord[] = [
     summary: "Keyraa, a corporate hotel booking platform: a FastAPI backend that turns bulk employee trip requests into booked hotels — Amadeus search, bulk booking through Celery workers, and confirmation emails. I built the core flows solo: multi-tenant, idempotent, with retry and backoff around a rate-limited external API. Shelved before launch when industry regulations changed.",
     tools: ["python", "fastapi", "sqlalchemy", "postgres", "redis", "celery", "docker", "rest-apis", "pytest"],
     repo: "https://github.com/mohalansari2005-sys/keyraa-hotel-booking",
-    ar: { org: "ماجرة", summary: "Keyraa منصة حجز فنادق للشركات: خلفية FastAPI تحوّل طلبات سفر الموظفين الجماعية إلى حجوزات فنادق مؤكدة، عبر بحث Amadeus والحجز الجماعي بواسطة عمّال Celery ورسائل التأكيد بالبريد. بنيتُ التدفقات الأساسية بمفردي: متعددة المستأجرين وآمنة التكرار، مع إعادة المحاولة والتراجع حول واجهة خارجية محدودة المعدل. أُوقف المشروع قبل الإطلاق بعد تغيّر أنظمة القطاع." },
+    ar: { org: "مجرة", summary: "Keyraa منصة حجز فنادق للشركات: خلفية FastAPI تحوّل طلبات سفر الموظفين الجماعية إلى حجوزات فنادق مؤكدة، عن طريق بحث Amadeus والحجز الجماعي بعمّال Celery ورسائل التأكيد بالإيميل. بنيت الأجزاء الأساسية بروحي: متعددة المستأجرين وما تتكرر فيها العمليات بالغلط، مع إعادة محاولة وتراجع حول واجهة خارجية لها حد على الطلبات. وقفنا المشروع قبل الإطلاق لأن أنظمة القطاع تغيّرت." },
   },
   {
     id: "proj-profile-webpage",
@@ -103,7 +103,7 @@ export const projects: WorkRecord[] = [
     summary: "This website: a statically exported Next.js and TypeScript front end whose content is a validated Markdown corpus, plus a Django and LangGraph chatbot that answers questions about my work by retrieving over pgvector with OpenAI models, and refuses anything it cannot ground in that corpus. English and Arabic (right-to-left), dark mode, CI with Playwright, and a backend that deploys itself to a VPS.",
     tools: ["typescript", "react", "nextjs", "tailwind", "python", "django", "langgraph", "openai-api", "rag", "postgres", "pgvector", "redis", "docker", "pytest", "playwright", "github-actions"],
     repo: "https://github.com/mohalansari2005-sys/profile-webpage",
-    ar: { title: "موقع المحفظة مع دردشة ذكية", org: "مشروع شخصي", summary: "هذا الموقع: واجهة Next.js وTypeScript مُصدَّرة بشكل ثابت، محتواها مجموعة Markdown موثَّقة، مع روبوت دردشة مبني على Django وLangGraph يجيب عن أسئلة حول أعمالي عبر الاسترجاع من pgvector ونماذج OpenAI، ويرفض أي سؤال لا يستطيع إسناده إلى هذه المجموعة. بالعربية والإنجليزية (من اليمين إلى اليسار)، ووضع داكن، وتكامل مستمر مع Playwright، وخلفية تنشر نفسها إلى خادم VPS." },
+    ar: { title: "موقعي الشخصي مع دردشة ذكية", org: "مشروع شخصي", summary: "هذا الموقع: واجهة Next.js وTypeScript تنبني كملفات ثابتة، ومحتواها ملفات Markdown ينتحقق منها، ومعها روبوت دردشة بـDjango وLangGraph يجاوب عن شغلي بالبحث في pgvector ونماذج OpenAI، ويرفض أي سؤال ما يقدر يثبته من هالمحتوى. عربي وإنجليزي (من اليمين لليسار)، ووضع داكن، واختبارات آلية بـPlaywright، والخلفية تنشر نفسها على سيرفر VPS." },
   },
 ];
 

@@ -1,10 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
+import { experience } from "../lib/content";
+import { format } from "../lib/i18n";
+import { ar } from "../messages/ar";
+
+// Assertions read the same dictionaries and content the site renders, so
+// rewording the Arabic copy never needs a test edit; the tests check that the
+// right strings land in the right places.
+const majara = experience.find((r) => r.id === "exp-majara")!;
 
 const CHAT_API = "http://chat.test/api/chat/";
 
 async function ask(page: Page, question: string) {
   await page.locator("#ask-input").fill(question);
-  await page.getByRole("button", { name: "إرسال السؤال" }).click();
+  await page.getByRole("button", { name: ar.ask.send }).click();
 }
 
 test.describe("Arabic page", () => {
@@ -14,17 +22,17 @@ test.describe("Arabic page", () => {
     expect(html).toMatch(/<html[^>]*lang="ar"[^>]*dir="rtl"/);
     await page.goto("/ar");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    await expect(page).toHaveTitle("محمد الأنصاري");
+    await expect(page).toHaveTitle(ar.meta.title);
   });
 
   test("every section is in Arabic", async ({ page }) => {
     await page.goto("/ar");
-    await expect(page.locator("h1")).toContainText("محمد");
-    for (const name of ["نبذة", "الخبرة", "المشاريع", "تواصل"]) {
+    await expect(page.locator("h1")).toContainText(ar.hero.nameFirst);
+    for (const name of [ar.about.label, ar.work.experience, ar.work.projects, ar.contact.label]) {
       await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
     }
     await expect(
-      page.getByRole("heading", { level: 2, name: "اسأل مساعدي الذكي عن أعمالي." }),
+      page.getByRole("heading", { level: 2, name: ar.ask.heading }),
     ).toBeVisible();
   });
 
@@ -50,9 +58,9 @@ test.describe("Arabic page", () => {
   test("translates the work records and the project link", async ({ page }) => {
     await page.goto("/ar");
     const row = page.locator("#record-exp-majara");
-    await expect(row).toContainText("متدرب هندسة منتجات");
-    await expect(row).toContainText("نوفمبر 2025 — الآن");
-    await expect(page.getByRole("link", { name: "Keyraa على GitHub" })).toHaveAttribute(
+    await expect(row).toContainText(majara.ar!.title!);
+    await expect(row).toContainText(majara.ar!.period!);
+    await expect(page.getByRole("link", { name: format(ar.work.onGithub, { title: "Keyraa" }) })).toHaveAttribute(
       "href",
       "https://github.com/mohalansari2005-sys/keyraa-hotel-booking",
     );
@@ -60,9 +68,9 @@ test.describe("Arabic page", () => {
 
   test("the theme toggle speaks Arabic", async ({ page }) => {
     await page.goto("/ar");
-    await expect(page.getByRole("button", { name: /^المظهر:/ })).toHaveAttribute(
+    await expect(page.locator("button[data-mode]")).toHaveAttribute(
       "aria-label",
-      "المظهر: النظام. التبديل إلى فاتح.",
+      format(ar.theme.aria, { current: ar.theme.system, next: ar.theme.light }),
     );
   });
 
@@ -87,10 +95,10 @@ test.describe("chat in Arabic", () => {
       route.fulfill({ json: { answer: "إجابة قصيرة.", sources: [], refused: false } }),
     );
     await page.goto("/ar");
-    await ask(page, "ما هي ماجرة؟");
+    await ask(page, "وش هي مجرة؟");
     const answer = page.getByText("إجابة قصيرة.");
     await expect(answer).toBeVisible();
-    const q = await page.getByText("ما هي ماجرة؟").last().boundingBox();
+    const q = await page.getByText("وش هي مجرة؟").last().boundingBox();
     const a = await answer.boundingBox();
     expect(q!.x + q!.width / 2).toBeLessThan(a!.x + a!.width / 2);
   });
@@ -107,7 +115,7 @@ test.describe("chat in Arabic", () => {
     );
     await page.goto("/ar");
     await ask(page, "ماذا فعل؟");
-    await expect(page.getByRole("button", { name: /متدرب هندسة منتجات/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: new RegExp(majara.ar!.title!) })).toBeVisible();
     await expect(page.getByText("Product Engineering Intern")).toHaveCount(0);
   });
 
@@ -115,7 +123,7 @@ test.describe("chat in Arabic", () => {
     await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
     await page.goto("/ar");
     await ask(page, "سؤال");
-    await expect(page.getByText("واجهت خدمة الإجابة خطأً. حاول بعد قليل.")).toBeVisible();
+    await expect(page.getByText(ar.ask.errors.server)).toBeVisible();
   });
 
   test("the English page still shows English errors", async ({ page }) => {
@@ -134,7 +142,7 @@ test.describe("switching language", () => {
     await expect(page).toHaveURL(/\/ar\/?$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
 
-    await page.getByRole("link", { name: "التبديل إلى الإنجليزية" }).click();
+    await page.getByRole("link", { name: ar.lang.switchAria }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page).toHaveURL(/\/$/);
   });
@@ -154,7 +162,7 @@ test.describe("switching language", () => {
       "/ar#about",
     );
     await page.goto("/ar#work");
-    await expect(page.getByRole("link", { name: "التبديل إلى الإنجليزية" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: ar.lang.switchAria })).toHaveAttribute(
       "href",
       "/?lang=en#work",
     );
@@ -166,7 +174,7 @@ test.describe("switching language", () => {
   }) => {
     await page.goto("/ar"); // visiting /ar remembers Arabic
     const href = await page
-      .getByRole("link", { name: "التبديل إلى الإنجليزية" })
+      .getByRole("link", { name: ar.lang.switchAria })
       .getAttribute("href");
 
     const tab = await context.newPage();
@@ -194,7 +202,7 @@ test.describe("switching language", () => {
     await expect(page).toHaveURL(/\/ar\/?$/);
 
     // ...and choosing English again stops the redirect.
-    await page.getByRole("link", { name: "التبديل إلى الإنجليزية" }).click();
+    await page.getByRole("link", { name: ar.lang.switchAria }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await page.goto("/");
     await expect(page).toHaveURL(/\/$/);
