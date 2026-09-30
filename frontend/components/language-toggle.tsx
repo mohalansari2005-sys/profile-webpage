@@ -1,8 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { Languages } from "lucide-react";
 import { useI18n } from "@/components/i18n-provider";
 import { homePath, type Locale } from "@/lib/i18n";
+import { iconChip } from "@/lib/icon-chip";
 
 function subscribe(onChange: () => void) {
   window.addEventListener("hashchange", onChange);
@@ -30,9 +32,10 @@ export function LanguageToggle() {
       hrefLang={other}
       lang={other}
       aria-label={t.lang.switchAria}
-      className="cursor-pointer rounded-sm border border-rule bg-foreground/[0.04] px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground transition-colors duration-200 hover:border-foreground"
+      title={t.lang.switchAria}
+      className={iconChip}
     >
-      {t.lang.switchLabel}
+      <Languages className="size-4" aria-hidden="true" />
     </a>
   );
 }

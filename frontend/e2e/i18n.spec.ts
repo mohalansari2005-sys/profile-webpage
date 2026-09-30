@@ -60,7 +60,17 @@ test.describe("Arabic page", () => {
 
   test("the theme toggle speaks Arabic", async ({ page }) => {
     await page.goto("/ar");
-    await expect(page.getByRole("button", { name: /^المظهر:/ })).toHaveText("المظهر: النظام");
+    await expect(page.getByRole("button", { name: /^المظهر:/ })).toHaveAttribute(
+      "aria-label",
+      "المظهر: النظام. التبديل إلى فاتح.",
+    );
+  });
+
+  test("the language switch is an icon, not text", async ({ page }) => {
+    await page.goto("/");
+    const link = page.getByRole("link", { name: "Switch to Arabic" });
+    await expect(link).toHaveText("");
+    expect(await link.locator("svg").getAttribute("class")).toContain("lucide-languages");
   });
 
   test("declares its language alternates for search engines", async ({ page }) => {

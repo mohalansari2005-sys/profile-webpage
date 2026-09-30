@@ -8,15 +8,12 @@ export const en = {
     ogAlt: "Mohammed Alansari — Product Engineer at Majara",
   },
   theme: {
-    label: "Theme",
     system: "System",
     light: "Light",
     dark: "Dark",
     aria: "Theme: {current}. Switch to {next}.",
   },
   lang: {
-    /** Names the *other* language, in that language. */
-    switchLabel: "العربية",
     switchAria: "Switch to Arabic",
   },
   hero: {

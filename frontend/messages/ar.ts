@@ -9,14 +9,12 @@ export const ar: Messages = {
     ogAlt: "محمد الأنصاري — مهندس منتجات في ماجرة",
   },
   theme: {
-    label: "المظهر",
     system: "النظام",
     light: "فاتح",
     dark: "داكن",
     aria: "المظهر: {current}. التبديل إلى {next}.",
   },
   lang: {
-    switchLabel: "English",
     switchAria: "التبديل إلى الإنجليزية",
   },
   hero: {

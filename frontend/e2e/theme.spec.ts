@@ -43,30 +43,46 @@ test.describe("OS prefers dark, script blocked", () => {
 test.describe("toggle", () => {
   test.use({ colorScheme: "light" });
 
+  const toggle = (page: import("@playwright/test").Page) =>
+    page.getByRole("button", { name: /^Theme:/ });
+  // lucide renders <svg class="lucide lucide-sun ...">.
+  const iconOf = (page: import("@playwright/test").Page) =>
+    toggle(page).locator("svg").getAttribute("class");
+
+  test("is an icon (monitor, sun, moon) with a full accessible name", async ({ page }) => {
+    await page.goto("/");
+    await expect(toggle(page)).toHaveText(""); // no visible text, icon only
+    await expect(toggle(page)).toHaveAttribute("aria-label", "Theme: System. Switch to Light.");
+    expect(await iconOf(page)).toContain("lucide-monitor");
+
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("aria-label", "Theme: Light. Switch to Dark.");
+    expect(await iconOf(page)).toContain("lucide-sun");
+
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("aria-label", "Theme: Dark. Switch to System.");
+    expect(await iconOf(page)).toContain("lucide-moon");
+  });
+
   test("cycles system -> light -> dark -> system and persists", async ({ page }) => {
     await page.goto("/");
-    const toggle = page.getByRole("button", { name: /^Theme:/ });
-    await expect(toggle).toHaveText("Theme: System");
+    await expect(toggle(page)).toHaveAttribute("data-mode", "system");
 
-    await toggle.click();
-    await expect(toggle).toHaveText("Theme: Light");
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "light");
     await expect(page.locator("html")).toHaveClass(/\blight\b/);
 
-    await toggle.click();
-    await expect(toggle).toHaveText("Theme: Dark");
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "dark");
     await expect(page.locator("html")).toHaveClass(/\bdark\b/);
     expect(await bodyBg(page)).toBe(DARK_BG);
 
     await page.reload();
     await expect(page.locator("html")).toHaveClass(/\bdark\b/);
-    await expect(page.getByRole("button", { name: /^Theme:/ })).toHaveText(
-      "Theme: Dark",
-    );
+    await expect(toggle(page)).toHaveAttribute("data-mode", "dark");
 
-    await page.getByRole("button", { name: /^Theme:/ }).click();
-    await expect(page.getByRole("button", { name: /^Theme:/ })).toHaveText(
-      "Theme: System",
-    );
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "system");
     await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
     expect(await page.evaluate(() => localStorage.getItem("theme"))).toBeNull();
   });
