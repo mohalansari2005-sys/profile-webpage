@@ -207,7 +207,7 @@ export function Ask() {
           </Reveal>
 
           <Reveal delay={160}>
-            <div className="mt-8 flex h-[min(34rem,72svh)] sm:h-[min(42rem,64svh)] lg:h-[min(36rem,72svh)] flex-col overflow-hidden rounded-3xl border border-rule bg-card shadow-sm">
+            <div className="mt-8 flex h-[min(34rem,72svh)] sm:portrait:h-[min(42rem,64svh)] lg:landscape:h-[min(36rem,72svh)] flex-col overflow-hidden rounded-3xl border border-rule bg-card shadow-sm">
               <div className="flex items-center gap-3 border-b border-rule px-5 py-3.5">
                 <span
                   aria-hidden="true"

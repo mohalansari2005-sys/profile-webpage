@@ -128,3 +128,22 @@ test.describe("chat height follows the device", () => {
     expect(ipad).toBeGreaterThan(laptop);
   });
 });
+
+test.describe("landscape phone", () => {
+  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+
+  test("the chat keeps most of the short screen (not the tall-tablet fraction)", async ({ page }) => {
+    await page.goto("/");
+    const h = (await page.locator("#ask .rounded-3xl").boundingBox())!.height;
+    // 72svh of 390 = 281; the portrait-tablet rule would give ~250.
+    expect(h).toBeGreaterThanOrEqual(0.72 * 390 - 2);
+  });
+
+  test("is never wider than the screen", async ({ page }) => {
+    await page.goto("/");
+    const over = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(over).toBeLessThanOrEqual(0);
+  });
+});

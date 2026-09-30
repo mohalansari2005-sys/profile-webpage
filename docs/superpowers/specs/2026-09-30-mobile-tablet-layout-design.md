@@ -6,7 +6,7 @@ On a phone the page looked misaligned. Measured with Playwright at 360-430px vie
 ## Device classes
 | Class | Width | Layout |
 |---|---|---|
-| Phone | < 640px | Single column, 24px gutter, label above content |
+| Phone | < 640px | Single column, 24px gutter, label above content (a landscape phone keeps the phone chat height) |
 | Tablet (iPad portrait / mini) | 640-1023px | Label column beside content, 40px gutter, taller chat |
 | Desktop / iPad landscape | >= 1024px | Unchanged (24px gutter, 1024px column) |
 
@@ -16,11 +16,14 @@ On a phone the page looked misaligned. Measured with Playwright at 360-430px vie
 - **Tablet label column:** section grids switch to `[7.5rem_1fr]` at `sm` (640px) instead of `md` (768px), matching the record rows.
 - **Pinned "Built with" bar (phone):** the label no longer wraps ("BUILT / WITH") and the hint truncates to one line instead of wrapping to two, so the always-visible bar is shorter.
 - **Touch targets:** `pointer-coarse:` variants raise the tool chips, Clear, project chevrons, card GitHub link, suggestion and source chips and the send button to finger-sized on touch screens (phones and iPads); mouse layouts are unchanged. (The icon toggles are already 44px on phones.)
-- **Chat height:** `min(34rem,72svh)` on phones, `min(42rem,64svh)` on tablets (tall screens), `min(36rem,72svh)` on desktop.
+- **Chat height:** `min(34rem,72svh)` on phones, `min(42rem,64svh)` on portrait screens 640px and wider (iPad portrait), gated on orientation so a landscape phone (844x390) keeps 72svh instead of shrinking to 64svh, `min(36rem,72svh)` on landscape screens 1024px and wider.
 - **Contact links** get `overflow-wrap: anywhere` so a long URL wraps instead of overflowing at 320px.
 
 ## Tests (`e2e/responsive.spec.ts`, 52 tests)
 Eight sizes (320, 375, 390, 430, 744, 820, 834, 1024) x both languages: never wider than the screen; correct gutter (24 / 40 / 24); section label stacked on phones, beside content from 640px. Phone specifics: the pinned bar's label and hint are one line; the chat box fits the phone and its suggestions wrap inside it. Under touch emulation (`isMobile`, so `pointer: coarse`): toggles, chevrons >= 44px, tool chips >= 38px. Chat is taller on an iPad than on a phone or laptop. **Checked against the unfixed code: 20 of these fail there** (every phone overflow case, the iPad gutters and label column), so they guard the fix.
 
+## Landscape phones
+Found in review: a landscape phone (844x390) crosses the 640px breakpoint, so the tablet chat height (64svh, ~250px) would have shrunk the chat below the previous 72svh (~281px). The tall chat is now gated on `portrait`, and two tests cover a landscape phone (no overflow; chat keeps >= 72svh).
+
 ## Not covered
-Real devices and the Vercel preview (login-protected); Safari/WebKit-specific quirks (tests run in Chromium with device emulation); landscape phones.
+Real devices and the Vercel preview (login-protected); Safari/WebKit-specific quirks (tests run in Chromium with device emulation); landscape phone layout beyond the overflow and chat-height checks.
