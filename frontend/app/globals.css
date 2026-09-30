@@ -169,6 +169,37 @@
   }
 }
 
+/* Page gutter: 24px on phones, 40px on tablets (iPad portrait and mini),
+   back to 24px once the 1024px container is centred on desktop and iPad
+   landscape. One token, so every section, strip and rail lines up. */
+:root {
+  --gutter: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --gutter: 2.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 1.5rem;
+  }
+}
+
+@utility gutter {
+  padding-inline: var(--gutter);
+}
+
+/* A scroller that runs edge to edge but starts and ends aligned with the
+   column: bleeds out by the gutter, pads back in by the same amount. */
+@utility gutter-bleed {
+  margin-inline: calc(var(--gutter) * -1);
+  padding-inline: var(--gutter);
+  scroll-padding-inline: var(--gutter);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
