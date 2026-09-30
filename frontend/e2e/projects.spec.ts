@@ -131,10 +131,13 @@ test.describe("on a phone", () => {
 
     await page.locator("#ask-input").fill("How was this built?");
     await page.getByRole("button", { name: "Send question" }).click();
-    await page.getByRole("button", { name: /Portfolio website with an AI chat/ }).click();
-
     const card = page.locator("#record-proj-profile-webpage");
-    await expect(card).toBeFocused();
+    // Retry click + focus together: the chat box may still be smooth-scrolling
+    // when the chip first becomes clickable (see chat.spec.ts).
+    await expect(async () => {
+      await page.getByRole("button", { name: /Portfolio website with an AI chat/ }).click();
+      await expect(card).toBeFocused({ timeout: 1500 });
+    }).toPass({ timeout: 15_000 });
     await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(50);
     // ...and the card is actually inside the rail's visible window.
     await expect

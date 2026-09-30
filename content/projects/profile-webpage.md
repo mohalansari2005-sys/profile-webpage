@@ -7,9 +7,9 @@ period: "2026"
 repo: "https://github.com/mohalansari2005-sys/profile-webpage"
 tools: ["typescript", "react", "nextjs", "tailwind", "python", "django", "langgraph", "openai-api", "rag", "postgres", "pgvector", "redis", "docker", "pytest", "playwright", "github-actions"]
 summary: "This website: a statically exported Next.js and TypeScript front end whose content is a validated Markdown corpus, plus a Django and LangGraph chatbot that answers questions about my work by retrieving over pgvector with OpenAI models, and refuses anything it cannot ground in that corpus. English and Arabic (right-to-left), dark mode, CI with Playwright, and a backend that deploys itself to a VPS."
-title_ar: "موقع المحفظة مع دردشة ذكية"
+title_ar: "موقعي الشخصي مع دردشة ذكية"
 org_ar: "مشروع شخصي"
-summary_ar: "هذا الموقع: واجهة Next.js وTypeScript مُصدَّرة بشكل ثابت، محتواها مجموعة Markdown موثَّقة، مع روبوت دردشة مبني على Django وLangGraph يجيب عن أسئلة حول أعمالي عبر الاسترجاع من pgvector ونماذج OpenAI، ويرفض أي سؤال لا يستطيع إسناده إلى هذه المجموعة. بالعربية والإنجليزية (من اليمين إلى اليسار)، ووضع داكن، وتكامل مستمر مع Playwright، وخلفية تنشر نفسها إلى خادم VPS."
+summary_ar: "هذا الموقع: واجهة Next.js وTypeScript تنبني كملفات ثابتة، ومحتواها ملفات Markdown ينتحقق منها، ومعها روبوت دردشة بـDjango وLangGraph يجاوب عن شغلي بالبحث في pgvector ونماذج OpenAI، ويرفض أي سؤال ما يقدر يثبته من هالمحتوى. عربي وإنجليزي (من اليمين لليسار)، ووضع داكن، واختبارات آلية بـPlaywright، والخلفية تنشر نفسها على سيرفر VPS."
 ---
 
 ## What it is
