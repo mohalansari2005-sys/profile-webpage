@@ -1,5 +1,7 @@
 # The Arabic page in Saudi white dialect
 
+> **Superseded for the page copy** by `2026-10-13-professional-arabic-copy-design.md`: the site is now in Modern Standard Arabic; only the chat greeting and suggestion chips (and the chat's generated answers) keep a Saudi tone.
+
 ## Why
 The Arabic copy I first drafted was a literal, formal translation (فصحى). The owner wants the whole Arabic page in Saudi white dialect (اللهجة البيضاء, Najdi-leaning), the way a Saudi would actually say it, and Majara written مجرة, not ماجرة.
 

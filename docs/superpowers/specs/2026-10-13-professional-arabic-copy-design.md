@@ -13,6 +13,8 @@ The owner found the Arabic page read like a literal translation of the English, 
 ## Decisions to flag
 - The major is written **نظم المعلومات** (the owner's choice), so the Arabic no longer mirrors the English "Computer Information Systems". `content/about/education.md` already says "Information Systems".
 - The Majara period reads «نوفمبر 2025 — الآن»: «حتى الآن» wrapped onto a second line in the date column from 640px up.
+- The sticky tool bar's status lines lead with the count («2 من أصل 4 تستخدم Docker»), like the English: the line truncates at the end on a 320px phone, so the numbers must come first. The verb agrees with the implied works, not with the tool name. The bar's heading stays the short «الأدوات» for the same reason.
+- The hero's location label is «المدينة», not «الموقع», which on a website also reads as "the site".
 - Skill chips (Full-stack, Systems analysis, B2B software…) stay English, by the owner's choice.
 - The backend's fixed Arabic refusals (`REFUSAL_AR`, `REFUSAL_OUT_OF_SCOPE_AR`) are unchanged and remain in dialect, consistent with the chat's answers.
 
