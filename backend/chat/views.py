@@ -17,8 +17,17 @@ GRAPH = build_graph()
 
 class ChatView(APIView):
     throttle_scope = "chat"
-    # Global first: the cheap service-wide check runs before per-IP bookkeeping.
-    throttle_classes = [GlobalDailyThrottle, ChatRateThrottle]
+    # Per-IP first, and the first refusal ends the check (below), so a request
+    # the per-IP limit turns away never counts against the global cap.
+    throttle_classes = [ChatRateThrottle, GlobalDailyThrottle]
+
+    def check_throttles(self, request):
+        # DRF's own version asks every throttle even after one refuses, and
+        # GlobalDailyThrottle counts as it asks. One client spamming past its
+        # per-IP limit would then burn the whole day's cap for every visitor.
+        for throttle in self.get_throttles():
+            if not throttle.allow_request(request, self):
+                self.throttled(request, throttle.wait())
 
     def post(self, request):
         serializer = ChatRequestSerializer(data=request.data)

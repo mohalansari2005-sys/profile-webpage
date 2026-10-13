@@ -49,6 +49,18 @@ def test_the_global_cap_stops_everyone(db, settings, stub_graph):
     assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.3").status_code == 429
 
 
+def test_one_client_over_its_limit_does_not_spend_the_global_cap(db, settings, stub_graph):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    settings.CHAT_DAILY_CAP = 2
+    api = APIClient()
+    body = {"question": "q"}
+    assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.1").status_code == 200
+    for _ in range(5):
+        assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.1").status_code == 429
+    assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.2").status_code == 200
+
+
 def test_a_rejected_request_never_reaches_the_graph(db, settings, monkeypatch):
     from chat import views
 
