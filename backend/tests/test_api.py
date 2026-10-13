@@ -51,11 +51,18 @@ def test_an_overlong_question_is_rejected(db, api, stub_graph):
 
 
 def test_a_long_history_message_is_truncated_not_rejected(db, api, stub_graph):
-    long_answer = "x" * 5000
+    from chat.serializers import MAX_HISTORY_CONTENT
+
     r = api.post("/api/chat/", {"question": "and then?", "history": [
-        {"role": "assistant", "content": long_answer}]}, format="json")
+        {"role": "assistant", "content": "x" * (MAX_HISTORY_CONTENT + 500)}]}, format="json")
     assert r.status_code == 200
-    assert stub_graph["state"]["history"][0]["content"] == "x" * 2000
+    assert stub_graph["state"]["history"][0]["content"] == "x" * MAX_HISTORY_CONTENT
+
+
+def test_a_blank_history_message_is_not_rejected(db, api, stub_graph):
+    r = api.post("/api/chat/", {"question": "and then?", "history": [
+        {"role": "user", "content": "q"}, {"role": "assistant", "content": "  "}]}, format="json")
+    assert r.status_code == 200
 
 
 def test_a_bad_history_role_is_rejected(db, api, stub_graph):
