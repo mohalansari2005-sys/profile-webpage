@@ -28,6 +28,20 @@ test("questions sit on the right, answers on the left", async ({ page }) => {
   expect(qb!.x + qb!.width / 2).toBeGreaterThan(ab!.x + ab!.width / 2);
 });
 
+test("an answer keeps its line breaks", async ({ page }) => {
+  await mock(page, "\nFirst paragraph.\n\nA list:\n- one\n- two\n");
+  await page.goto("/");
+  await ask(page, "Two parts?");
+  const answer = page.getByText("First paragraph.");
+  // Under a busy parallel run the default 5s can pass before the fetch resolves.
+  await expect(answer).toBeVisible({ timeout: 15_000 });
+  // Rendered text: collapsed whitespace would read back as one line, and the
+  // stray newlines at either end are trimmed.
+  expect(await answer.evaluate((el: HTMLElement) => el.innerText)).toBe(
+    "First paragraph.\n\nA list:\n- one\n- two",
+  );
+});
+
 test("a new answer scrolls the box, not the page", async ({ page }) => {
   await mock(page, LONG);
   await page.goto("/");
