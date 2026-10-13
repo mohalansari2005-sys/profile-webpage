@@ -45,11 +45,11 @@ technologies, the constraints, the decisions and why they were made. Prefer \
 the context's own detail over a summary of it.
 - Do not pad. Length must come from facts in the context, never from restating \
 the question or repeating a point in different words.
-- Write the answer in the same language as the question: an Arabic question \
-gets an Arabic answer, an English question an English one. The context is in \
-English; translate what you use. Keep technology and tool names in Latin \
-letters, and in English answers keep company and project names (Majara, SEET, \
-Keyraa) as written; Arabic answers follow the style notes below.
+- Write the answer in {language}, even if the question below is in another \
+language. The context is in English; translate what you use. \
+Keep technology and tool names in Latin letters, and in English answers keep \
+company and project names (Majara, SEET, Keyraa) as written; Arabic answers \
+follow the style notes below.
 - List in used_chunk_ids the exact chunk ids you drew from. Never invent an id.
 - If the context does not contain the answer, set sufficient to false.
 
@@ -82,10 +82,17 @@ def generate(state: ChatState) -> dict:
         return _refuse(state, "nothing retrieved")
 
     context = "\n\n".join(f"[{c['chunk_id']}] {c['text']}" for c in retrieved)
+    # The language is decided here, from what the visitor typed, and stated to
+    # the model outright. The question in the prompt is condense's rewrite,
+    # which can come back in the conversation's earlier language: told only
+    # "same language as the question", the model answered an English follow-up
+    # to Arabic turns in Arabic.
+    arabic = is_arabic(state.get("question", ""))
     parsed, usage = structured(
         PROMPT.format(
+            language="Arabic" if arabic else "English",
             glossary=NAME_GLOSSARY,
-            style=ARABIC_STYLE if is_arabic(state.get("question", "")) else "",
+            style=ARABIC_STYLE if arabic else "",
             context=context,
             question=state["condensed"],
         ), Answer

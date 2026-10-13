@@ -35,10 +35,19 @@ def test_generate_refusal_follows_the_question_language(monkeypatch):
     assert en["refused"] and en["answer"] == node.REFUSAL
 
 
-def test_generate_prompt_asks_for_the_question_language():
-    from chat.graph.nodes.generate import PROMPT
+def test_generate_prompt_names_the_answer_language(monkeypatch):
+    assert "Write the answer in Arabic" in _captured_prompt(monkeypatch, "وش سوّى محمد؟")
+    assert "Write the answer in English" in _captured_prompt(monkeypatch, "What did he build?")
 
-    assert "same language as the question" in PROMPT
+
+def test_an_english_follow_up_is_answered_in_english_after_arabic_turns(monkeypatch):
+    """The reported bug: an English question answered in Arabic. condense can
+    rewrite the follow-up in the transcript's language; the answer language
+    must still come from what the visitor typed."""
+    prompt = _captured_prompt(monkeypatch, "What did he do there?",
+                              condensed="وش سوّى محمد في مجرة؟")
+    assert "Write the answer in English" in prompt
+    assert "Saudi" not in prompt
 
 
 def test_out_of_scope_refusal_follows_the_question_language():
@@ -115,7 +124,7 @@ def test_prompts_carry_the_glossary():
 
 # --- Saudi white dialect for Arabic questions -----------------------------------
 
-def _captured_prompt(monkeypatch, question):
+def _captured_prompt(monkeypatch, question, condensed=None):
     from chat.graph.nodes import generate as node
 
     seen = {}
@@ -126,7 +135,7 @@ def _captured_prompt(monkeypatch, question):
 
     monkeypatch.setattr(node, "structured", fake)
     node.generate({
-        "question": question, "condensed": question,
+        "question": question, "condensed": condensed or question,
         "retrieved": [{"chunk_id": "c#s", "record_id": "c", "title": "t", "text": "x"}],
     })
     return seen["prompt"]
