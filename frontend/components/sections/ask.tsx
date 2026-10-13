@@ -246,12 +246,14 @@ export function Ask() {
                       <UserMessage>{turn.question}</UserMessage>
                       <AssistantMessage>
                         {/* pre-line keeps the paragraphs and list lines the model
-                            writes; a plain <p> runs them into one block. */}
+                            writes; a plain <p> runs them into one block. The trim
+                            stops a stray leading or trailing newline showing as
+                            an empty line in the bubble. */}
                         <p
                           dir="auto"
                           className={`whitespace-pre-line ${turn.refused ? "text-dim" : ""}`}
                         >
-                          {turn.answer}
+                          {turn.answer.trim()}
                         </p>
 
                         {turn.sources.length > 0 && (
