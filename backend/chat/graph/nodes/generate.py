@@ -45,8 +45,8 @@ technologies, the constraints, the decisions and why they were made. Prefer \
 the context's own detail over a summary of it.
 - Do not pad. Length must come from facts in the context, never from restating \
 the question or repeating a point in different words.
-- Write the answer in {language}, whatever language the question below or the \
-earlier conversation is in. The context is in English; translate what you use. \
+- Write the answer in {language}, even if the question below is in another \
+language. The context is in English; translate what you use. \
 Keep technology and tool names in Latin letters, and in English answers keep \
 company and project names (Majara, SEET, Keyraa) as written; Arabic answers \
 follow the style notes below.
@@ -83,9 +83,10 @@ def generate(state: ChatState) -> dict:
 
     context = "\n\n".join(f"[{c['chunk_id']}] {c['text']}" for c in retrieved)
     # The language is decided here, from what the visitor typed, and stated to
-    # the model outright. "Same language as the question" let the model follow
-    # the condensed question instead, which is a rewrite and can come back in
-    # the conversation's earlier language.
+    # the model outright. The question in the prompt is condense's rewrite,
+    # which can come back in the conversation's earlier language: told only
+    # "same language as the question", the model answered an English follow-up
+    # to Arabic turns in Arabic.
     arabic = is_arabic(state.get("question", ""))
     parsed, usage = structured(
         PROMPT.format(

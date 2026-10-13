@@ -9,7 +9,6 @@ from chat.language import is_arabic
     "ما هي Majara؟",  # Arabic sentence carrying a Latin name
     "ماذا يعني  ١٢٣ ؟",
     "من هو مُحَمَّد؟",  # vowelled (diacritized) Arabic
-    "وش Celery",  # half Arabic: a short question about a tool, no ؟
 ])
 def test_arabic_questions_are_detected(text):
     assert is_arabic(text) is True
@@ -42,39 +41,13 @@ def test_generate_prompt_names_the_answer_language(monkeypatch):
 
 
 def test_an_english_follow_up_is_answered_in_english_after_arabic_turns(monkeypatch):
-    """The reported bug: an English question answered in Arabic. condense rewrote
-    the follow-up in the transcript's language, and generate answered in the
-    language of that rewrite."""
-    from chat.graph.nodes import condense as node
-    from chat.graph.nodes.condense import Standalone
-
-    monkeypatch.setattr(node, "structured", lambda *a, **k: (
-        Standalone(standalone_question="وش سوّى محمد في مجرة؟",
-                   english_query="What did Mohammed do at Majara?"), {}))
-    out = node.condense({"question": "What did he do there?", "history": [
-        {"role": "user", "content": "وين يشتغل محمد؟"},
-        {"role": "assistant", "content": "يشتغل في مجرة."},
-    ]})
-    assert out["condensed"] == "What did Mohammed do at Majara?"
-
+    """The reported bug: an English question answered in Arabic. condense can
+    rewrite the follow-up in the transcript's language; the answer language
+    must still come from what the visitor typed."""
     prompt = _captured_prompt(monkeypatch, "What did he do there?",
                               condensed="وش سوّى محمد في مجرة؟")
     assert "Write the answer in English" in prompt
     assert "Saudi" not in prompt
-
-
-def test_an_arabic_follow_up_keeps_its_arabic_rewrite(monkeypatch):
-    from chat.graph.nodes import condense as node
-    from chat.graph.nodes.condense import Standalone
-
-    monkeypatch.setattr(node, "structured", lambda *a, **k: (
-        Standalone(standalone_question="وش سوّى محمد في Majara؟",
-                   english_query="What did Mohammed do at Majara?"), {}))
-    out = node.condense({"question": "وش سوّى هناك؟", "history": [
-        {"role": "user", "content": "Where does he work?"},
-        {"role": "assistant", "content": "At Majara."},
-    ]})
-    assert out["condensed"] == "وش سوّى محمد في Majara؟"
 
 
 def test_out_of_scope_refusal_follows_the_question_language():

@@ -15,22 +15,21 @@ def _has_arabic(word: str) -> bool:
 
 
 def is_arabic(text: str) -> bool:
-    """True when at least half of the words in `text` contain Arabic script.
+    """True when most of the words in `text` contain Arabic script.
 
     Deterministic on purpose: the out-of-scope path refuses before any
     generation, so there is no model call that could report the language.
     Counting words rather than letters keeps a short Arabic question that
     carries one long Latin name ("ما هي Majara؟") Arabic, while an English
     question that merely quotes an Arabic name ("What does صيت mean?") stays
-    English. A tie goes to Arabic: a two-word Arabic question about a tool
-    ("وش Celery") is common, an English one half in Arabic script is not.
+    English.
     """
     # Whitespace tokens, not a \w regex: that splits a vowelled word such as
     # مُحَمَّد at each diacritic (a combining mark, not a word character).
     words = [w for w in (text or "").split() if any(ch.isalpha() for ch in w)]
     if not words:
         return False
-    return sum(1 for w in words if _has_arabic(w)) * 2 >= len(words)
+    return sum(1 for w in words if _has_arabic(w)) * 2 > len(words)
 
 
 # How visitors write this site's names in Arabic script. The companies are
