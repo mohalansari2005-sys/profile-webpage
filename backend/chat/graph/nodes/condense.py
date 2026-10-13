@@ -48,7 +48,13 @@ def condense(state: ChatState) -> dict:
         fast=True,
     )
     rewritten = normalize_names((parsed.standalone_question or "").strip()) if parsed else ""
-    condensed = rewritten or question
     english = (parsed.english_query or "").strip() if parsed else ""
+    if rewritten and not arabic and is_arabic(rewritten):
+        # An English follow-up after Arabic turns: the model echoes the
+        # transcript's language despite the prompt, and an Arabic question here
+        # pulls generate into answering in Arabic. english_query is the same
+        # standalone question, already in the visitor's language.
+        rewritten = english
+    condensed = rewritten or question
     # Billable even when the rewrite is discarded, so it is carried, not dropped.
     return {"condensed": condensed, "search_query": english or condensed, "usage": usage}
