@@ -118,7 +118,10 @@ devtools Network tab shows no CORS errors on the `api/chat/` request.
 
 Pushing to `main` with changes under `backend/**`, `docker-compose.prod.yml`, or
 `Caddyfile` triggers `.github/workflows/deploy-backend.yml`, which SSHes into the VPS
-and runs the same commands below. To update manually instead:
+and runs the same commands below under `set -e`: the first command that fails fails
+the job, and the chat canary (which runs after a successful deploy) is skipped. A red
+deploy means the server may be part-way through — check `git log -1` and
+`docker compose -f docker-compose.prod.yml ps` there. To update manually instead:
 
 ```bash
 cd profile-webpage

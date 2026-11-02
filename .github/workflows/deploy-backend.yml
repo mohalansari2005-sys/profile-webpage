@@ -20,6 +20,11 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            # Stop at the first failed step. ssh-action does not, so the job
+            # reported only the last line's exit code: a failed pull, build or
+            # migrate still went green, and the canary ran against code that
+            # never deployed.
+            set -e
             cd /opt/profile-webpage
             git pull
             docker compose -f docker-compose.prod.yml up -d --build
