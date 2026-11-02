@@ -21,16 +21,19 @@ class Migration(migrations.Migration):
         ('chat', '0001_initial'),
     ]
 
+    # db_default keeps `DEFAULT false` on the columns (a plain default is
+    # dropped again once the column is added), so code from before this
+    # migration still inserts after a revert; see ChatLog.
     operations = [
         migrations.AddField(
             model_name='chatlog',
             name='synthetic',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(default=False, db_default=False),
         ),
         migrations.AddField(
             model_name='chatlog',
             name='unavailable',
-            field=models.BooleanField(default=False),
+            field=models.BooleanField(default=False, db_default=False),
         ),
         # Nothing to undo: reversing drops the column.
         migrations.RunPython(mark_past_outages, migrations.RunPython.noop),

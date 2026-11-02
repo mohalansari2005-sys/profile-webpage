@@ -61,3 +61,23 @@ def test_the_migration_marks_past_outages_by_their_exact_labels(db):
     flagged = dict(ChatLog.objects.values_list("refusal_reason", "unavailable"))
     assert flagged == {reason: reason in migration.OUTAGE_REASONS for reason in reasons}
     assert sum(flagged.values()) == 3
+
+
+def test_code_from_before_the_flags_can_still_log_a_turn(db):
+    """`migrate` never unapplies a migration whose file is gone, so after a
+    revert of chat.0002 the old code runs against these columns and inserts
+    without them. Their database default is what keeps that from being a 500
+    on every chat turn."""
+    from django.db import connection
+
+    from chat.models import ChatLog
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO chat_chatlog (created_at, ip_hash, question, condensed_question,"
+            " answer, refused, refusal_reason, retrieved_chunk_ids, used_chunk_ids,"
+            " latency_ms, model) VALUES (now(), %s, 'q', '', '', false, '', '[]', '[]', 1, 'm')",
+            ["h" * 64],
+        )
+    row = ChatLog.objects.get()
+    assert (row.unavailable, row.synthetic) == (False, False)
