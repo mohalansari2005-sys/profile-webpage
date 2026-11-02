@@ -187,7 +187,8 @@ to git but `COPY . .` would bake it into a layer.
 The image runs as an unprivileged `app` user (uid 1000), not root. It still
 installs the `[dev]` extras so `docker compose run --rm web pytest` works.
 
-`ChatLog` stores a salted SHA-256 of the client IP, never the address.
+`ChatLog` stores a salted SHA-256 of the client IP, never the address -- of
+an IPv6 visitor's /64, the same key the per-IP limit uses (see Limits).
 
 ## Limits
 
@@ -203,9 +204,12 @@ The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
 `Caddyfile` -- and passes it on as `X-Real-IP`, which is what `chat/ip.py` reads.
 `X-Forwarded-For` is never read -- Cloudflare appends to whatever the visitor
 sent, so its first entry is the visitor's to choose -- and without `X-Real-IP`
-(local dev) the socket address is used. Caddy still overwrites `X-Forwarded-For`
-with the visitor's address, for the Django that is running while a deploy
-reloads the `Caddyfile`; see DEPLOYMENT.md.
+(local dev) the socket address is used. An IPv6 address is keyed by its /64:
+a visitor can pick any address in theirs, a new one per request if they
+like, and keyed on the full address each was a fresh per-IP bucket. IPv4 is
+keyed as it is, and an IPv4-mapped IPv6 address as its IPv4 one. Caddy still
+overwrites `X-Forwarded-For` with the visitor's address, for the Django that is
+running while a deploy reloads the `Caddyfile`; see DEPLOYMENT.md.
 
 The daily cap was sized against a free-tier daily quota. OpenAI is billed per
 token, not capped, so this counter is now the **spend** limit — it is the only

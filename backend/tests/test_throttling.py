@@ -72,6 +72,51 @@ def test_a_spoofed_x_forwarded_for_does_not_buy_a_fresh_bucket(db, settings, stu
         assert r.status_code == expected
 
 
+@pytest.mark.parametrize("address, key", [
+    pytest.param("198.51.100.1", "198.51.100.1", id="ipv4-unchanged"),
+    pytest.param("2001:db8:1:2:a:b:c:d", "2001:db8:1:2::/64", id="ipv6-its-64"),
+    pytest.param("2001:DB8:1:2::1", "2001:db8:1:2::/64", id="ipv6-any-spelling"),
+    pytest.param("::ffff:198.51.100.1", "198.51.100.1", id="ipv4-mapped-is-ipv4"),
+    pytest.param("not-an-address", "not-an-address", id="unparsed-passes-through"),
+])
+def test_a_visitor_is_keyed_on_their_ipv4_address_or_ipv6_64(address, key):
+    from chat.ip import visitor
+
+    assert visitor(address) == key
+
+
+def test_an_ipv6_visitor_cannot_rotate_into_a_fresh_bucket(db, settings, stub_graph):
+    """Any address in a /64 is the same subscriber's to pick, one per request
+    if they like. Keyed on the full address, each was a fresh bucket."""
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/day"}}
+    api = APIClient()
+    body = {"question": "q"}
+    for address, expected in (("2001:db8:1:2::1", 200), ("2001:db8:1:2::2", 429),
+                              ("2001:db8:1:3::1", 200)):
+        r = api.post("/api/chat/", body, format="json", REMOTE_ADDR="172.18.0.5",
+                     HTTP_X_REAL_IP=address)
+        assert r.status_code == expected, address
+
+
+def test_chatlog_hashes_an_ipv6_visitor_s_64(db, monkeypatch):
+    from chat import views
+    from chat.models import hash_ip
+
+    seen = []
+
+    class Recorder:
+        def invoke(self, state):
+            seen.append(state["ip_hash"])
+            return {"answer": "ok", "refused": False, "sources": []}
+
+    monkeypatch.setattr(views, "GRAPH", Recorder())
+    for address in ("2001:db8:1:2::1", "2001:db8:1:2:ffff::9"):
+        APIClient().post("/api/chat/", {"question": "q"}, format="json",
+                         HTTP_X_REAL_IP=address)
+    assert seen == [hash_ip("2001:db8:1:2::/64")] * 2
+
+
 def _at_once(n, send):
     """Calls send(i) from n threads released together -- what gthread does
     with one visitor's parallel requests -- and returns the results."""
