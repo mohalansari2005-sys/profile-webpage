@@ -2,7 +2,7 @@ import logging
 import time
 
 from django.conf import settings
-from django.db import DatabaseError
+from django.db import InterfaceError, OperationalError
 
 from chat.graph.state import ChatState
 from chat.models import ChatLog
@@ -32,10 +32,16 @@ def log(state: ChatState) -> dict:
             # fast model without ever reaching generate.
             model=state.get("model") or settings.OPENAI_MODEL,
         )
-    except DatabaseError:
+    except (OperationalError, InterfaceError):
         # The turn is decided and, past the gate, paid for. A failed write -- a
-        # full disk, a dropped connection -- turned its answer into a 500 with
-        # no row; the visitor gets the answer and stderr gets the error.
-        # DatabaseError only, so a bug in this node still fails loudly.
+        # full disk, a dropped connection, a lock or statement timeout -- turned
+        # its answer into a 500 with no row; the visitor gets the answer and
+        # stderr gets the error. (InterfaceError, a connection already closed,
+        # is no DatabaseError, so catching that missed it.) Not all of
+        # DatabaseError either: a broken schema, a revoked grant or a bad value
+        # (ProgrammingError, IntegrityError, DataError) fails every turn the
+        # same way, and caught it would leave ChatLog -- the only record of
+        # spend -- empty behind 200s the canary cannot tell from health. Those
+        # stay 500s, as does a bug in this node.
         logger.exception("ChatLog write failed; the turn is answered unlogged")
     return {}
