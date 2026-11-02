@@ -1,5 +1,10 @@
+import contextvars
 import logging
 import math
+import time
+from contextlib import contextmanager
+
+import httpx
 
 from django.conf import settings
 from openai import (
@@ -13,11 +18,41 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 # Named openai_client, not openai, so it can never shadow the SDK it imports.
-# The SDK's defaults (a 600s timeout, 2 retries with backoff) outlast
-# gunicorn's 120s, which then kills the worker mid-turn: no ChatLog row, no
-# 503, just a 502 from Caddy. 20s and one retry keep a turn's few sequential
-# calls inside it, so a hung or failing provider ends as a logged outage.
-_client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=20.0, max_retries=1)
+# SDK defaults (600s timeout, retries that sleep out a 429's Retry-After) suit
+# ingest_content at deploy time. A visitor's turn runs under turn_budget below.
+_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+# The deadline of the turn in progress, set by the view. A turn is up to four
+# sequential calls, and the browser gives up at 30s (frontend/lib/chat-api.ts):
+# a fixed per-call timeout either outlasts that -- the visitor sees "couldn't
+# reach" instead of the 503's "try again", and gunicorn kills the worker at
+# 120s with no log row -- or is too short for a slow but healthy answer. Each
+# call gets what is left of one budget instead, in a single attempt.
+_deadline: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "openai_deadline", default=None)
+
+
+@contextmanager
+def turn_budget(seconds: float):
+    token = _deadline.set(time.monotonic() + seconds)
+    try:
+        yield
+    finally:
+        _deadline.reset(token)
+
+
+def _request_client():
+    """The client for one call: the remaining budget and no SDK retries, or
+    None once the budget is spent. Outside a turn (ingest, a shell), the
+    plain client."""
+    deadline = _deadline.get()
+    if deadline is None:
+        return _client
+    remaining = deadline - time.monotonic()
+    if remaining < 1.0:
+        return None
+    return _client.with_options(
+        timeout=httpx.Timeout(remaining, connect=min(5.0, remaining)), max_retries=0)
 
 # Set the first time OPENAI_FAST_MODEL comes back model_not_found. OpenAI retires
 # models on a schedule -- gpt-4.1-nano was shut down on 2026-10-23 -- and
@@ -34,7 +69,9 @@ _fast_model_gone = False
 # not an outage. Matched by code, not by 400: a 400 can also be configuration
 # (a parameter the model does not take), and calling that "not an outage"
 # would hide the next broken deploy behind refusals again.
-_REJECTED_CODES = {"invalid_prompt", "context_length_exceeded"}
+# Not context_length_exceeded: visitor input is capped by the serializer, so an
+# oversized prompt is the retrieved context's size -- the server's doing.
+_REJECTED_CODES = {"invalid_prompt"}
 
 
 def fast_model() -> str:
@@ -50,6 +87,10 @@ def _log_api_error(model: str, exc: APIError) -> None:
                  getattr(exc, "status_code", None), exc.code, type(exc).__name__)
 
 
+class _OutOfTime(Exception):
+    """The turn's budget ran out before this call could start."""
+
+
 def normalize(vec: list[float]) -> list[float]:
     """OpenAI returns unit vectors, and re-normalizes when `dimensions` shortens
     them. This is belt and braces: pgvector's cosine distance assumes unit
@@ -62,7 +103,10 @@ def _embed(texts: list[str]) -> list[list[float]]:
     """One call shape for both sides. Gemini needed a task_type asymmetry
     between documents and queries; OpenAI has no such parameter, so the two
     wrappers below differ only in arity."""
-    resp = _client.embeddings.create(
+    client = _request_client()
+    if client is None:
+        raise _OutOfTime
+    resp = client.embeddings.create(
         model=settings.OPENAI_EMBED_MODEL,
         input=texts,
         dimensions=settings.EMBED_DIMENSIONS,
@@ -81,6 +125,10 @@ def embed_query(text: str) -> list[float] | None:
         return _embed([text])[0]
     except APIError as exc:
         _log_api_error(settings.OPENAI_EMBED_MODEL, exc)
+        return None
+    except _OutOfTime:
+        logger.error("OpenAI call skipped: model=%s, turn budget spent",
+                     settings.OPENAI_EMBED_MODEL)
         return None
 
 
@@ -117,8 +165,12 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     """
     global _fast_model_gone
     model = fast_model() if fast else settings.OPENAI_MODEL
+    client = _request_client()
+    if client is None:
+        logger.error("OpenAI call skipped: model=%s, turn budget spent", model)
+        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
     try:
-        resp = _client.chat.completions.parse(
+        resp = client.chat.completions.parse(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             response_format=schema,

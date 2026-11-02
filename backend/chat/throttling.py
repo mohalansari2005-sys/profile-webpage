@@ -42,7 +42,24 @@ class GlobalDailyThrottle(BaseThrottle):
             cache.incr(key)
         except ValueError:  # key expired between get_or_set and incr
             cache.set(key, 1, timeout=60 * 60 * 48)
+        # The key this request counted against, for refund(): recomputing it
+        # later would give a turn that crossed midnight back to the wrong day.
+        request.chat_daily_key = key
         return True
 
     def wait(self):
         return None
+
+    @staticmethod
+    def refund(request):
+        """Give back the slot this request counted. Redis DECR is atomic; a
+        refund racing the key's expiry or another refund cannot leave it below
+        zero, which would grant slots past the cap."""
+        key = getattr(request, "chat_daily_key", None)
+        if key is None:
+            return
+        try:
+            if cache.decr(key) < 0:
+                cache.incr(key)
+        except ValueError:  # expired since it was counted: nothing to give back
+            pass

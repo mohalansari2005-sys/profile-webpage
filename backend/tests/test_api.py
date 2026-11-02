@@ -109,19 +109,36 @@ def test_a_provider_outage_is_a_503_not_a_refusal(db, api, monkeypatch):
     assert "answer" not in r.json()
 
 
-def test_an_outage_still_counts_against_the_daily_cap(db, api, monkeypatch, settings):
-    """The cap is the hard spend limit. An outage turn may already have paid
-    for the gate and an embedding before generate failed, so it is not given
-    back -- refunding those once let a partial outage spend without limit."""
-    from django.core.cache import cache
-
+def _post_with(api, monkeypatch, result, n):
     from chat import views
+
+    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: result})())
+    return [api.post("/api/chat/", {"question": "q"}, format="json").status_code for _ in range(n)]
+
+
+def test_an_outage_at_the_gate_gives_its_cap_slot_back(db, api, monkeypatch, settings):
+    """Nothing past a classifier call was billed. Counting the "try again"
+    retries of a quota outage would leave the cap spent when OpenAI is back."""
+    from django.core.cache import cache
 
     cache.clear()
     settings.CHAT_DAILY_CAP = 2
-    outage = {"answer": "", "refused": True, "sources": [], "unavailable": True}
-    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: outage})())
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 429
+    gate_down = {"answer": "", "refused": True, "sources": [], "unavailable": True,
+                 "in_scope": False}
+    assert _post_with(api, monkeypatch, gate_down, 4) == [503] * 4
+    answered = {"answer": "ok", "refused": False, "sources": [], "in_scope": True}
+    assert _post_with(api, monkeypatch, answered, 3) == [200, 200, 429]
+    cache.clear()
+
+
+def test_an_outage_past_the_gate_still_counts(db, api, monkeypatch, settings):
+    """Retrieval or generate failing means the gate and an embedding were
+    billed. Refunding those let a partial outage spend without limit."""
+    from django.core.cache import cache
+
+    cache.clear()
+    settings.CHAT_DAILY_CAP = 2
+    generate_down = {"answer": "", "refused": True, "sources": [], "unavailable": True,
+                     "in_scope": True}
+    assert _post_with(api, monkeypatch, generate_down, 3) == [503, 503, 429]
     cache.clear()

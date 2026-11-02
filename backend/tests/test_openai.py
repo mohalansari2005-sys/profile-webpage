@@ -380,6 +380,9 @@ def test_a_rejected_prompt_is_not_an_outage(monkeypatch):
     pytest.param(lambda: _status_error(BadRequestError, 400, "unsupported_parameter"),
                  id="config-400"),
     pytest.param(lambda: _status_error(ConflictError, 409, None), id="conflict-409"),
+    # Visitor input is capped; an oversized prompt is the retrieved context.
+    pytest.param(lambda: _status_error(BadRequestError, 400, "context_length_exceeded"),
+                 id="context-length"),
 ])
 def test_a_config_error_or_a_conflict_is_an_outage(monkeypatch, error):
     """A 400 can be configuration -- a parameter the model does not take --
@@ -402,3 +405,57 @@ def test_an_api_error_is_logged_without_its_message(monkeypatch, caplog):
         openai_client.structured("prompt", Shape)
     assert "status=429" in caplog.text
     assert "rate limit reached" not in caplog.text
+
+
+def _budgeted_client(seen):
+    """A fake whose with_options records what each call was allowed."""
+    base = _fake_client()
+
+    def with_options(**kw):
+        seen.append(kw)
+        return base
+
+    base.with_options = with_options
+    return base
+
+
+def test_inside_a_turn_each_call_gets_the_remaining_budget_and_no_retries(monkeypatch):
+    """SDK retries can sleep out a 429's Retry-After for minutes, and a fixed
+    per-call timeout times four calls outlasts the browser's 30s."""
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _budgeted_client(seen))
+    with openai_client.turn_budget(10):
+        parsed, _ = openai_client.structured("prompt", Shape)
+        openai_client.embed_query("q")
+
+    assert parsed == SHAPE
+    assert [kw["max_retries"] for kw in seen] == [0, 0]
+    assert all(kw["timeout"].read <= 10 and kw["timeout"].connect <= 5 for kw in seen)
+
+
+def test_a_spent_budget_ends_the_turn_as_an_outage_without_a_call(monkeypatch):
+    from chat import openai_client
+
+    def no_call(**kw):
+        raise AssertionError("no call may start once the budget is spent")
+
+    client = _fake_client()
+    client.with_options = no_call
+    monkeypatch.setattr(openai_client, "_client", client)
+    with openai_client.turn_budget(0.5):
+        parsed, usage = openai_client.structured("prompt", Shape)
+        assert openai_client.embed_query("q") is None
+    assert (parsed, usage["api_error"]) == (None, True)
+
+
+def test_outside_a_turn_the_sdk_defaults_apply(monkeypatch):
+    """ingest_content runs at deploy time with no visitor waiting: it keeps the
+    SDK's patience rather than a turn's single attempt."""
+    from chat import openai_client
+
+    client = _fake_client()
+    client.with_options = lambda **kw: (_ for _ in ()).throw(AssertionError("not in a turn"))
+    monkeypatch.setattr(openai_client, "_client", client)
+    assert len(openai_client.embed_documents(["a"])) == 1

@@ -24,9 +24,11 @@ jobs:
           API: https://api.alansari.stream/api/chat/
         run: |
           # Three attempts, 30s apart: right after a deploy the web container
-          # can still be starting.
+          # can still be starting. 40s per attempt is past the server's own
+          # 25s turn budget (CHAT_TURN_BUDGET), so a slow turn is not cut off
+          # and then queued behind by the next attempt.
           for attempt in 1 2 3; do
-            status=$(curl -sS -m 60 -o body.json -w '%{http_code}' -X POST "$API" \
+            status=$(curl -sS -m 40 -o body.json -w '%{http_code}' -X POST "$API" \
               -H 'Content-Type: application/json' \
               -d '{"question":"What is Keyraa?","history":[]}') || status=000
             echo "attempt $attempt: HTTP $status"
@@ -34,7 +36,7 @@ jobs:
             if [ "$status" = 200 ] && jq -e '.refused == false and (.answer | length) > 0' body.json > /dev/null; then
               exit 0
             fi
-            sleep 30
+            [ "$attempt" = 3 ] || sleep 30
           done
           echo "::error::The live chatbot did not answer an in-scope question. Check: docker compose -f docker-compose.prod.yml logs web"
           exit 1

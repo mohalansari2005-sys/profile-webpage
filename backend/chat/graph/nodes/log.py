@@ -2,7 +2,7 @@ import time
 
 from django.conf import settings
 
-from chat.graph.state import ChatState
+from chat.graph.state import ChatState, is_outage
 from chat.models import ChatLog
 
 
@@ -10,6 +10,10 @@ def log(state: ChatState) -> dict:
     """Terminal node on both paths -- refusals are the most interesting rows."""
     usage = state.get("usage") or {}
     started = state.get("started_at") or time.monotonic()
+    reason = state.get("refusal_reason") or ""
+    if is_outage(state) and not reason.endswith("unavailable"):
+        # The visitor got a 503, so the row must not read as a normal refusal.
+        reason = f"condense unavailable; {reason}"
 
     ChatLog.objects.create(
         ip_hash=state.get("ip_hash", ""),
@@ -17,7 +21,7 @@ def log(state: ChatState) -> dict:
         condensed_question=state.get("condensed", ""),
         answer=state.get("answer", ""),
         refused=bool(state.get("refused", not state.get("in_scope", False))),
-        refusal_reason=(state.get("refusal_reason") or "")[:200],
+        refusal_reason=reason[:200],
         retrieved_chunk_ids=[c["chunk_id"] for c in state.get("retrieved") or []],
         used_chunk_ids=state.get("used_chunk_ids") or [],
         prompt_tokens=usage.get("prompt_tokens"),

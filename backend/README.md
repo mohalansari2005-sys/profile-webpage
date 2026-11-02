@@ -101,14 +101,23 @@ nothing said why. What now stops a repeat:
 - A fast model that comes back `model_not_found` makes `openai_client` fall back
   to `OPENAI_MODEL` for the life of that worker (an env file can still name a
   retired model).
-- An outage -- auth, quota, rate limit, 5xx, a timeout (20s, one retry, so it
-  ends inside gunicorn's 120s), a retired model with nowhere to fall back --
-  answers **503**, the UI's "service hit an error, try again", instead of a
-  refusal. It still counts against `CHAT_DAILY_CAP`: earlier calls in the turn
-  may have been billed, and the cap is the hard spend limit.
-- Only a prompt OpenAI rejects for what the visitor sent (`invalid_prompt`,
-  `context_length_exceeded`) stays a refusal, logged `request rejected`. Any
-  other 400 can be configuration, so it is an outage and gets noticed.
+- A turn has one time budget, `CHAT_TURN_BUDGET` (25s, under the browser's
+  30s). Each OpenAI call gets what is left of it in a single attempt, so a hung
+  or rate-limited provider ends the turn in time for the visitor to see the
+  503, instead of the SDK sleeping out retries until gunicorn kills the worker.
+  `ingest_content` runs outside a turn and keeps the SDK's patient defaults.
+- An outage -- auth, quota, rate limit, 5xx, the budget running out, a retired
+  model with nowhere to fall back -- answers **503**, the UI's "service hit an
+  error, try again", instead of a refusal. So does a refusal after `condense`
+  failed: the unresolved follow-up was refused for a reason the visitor did not
+  cause. The answer still stands when the turn produced one.
+- An outage that never got past the gate gives its `CHAT_DAILY_CAP` slot back:
+  at most a classifier call was billed, and counting the retries of a quota
+  outage would leave the cap spent when OpenAI recovers. Past the gate, the
+  slot counts -- refunding those let a partial outage spend without limit.
+- Only a prompt OpenAI rejects for what the visitor sent (`invalid_prompt`)
+  stays a refusal, logged `request rejected`. Any other 400 can be
+  configuration, so it is an outage and gets noticed.
 - Every OpenAI failure is logged to stderr (`docker compose logs web`) with its
   status and error code.
 - `.github/workflows/chat-canary.yml` asks the live API one real question every
@@ -117,7 +126,12 @@ nothing said why. What now stops a repeat:
 
 `refusal_reason` on an outage row says which call failed: `generation
 unavailable` for the gate or `generate`, `retrieval unavailable` for the
-embedding.
+embedding, and `condense unavailable; <the refusal>` when condense failed and
+the turn then refused.
+
+GitHub disables a scheduled workflow after 60 days without activity in the
+repository; it emails a warning first. Re-enable the canary from the Actions
+tab if that happens.
 
 Check OpenAI's deprecations page before a model's shutdown date, not after.
 

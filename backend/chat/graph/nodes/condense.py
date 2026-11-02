@@ -51,4 +51,7 @@ def condense(state: ChatState) -> dict:
     condensed = rewritten or question
     english = (parsed.english_query or "").strip() if parsed else ""
     # Billable even when the rewrite is discarded, so it is carried, not dropped.
-    return {"condensed": condensed, "search_query": english or condensed, "usage": usage}
+    out = {"condensed": condensed, "search_query": english or condensed, "usage": usage}
+    if usage.get("api_error"):
+        out["degraded"] = True
+    return out

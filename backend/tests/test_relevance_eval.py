@@ -23,13 +23,18 @@ pytestmark = [
 @pytest.fixture(autouse=True)
 def no_fallback(settings):
     """openai_client falls back to OPENAI_MODEL when the fast model is gone.
-    Here that would grade a model other than the one named, so it fails."""
+    Here that would grade a model other than the one named, so the run stops
+    at the first sign of it rather than paying for every remaining case."""
     from chat import openai_client
 
+    def check():
+        if openai_client.fast_model() != settings.OPENAI_FAST_MODEL:
+            pytest.exit(f"OPENAI_FAST_MODEL {settings.OPENAI_FAST_MODEL} was not found; "
+                        "the eval would grade the fallback model instead", returncode=1)
+
+    check()
     yield
-    assert openai_client.fast_model() == settings.OPENAI_FAST_MODEL, (
-        f"OPENAI_FAST_MODEL {settings.OPENAI_FAST_MODEL} was not found; "
-        "the eval ran on the fallback instead")
+    check()
 
 
 # Named entities from content/. The gate is never told these exist, so each one
