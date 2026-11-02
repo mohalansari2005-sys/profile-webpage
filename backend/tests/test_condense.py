@@ -98,3 +98,12 @@ def test_a_short_arabic_question_is_still_detected_after_normalization(monkeypat
         Standalone(standalone_question="ما Majara؟", english_query="What is Majara?"), {}))
     out = node.condense({"question": "ما ماجرة؟", "history": []})
     assert out["search_query"] == "What is Majara?"
+
+
+def test_an_api_failure_ends_the_turn_as_an_outage(monkeypatch):
+    from chat.graph.nodes import condense as node
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {"api_error": True}))
+    out = node.condense({"question": "and there?",
+                         "history": [{"role": "user", "content": "Majara?"}]})
+    assert (out["unavailable"], out["refusal_reason"]) == (True, "condense unavailable")

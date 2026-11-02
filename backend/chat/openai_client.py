@@ -1,22 +1,83 @@
+import contextvars
 import logging
 import math
+import time
+from contextlib import contextmanager
 
 from django.conf import settings
 from openai import (
+    APIConnectionError,
     APIError,
-    BadRequestError,
-    ConflictError,
+    APITimeoutError,
     ContentFilterFinishReasonError,
+    InternalServerError,
     LengthFinishReasonError,
     OpenAI,
-    UnprocessableEntityError,
+    Timeout,
 )
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 # Named openai_client, not openai, so it can never shadow the SDK it imports.
+# SDK defaults (600s timeout, retries that sleep out a 429's Retry-After) suit
+# ingest_content at deploy time. A visitor's turn runs under turn_budget below.
 _client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+# The deadline of the turn in progress, set by the view. A turn is up to four
+# sequential calls, and the browser gives up at 30s (frontend/lib/chat-api.ts):
+# a fixed per-call timeout either outlasts that -- the visitor sees "couldn't
+# reach" instead of the 503's "try again", and gunicorn kills the worker at
+# 120s with no log row -- or is too short for a slow but healthy answer. Each
+# call gets what is left of one budget instead.
+_deadline: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "openai_deadline", default=None)
+
+# The least budget worth starting a call with. Below it the call would time out
+# after OpenAI had started -- and billed -- the work, for nothing.
+MIN_SECONDS_FAST = 2.0
+MIN_SECONDS_GENERATE = 6.0
+
+
+@contextmanager
+def turn_budget(seconds: float):
+    token = _deadline.set(time.monotonic() + seconds)
+    try:
+        yield
+    finally:
+        _deadline.reset(token)
+
+
+class _OutOfTime(Exception):
+    """Too little of the turn's budget is left to start this call."""
+
+
+def _call(model: str, min_seconds: float, send):
+    """Runs send(client) within the turn's budget. Connect and read time both
+    come out of what is left, so the budget is a deadline, not a per-call
+    allowance. No SDK retries -- they sleep out a 429's Retry-After -- but one
+    of our own for a dropped connection or a 5xx, the blips the SDK used to
+    absorb, when the budget still allows it. Outside a turn (ingest, a shell)
+    it is the plain client and the SDK's defaults."""
+    deadline = _deadline.get()
+    if deadline is None:
+        return send(_client)
+    for attempt in (1, 2):
+        remaining = deadline - time.monotonic()
+        if remaining < min_seconds:
+            logger.error("OpenAI call skipped: model=%s, %.1fs of the turn budget left",
+                         model, remaining)
+            raise _OutOfTime
+        connect = min(3.0, remaining / 4)
+        client = _client.with_options(
+            timeout=Timeout(remaining - connect, connect=connect), max_retries=0)
+        try:
+            return send(client)
+        except (APIConnectionError, InternalServerError) as exc:
+            # A timeout has already spent the budget; anything else, once.
+            if attempt == 2 or isinstance(exc, APITimeoutError):
+                raise
+            logger.warning("OpenAI call retried: model=%s (%s)", model, type(exc).__name__)
 
 # Set the first time OPENAI_FAST_MODEL comes back model_not_found. OpenAI retires
 # models on a schedule -- gpt-4.1-nano was shut down on 2026-10-23 -- and
@@ -28,11 +89,14 @@ _client = OpenAI(api_key=settings.OPENAI_API_KEY)
 # when a project cannot use a model, and an unrelated 404 must not flip this.
 _fast_model_gone = False
 
-# A request the API judged bad (a flagged prompt, an oversized context) fails
-# the same way on every retry -- a bad response, not an outage, so no
-# api_error and no "try again". Auth, quota, rate limits, 5xx, timeouts and a
-# retired model are the service, and are.
-_NOT_AN_OUTAGE = (BadRequestError, ConflictError, UnprocessableEntityError)
+# Codes for a request the API judged bad because of what the visitor sent: it
+# fails the same way on every retry, so it is a refusal ("request rejected"),
+# not an outage. Matched by code, not by 400: a 400 can also be configuration
+# (a parameter the model does not take), and calling that "not an outage"
+# would hide the next broken deploy behind refusals again.
+# Not context_length_exceeded: visitor input is capped by the serializer, so an
+# oversized prompt is the retrieved context's size -- the server's doing.
+_REJECTED_CODES = {"invalid_prompt"}
 
 
 def fast_model() -> str:
@@ -56,11 +120,11 @@ def normalize(vec: list[float]) -> list[float]:
     return vec if norm == 0 else [x / norm for x in vec]
 
 
-def _embed(texts: list[str]) -> list[list[float]]:
+def _embed(client, texts: list[str]) -> list[list[float]]:
     """One call shape for both sides. Gemini needed a task_type asymmetry
     between documents and queries; OpenAI has no such parameter, so the two
     wrappers below differ only in arity."""
-    resp = _client.embeddings.create(
+    resp = client.embeddings.create(
         model=settings.OPENAI_EMBED_MODEL,
         input=texts,
         dimensions=settings.EMBED_DIMENSIONS,
@@ -69,16 +133,19 @@ def _embed(texts: list[str]) -> list[list[float]]:
 
 
 def embed_documents(texts: list[str]) -> list[list[float]]:
-    return _embed(texts)
+    return _embed(_client, texts)
 
 
 def embed_query(text: str) -> list[float] | None:
     """None means the API call itself failed (e.g. quota exhausted) -- the
     caller, retrieve(), finds nothing and flags the turn as an outage."""
     try:
-        return _embed([text])[0]
+        return _call(settings.OPENAI_EMBED_MODEL, MIN_SECONDS_FAST,
+                     lambda client: _embed(client, [text]))[0]
     except APIError as exc:
         _log_api_error(settings.OPENAI_EMBED_MODEL, exc)
+        return None
+    except _OutOfTime:
         return None
 
 
@@ -108,15 +175,17 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     `fast=True` selects OPENAI_FAST_MODEL for the cheap classifier calls
     (condense, relevance), or OPENAI_MODEL once the fast one is not found.
 
-    A failed API call (quota exhausted, rate limited, transient 5xx, a retired
-    model with nowhere to fall back) returns parsed=None with usage["api_error"] -- every caller already fails closed on
-    parsed=None, and the flag is what stops a refusal log from calling an
-    outage an "unparseable response".
+    A failed API call (quota exhausted, rate limited, a 5xx that a retry did not
+    clear, the turn's budget spent, a retired model with nowhere to fall back)
+    returns parsed=None with usage["api_error"] -- every caller already fails
+    closed on parsed=None, and the flag is what stops a refusal log from
+    calling an outage an "unparseable response".
     """
     global _fast_model_gone
     model = fast_model() if fast else settings.OPENAI_MODEL
-    try:
-        resp = _client.chat.completions.parse(
+
+    def send(client):
+        return client.chat.completions.parse(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             response_format=schema,
@@ -128,6 +197,11 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             # enforced in Python regardless.
             **({"temperature": 0} if fast else {}),
         )
+
+    try:
+        resp = _call(model, MIN_SECONDS_FAST if fast else MIN_SECONDS_GENERATE, send)
+    except _OutOfTime:
+        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
     except APIError as exc:
         _log_api_error(model, exc)
         if exc.code == "model_not_found" and model != settings.OPENAI_MODEL:
@@ -135,8 +209,8 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
                          "OPENAI_MODEL %s. Update backend/.env.", model, settings.OPENAI_MODEL)
             _fast_model_gone = True
             return structured(prompt, schema, fast=fast)
-        if isinstance(exc, _NOT_AN_OUTAGE):
-            return None, {"prompt_tokens": None, "completion_tokens": None}
+        if exc.code in _REJECTED_CODES:
+            return None, {"prompt_tokens": None, "completion_tokens": None, "rejected": True}
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
     except (LengthFinishReasonError, ContentFilterFinishReasonError):
         # Neither subclasses APIError, so an `except APIError` alone lets these
@@ -154,3 +228,13 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     # succeeded, so the token counts are real and worth logging, and there is
     # no api_error: this was a bad response, not an outage.
     return getattr(resp.choices[0].message, "parsed", None), counts
+
+
+def failure_reason(usage: dict, otherwise: str) -> str:
+    """The refusal_reason for a call that produced nothing usable: an outage, a
+    request OpenAI rejected for what the visitor sent, or the caller's own."""
+    if usage.get("api_error"):
+        return "generation unavailable"
+    if usage.get("rejected"):
+        return "request rejected"
+    return otherwise

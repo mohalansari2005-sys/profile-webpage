@@ -3,9 +3,12 @@ import math
 import httpx
 import pytest
 from openai import (
+    APITimeoutError,
     BadRequestError,
+    ConflictError,
     ContentFilterFinishReasonError,
     LengthFinishReasonError,
+    InternalServerError,
     NotFoundError,
     PermissionDeniedError,
     RateLimitError,
@@ -361,7 +364,7 @@ def test_a_missing_generate_model_does_not_touch_the_fast_one(monkeypatch, setti
     assert openai_client.fast_model() == "fast-model"
 
 
-def test_a_rejected_request_is_not_an_outage(monkeypatch):
+def test_a_rejected_prompt_is_not_an_outage(monkeypatch):
     """A flagged prompt fails the same way on every retry. Reported as an
     outage, the visitor would be told to try again, forever."""
     from chat import openai_client
@@ -371,7 +374,27 @@ def test_a_rejected_request_is_not_an_outage(monkeypatch):
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
+    assert usage.get("rejected") is True
     assert "api_error" not in usage
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(lambda: _status_error(BadRequestError, 400, "unsupported_parameter"),
+                 id="config-400"),
+    pytest.param(lambda: _status_error(ConflictError, 409, None), id="conflict-409"),
+    # Visitor input is capped; an oversized prompt is the retrieved context.
+    pytest.param(lambda: _status_error(BadRequestError, 400, "context_length_exceeded"),
+                 id="context-length"),
+])
+def test_a_config_error_or_a_conflict_is_an_outage(monkeypatch, error):
+    """A 400 can be configuration -- a parameter the model does not take --
+    and the SDK retries a 409 as transient. Calling either "not an outage"
+    would hide a broken deploy behind refusals again."""
+    from chat import openai_client
+
+    monkeypatch.setattr(openai_client, "_client", _fake_client(raises=error()))
+    parsed, usage = openai_client.structured("prompt", Shape)
+    assert (parsed, usage.get("api_error")) == (None, True)
 
 
 def test_an_api_error_is_logged_without_its_message(monkeypatch, caplog):
@@ -384,3 +407,108 @@ def test_an_api_error_is_logged_without_its_message(monkeypatch, caplog):
         openai_client.structured("prompt", Shape)
     assert "status=429" in caplog.text
     assert "rate limit reached" not in caplog.text
+
+
+def _budgeted_client(seen, fail_first=None):
+    """A fake whose with_options records what each attempt was allowed, and
+    whose first call can raise."""
+    base = _fake_client()
+    calls = {"n": 0}
+    real_parse = base.chat.completions.parse
+
+    def parse(**kw):
+        calls["n"] += 1
+        if fail_first is not None and calls["n"] == 1:
+            raise fail_first
+        return real_parse(**kw)
+
+    base.chat.completions.parse = parse
+
+    def with_options(**kw):
+        seen.append(kw)
+        return base
+
+    base.with_options = with_options
+    return base
+
+
+def _internal_error():
+    return InternalServerError("upstream", response=httpx.Response(
+        502, request=httpx.Request("POST", "https://api.openai.com")), body=None)
+
+
+def test_inside_a_turn_each_call_gets_the_remaining_budget_and_no_sdk_retries(monkeypatch):
+    """SDK retries sleep out a 429's Retry-After, and connect time on top of a
+    full read timeout would overrun the browser's 30s."""
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _budgeted_client(seen))
+    with openai_client.turn_budget(10):
+        parsed, _ = openai_client.structured("prompt", Shape)
+        openai_client.embed_query("q")
+
+    assert parsed == SHAPE
+    assert [kw["max_retries"] for kw in seen] == [0, 0]
+    assert all(kw["timeout"].connect + kw["timeout"].read <= 10 for kw in seen)
+
+
+def test_the_real_client_accepts_the_budgeted_options():
+    """The fakes above would not notice the SDK rejecting the timeout type."""
+    from chat import openai_client
+
+    with openai_client.turn_budget(10):
+        client = openai_client._call("m", 2.0, lambda c: c)
+    assert client.max_retries == 0
+    assert client.timeout.connect + client.timeout.read <= 10
+
+
+def test_one_blip_is_retried_within_the_budget(monkeypatch):
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _budgeted_client(seen, _internal_error()))
+    with openai_client.turn_budget(10):
+        parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed == SHAPE and "api_error" not in usage
+    assert len(seen) == 2
+
+
+def test_a_timeout_is_not_retried(monkeypatch):
+    """It has already spent the budget a retry would need."""
+    from chat import openai_client
+
+    seen = []
+    timeout = APITimeoutError(request=httpx.Request("POST", "https://api.openai.com"))
+    monkeypatch.setattr(openai_client, "_client", _budgeted_client(seen, timeout))
+    with openai_client.turn_budget(10):
+        parsed, usage = openai_client.structured("prompt", Shape)
+    assert (parsed, usage["api_error"]) == (None, True)
+    assert len(seen) == 1
+
+
+def test_generate_is_not_started_without_the_time_to_finish(monkeypatch):
+    """OpenAI bills a generation the client gave up on. With 4s left the
+    classifier may run, the answer may not."""
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _budgeted_client(seen))
+    with openai_client.turn_budget(4):
+        fast, _ = openai_client.structured("prompt", Shape, fast=True)
+        answer, usage = openai_client.structured("prompt", Shape)
+    assert fast == SHAPE
+    assert (answer, usage["api_error"]) == (None, True)
+    assert len(seen) == 1
+
+
+def test_outside_a_turn_the_sdk_defaults_apply(monkeypatch):
+    """ingest_content runs at deploy time with no visitor waiting: it keeps the
+    SDK's patience rather than a turn's budget."""
+    from chat import openai_client
+
+    client = _fake_client()
+    client.with_options = lambda **kw: (_ for _ in ()).throw(AssertionError("not in a turn"))
+    monkeypatch.setattr(openai_client, "_client", client)
+    assert len(openai_client.embed_documents(["a"])) == 1
+    assert openai_client.structured("prompt", Shape)[0] == SHAPE

@@ -109,23 +109,39 @@ def test_a_provider_outage_is_a_503_not_a_refusal(db, api, monkeypatch):
     assert "answer" not in r.json()
 
 
-def test_an_outage_does_not_spend_the_daily_cap(db, api, monkeypatch, settings):
-    """The 503 asks the visitor to try again. If those retries counted, the cap
-    would be gone by the time OpenAI came back."""
+@pytest.fixture
+def fresh_cache():
+    """The daily counter lives 48h in Redis. Cleared after a failure too, or one
+    failing cap test would leave every later post here throttled."""
     from django.core.cache import cache
 
+    cache.clear()
+    yield
+    cache.clear()
+
+
+def _post_with(api, monkeypatch, result, n):
     from chat import views
 
-    cache.clear()
-    settings.CHAT_DAILY_CAP = 2
-    outage = {"answer": "", "refused": True, "sources": [], "unavailable": True}
-    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: outage})())
-    for _ in range(4):
-        assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
+    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: result})())
+    return [api.post("/api/chat/", {"question": "q"}, format="json").status_code for _ in range(n)]
 
-    answered = {"answer": "ok", "refused": False, "sources": []}
-    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: answered})())
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 429
-    cache.clear()
+
+def test_an_outage_at_the_gate_gives_its_cap_slot_back(db, api, monkeypatch, settings, fresh_cache):
+    """Nothing past a classifier call was billed. Counting the "try again"
+    retries of a quota outage would leave the cap spent when OpenAI is back."""
+    settings.CHAT_DAILY_CAP = 2
+    gate_down = {"answer": "", "refused": True, "sources": [], "unavailable": True,
+                 "in_scope": False}
+    assert _post_with(api, monkeypatch, gate_down, 4) == [503] * 4
+    answered = {"answer": "ok", "refused": False, "sources": [], "in_scope": True}
+    assert _post_with(api, monkeypatch, answered, 3) == [200, 200, 429]
+
+
+def test_an_outage_past_the_gate_still_counts(db, api, monkeypatch, settings, fresh_cache):
+    """Retrieval or generate failing means the gate and an embedding were
+    billed. Refunding those let a partial outage spend without limit."""
+    settings.CHAT_DAILY_CAP = 2
+    generate_down = {"answer": "", "refused": True, "sources": [], "unavailable": True,
+                     "in_scope": True}
+    assert _post_with(api, monkeypatch, generate_down, 3) == [503, 503, 429]

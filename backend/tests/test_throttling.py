@@ -79,3 +79,19 @@ def test_the_429_body_is_json_with_a_detail_key(db, settings, stub_graph):
     r = APIClient().post("/api/chat/", {"question": "q"}, format="json")
     assert r.status_code == 429
     assert "detail" in r.json()
+
+
+def test_a_refund_never_takes_the_counter_below_zero():
+    """Two refunds racing for one slot, or one after the key expired, must not
+    grant slots past the cap."""
+    from types import SimpleNamespace
+
+    from chat.throttling import GlobalDailyThrottle
+
+    cache.set("chat:daily:test", 1)
+    request = SimpleNamespace(chat_daily_key="chat:daily:test")
+    GlobalDailyThrottle.refund(request)
+    GlobalDailyThrottle.refund(request)
+    assert cache.get("chat:daily:test") == 0
+    GlobalDailyThrottle.refund(SimpleNamespace(chat_daily_key="chat:daily:gone"))
+    GlobalDailyThrottle.refund(SimpleNamespace())

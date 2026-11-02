@@ -92,3 +92,12 @@ def test_scope_is_decided_in_python_not_by_the_model(monkeypatch):
 
     assert "in_scope" not in Relevance.model_fields
     assert IN_SCOPE == {"mohammed", "unknown_name"}
+
+
+def test_a_rejected_request_is_labelled_not_called_unparseable(monkeypatch):
+    from chat.graph.nodes import relevance as node
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {"rejected": True}))
+    out = node.relevance({"condensed": "anything"})
+    assert out["refusal_reason"] == "request rejected"
+    assert out["unavailable"] is False

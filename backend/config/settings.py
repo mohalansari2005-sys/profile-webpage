@@ -59,6 +59,9 @@ EMBED_DIMENSIONS = 1536
 
 IP_HASH_SALT = required("IP_HASH_SALT")
 CHAT_DAILY_CAP = int(os.environ.get("CHAT_DAILY_CAP", "200"))
+# Seconds one chat turn may spend on OpenAI calls, under the browser's 30s
+# (frontend/lib/chat-api.ts) so the visitor sees an answer or the 503.
+CHAT_TURN_BUDGET = float(os.environ.get("CHAT_TURN_BUDGET", "25"))
 CORPUS_PATH = Path(os.environ.get("CORPUS_PATH", BASE_DIR / "corpus.json"))
 
 # Analytics. Collection always runs; the dashboard only exists once a password
