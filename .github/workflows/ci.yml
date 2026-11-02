@@ -49,6 +49,20 @@ jobs:
       - run: npm test
       - run: npm run content:check
 
+  caddy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The deploy's `caddy reload` refuses a bad Caddyfile and keeps serving
+      # the old config, but the bad file is on disk by then: the next time the
+      # container restarts it loads that file and crash-loops, and the deploy
+      # carrying the fix cannot `exec` into it. Catch it here instead.
+      # DOMAIN is a placeholder; validate does not request a certificate.
+      - run: >-
+          docker run --rm -e DOMAIN=example.com
+          -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   backend:
     runs-on: ubuntu-latest
     services:

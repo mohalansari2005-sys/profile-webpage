@@ -165,4 +165,6 @@ visitor correctly.
 The `Caddyfile` trusts Cloudflare's `CF-Connecting-IP` header from Cloudflare's
 published IP ranges only, so the chat's per-IP limit sees the visitor rather than a
 Cloudflare edge. The ranges are listed by hand with the date they were fetched;
-refresh them from <https://www.cloudflare.com/ips/> now and then.
+refresh them from <https://www.cloudflare.com/ips/> now and then. CI's `caddy` job
+runs `caddy validate` on every pull request, so a bad edit is caught before it reaches
+the server — where a Caddy restart would load it from disk and keep failing.
