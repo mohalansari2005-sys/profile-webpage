@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from chat.graph.build import build_graph
-from chat.graph.state import is_outage
 from chat.ip import client_ip
 from chat.models import hash_ip
 from chat.openai_client import turn_budget
@@ -45,7 +44,7 @@ class ChatView(APIView):
                 "started_at": time.monotonic(),
             })
 
-        if is_outage(result):
+        if result.get("unavailable"):
             # OpenAI failed, not the question. Answering with a refusal told
             # every visitor their question was off-topic for ten days after
             # gpt-4.1-nano was retired; a 503 makes the UI say the service hit

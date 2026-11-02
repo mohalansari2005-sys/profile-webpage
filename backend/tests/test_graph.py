@@ -222,48 +222,39 @@ FOLLOW_UP = {"ip_hash": "h" * 64, "started_at": 0.0,
                          {"role": "assistant", "content": "He works there."}]}
 
 
-def test_a_condense_failure_still_answers_what_it_can(db, stub_nodes, monkeypatch):
-    """A self-contained follow-up does not need the rewrite: the raw question
-    goes on, and an answer it earns is not thrown away."""
+def test_a_condense_outage_ends_the_turn_without_a_gate_call(db, stub_nodes, monkeypatch):
+    """Unresolved, "what did he build there?" could come back a grounded answer
+    about the wrong employer. The visitor gets the 503 instead, and the gate is
+    not paid for a call that would most likely fail the same way."""
     from chat.graph.build import build_graph
-    from chat.graph.nodes.generate import Answer
-    from chat.graph.nodes.relevance import Relevance
-    from chat.graph.state import is_outage
-    from chat.models import ContentChunk
-
-    ContentChunk.objects.create(
-        chunk_id="exp-a#summary", record_id="exp-a", kind="experience", title="Engineer",
-        text="Built services.", content_hash="h", embedding=[0.0] * 1536)
-    _condense_fails(stub_nodes, monkeypatch)
-    seen = {}
-
-    def gate(prompt, *a, **k):
-        seen["prompt"] = prompt
-        return Relevance(subject="mohammed", reason="ok"), {}
-
-    monkeypatch.setattr(stub_nodes["relevance"], "structured", gate)
-    monkeypatch.setattr(stub_nodes["generate"], "structured", lambda *a, **k: (
-        Answer(answer="He built services.", used_chunk_ids=["exp-a#summary"], sufficient=True), {}))
-
-    out = build_graph().invoke({"question": "What tools does Mohammed use at Majara?", **FOLLOW_UP})
-    assert "What tools does Mohammed use at Majara?" in seen["prompt"]
-    assert out["refused"] is False and out["degraded"] is True
-    assert is_outage(out) is False
-
-
-def test_a_condense_failure_that_ends_in_a_refusal_is_an_outage(db, stub_nodes, monkeypatch):
-    """"and there?" reaches the gate unresolved and reads as off-topic. That
-    refusal is the outage's doing, so the visitor gets the 503 and the row
-    says why."""
-    from chat.graph.build import build_graph
-    from chat.graph.nodes.relevance import Relevance
-    from chat.graph.state import is_outage
     from chat.models import ChatLog
 
     _condense_fails(stub_nodes, monkeypatch)
-    monkeypatch.setattr(stub_nodes["relevance"], "structured",
-                        lambda *a, **k: (Relevance(subject="general", reason="no subject"), {}))
 
-    out = build_graph().invoke({"question": "and there?", **FOLLOW_UP})
-    assert is_outage(out) is True
-    assert ChatLog.objects.get().refusal_reason == "condense unavailable; general: no subject"
+    def no_gate(*a, **k):
+        raise AssertionError("the gate must not be called after condense failed")
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", no_gate)
+    out = build_graph().invoke({"question": "what did he build there?", **FOLLOW_UP})
+    assert (out["unavailable"], out["in_scope"]) == (True, False)
+    assert ChatLog.objects.get().refusal_reason == "condense unavailable"
+
+
+def test_the_turn_budget_reaches_the_nodes(db, stub_nodes, monkeypatch):
+    """The deadline travels in a ContextVar. If LangGraph stopped carrying it
+    into nodes, every call would silently fall back to the SDK's 600s."""
+    from chat import openai_client
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+
+    seen = {}
+
+    def gate(*a, **k):
+        seen["deadline"] = openai_client._deadline.get()
+        return Relevance(subject="general", reason="mock"), {}
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", gate)
+    with openai_client.turn_budget(10):
+        build_graph().invoke({"question": "weather", "history": [],
+                              "ip_hash": "h" * 64, "started_at": 0.0})
+    assert seen["deadline"] is not None

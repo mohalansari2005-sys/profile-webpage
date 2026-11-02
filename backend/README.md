@@ -102,15 +102,18 @@ nothing said why. What now stops a repeat:
   to `OPENAI_MODEL` for the life of that worker (an env file can still name a
   retired model).
 - A turn has one time budget, `CHAT_TURN_BUDGET` (25s, under the browser's
-  30s). Each OpenAI call gets what is left of it in a single attempt, so a hung
-  or rate-limited provider ends the turn in time for the visitor to see the
-  503, instead of the SDK sleeping out retries until gunicorn kills the worker.
-  `ingest_content` runs outside a turn and keeps the SDK's patient defaults.
+  30s). Each OpenAI call gets what is left of it -- connect time included --
+  with no SDK retries (they sleep out a 429's Retry-After) but one retry of a
+  dropped connection or 5xx while the budget allows. A call is not started
+  with less than 2s left (6s for `generate`, which OpenAI bills even when the
+  client gives up). So a hung or failing provider ends the turn in time for
+  the visitor to see the 503. `ingest_content` runs outside a turn and keeps
+  the SDK's patient defaults.
 - An outage -- auth, quota, rate limit, 5xx, the budget running out, a retired
   model with nowhere to fall back -- answers **503**, the UI's "service hit an
-  error, try again", instead of a refusal. So does a refusal after `condense`
-  failed: the unresolved follow-up was refused for a reason the visitor did not
-  cause. The answer still stands when the turn produced one.
+  error, try again", instead of a refusal. A failed `condense` ends the turn the
+  same way: unresolved, "what did he build there?" could come back a grounded
+  answer about the wrong employer.
 - An outage that never got past the gate gives its `CHAT_DAILY_CAP` slot back:
   at most a classifier call was billed, and counting the retries of a quota
   outage would leave the cap spent when OpenAI recovers. Past the gate, the
@@ -124,10 +127,9 @@ nothing said why. What now stops a repeat:
   day and after every backend deploy, and fails -- which emails the repo owner
   -- if it is refused or errors.
 
-`refusal_reason` on an outage row says which call failed: `generation
-unavailable` for the gate or `generate`, `retrieval unavailable` for the
-embedding, and `condense unavailable; <the refusal>` when condense failed and
-the turn then refused.
+`refusal_reason` on an outage row says which call failed: `condense
+unavailable`, `generation unavailable` (the gate or `generate`) or `retrieval
+unavailable` (the embedding).
 
 GitHub disables a scheduled workflow after 60 days without activity in the
 repository; it emails a warning first. Re-enable the canary from the Actions

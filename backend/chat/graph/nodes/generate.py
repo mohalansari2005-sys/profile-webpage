@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from chat.graph.state import ChatState
 from chat.language import NAME_GLOSSARY, is_arabic
-from chat.openai_client import fast_model, structured
+from chat.openai_client import failure_reason, fast_model, structured
 
 REFUSAL = (
     "I can only answer from what Mohammed has written about his own work, "
@@ -105,10 +105,8 @@ def generate(state: ChatState) -> dict:
     )
 
     if parsed is None:
-        unavailable = bool(usage.get("api_error"))
-        reason = ("generation unavailable" if unavailable
-                  else "request rejected" if usage.get("rejected") else "unparseable response")
-        return _refuse(state, reason, usage, unavailable=unavailable)
+        return _refuse(state, failure_reason(usage, "unparseable response"), usage,
+                       unavailable=bool(usage.get("api_error")))
     if not parsed.sufficient:
         return _refuse(state, "insufficient context", usage)
 
