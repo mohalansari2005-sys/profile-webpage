@@ -104,6 +104,10 @@ def test_known_names_are_mapped_to_latin(text, expected):
     "ذهب للمجرة",
     "ما ماجرا الفيلم؟",  # "the film's incident": ماجرا is an ordinary word
     "كم سيت في الطاولة؟",  # سيت ("set") is an ordinary word
+    # صيت is also the ordinary word "reputation": same rule as مجرة
+    "هل محمد ذائع الصيت في مجاله؟",
+    "بنى محمد سمعة طيبة وحسن الصيت",
+    "هذا مهم للصيت",
     "",
 ])
 def test_look_alike_arabic_words_are_left_alone(text):
