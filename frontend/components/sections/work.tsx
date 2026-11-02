@@ -233,8 +233,11 @@ function ProjectRail({
     el.scrollBy({ left: sign * step });
   }
 
+  // aria-disabled, not `disabled`: paging to the end disables the chevron the
+  // reader just pressed, and a natively disabled button drops keyboard focus
+  // to <body>. This one keeps it and ignores the press.
   const chevron =
-    "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule pointer-coarse:size-11";
+    "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-rule pointer-coarse:size-11";
 
   return (
     <>
@@ -246,8 +249,8 @@ function ProjectRail({
           <button
             type="button"
             aria-label={t.work.previousProject}
-            disabled={!canPrev}
-            onClick={() => page("prev")}
+            aria-disabled={!canPrev}
+            onClick={() => canPrev && page("prev")}
             className={chevron}
           >
             <Chevron direction="left" />
@@ -255,8 +258,8 @@ function ProjectRail({
           <button
             type="button"
             aria-label={t.work.nextProject}
-            disabled={!canNext}
-            onClick={() => page("next")}
+            aria-disabled={!canNext}
+            onClick={() => canNext && page("next")}
             className={chevron}
           >
             <Chevron direction="right" />
@@ -308,12 +311,21 @@ export function Work() {
     );
   }, []);
 
-  // Re-measured on pin too: the Clear button changes the strip's width.
   useEffect(() => {
     syncEdges();
     window.addEventListener("resize", syncEdges);
     return () => window.removeEventListener("resize", syncEdges);
-  }, [syncEdges, pinnedTool, citedRecordIds]);
+  }, [syncEdges]);
+
+  // Clear unmounts itself, which would drop keyboard focus to <body>. Hand it
+  // to the strip's heading: focusing a chip instead would preview that tool
+  // and light its rows straight back up, and from the heading the next Tab
+  // reaches the first tool.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  function clearJoin() {
+    clear();
+    headingRef.current?.focus({ preventScroll: true });
+  }
 
   const matchCount = useMemo(() => {
     if (!activeTool) return 0;
@@ -352,24 +364,45 @@ export function Work() {
       <div className="sticky top-0 z-20 border-b border-rule bg-background/95 backdrop-blur-md">
         <div className="mx-auto w-full max-w-5xl gutter py-3.5">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="field-label shrink-0 whitespace-nowrap">{t.work.builtWith}</h2>
-            <p
-              aria-live="polite"
-              className="min-w-0 truncate font-mono text-xs tracking-[0.1em] text-dim"
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="field-label shrink-0 whitespace-nowrap"
             >
-              {activeLabel
-                ? format(t.work.toolMatch, {
-                    count: matchCount,
-                    total: experience.length + projects.length,
-                    tool: activeLabel,
-                  })
-                : litByCitation
-                  ? format(t.work.cited, {
-                      count: litByCitation.size,
+              {t.work.builtWith}
+            </h2>
+            <div className="flex min-w-0 items-baseline gap-3">
+              <p
+                aria-live="polite"
+                className="min-w-0 truncate font-mono text-xs tracking-[0.1em] text-dim"
+              >
+                {activeLabel
+                  ? format(t.work.toolMatch, {
+                      count: matchCount,
                       total: experience.length + projects.length,
+                      tool: activeLabel,
                     })
-                  : t.work.pickTool}
-            </p>
+                  : litByCitation
+                    ? format(t.work.cited, {
+                        count: litByCitation.size,
+                        total: experience.length + projects.length,
+                      })
+                    : t.work.pickTool}
+              </p>
+              {/* Beside the status it resets, not at the end of the strip,
+                  which runs 1,400px or more past the column: there it was
+                  always scrolled out of sight. The negative margins give it
+                  a finger-sized target without making the bar taller. */}
+              {(pinnedTool || citedRecordIds.length > 0) && (
+                <button
+                  type="button"
+                  onClick={clearJoin}
+                  className="-mx-1.5 -my-1.5 shrink-0 cursor-pointer rounded-sm px-1.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink pointer-coarse:-my-2.5 pointer-coarse:py-2.5"
+                >
+                  {t.work.clear}
+                </button>
+              )}
+            </div>
           </div>
 
           <div
@@ -399,7 +432,16 @@ export function Work() {
                           aria-pressed={isPinned}
                           onMouseEnter={() => setHoveredTool(tool.id)}
                           onMouseLeave={() => setHoveredTool(null)}
-                          onFocus={() => setHoveredTool(tool.id)}
+                          onFocus={(event) => {
+                            setHoveredTool(tool.id);
+                            // The browser only scrolls a focused chip that is
+                            // wholly out of view, so one half under the edge
+                            // fade stayed there. Bring it fully in.
+                            event.currentTarget.scrollIntoView({
+                              block: "nearest",
+                              inline: "nearest",
+                            });
+                          }}
                           onBlur={() => setHoveredTool(null)}
                           onClick={() => toggleTool(tool.id)}
                           className={cn(
@@ -417,22 +459,6 @@ export function Work() {
                     })}
                 </li>
               ))}
-
-              {(pinnedTool || citedRecordIds.length > 0) && (
-                <li className="contents">
-                  <span
-                    aria-hidden="true"
-                    className="mx-1.5 h-4 w-px shrink-0 bg-rule"
-                  />
-                  <button
-                    type="button"
-                    onClick={clear}
-                    className="shrink-0 cursor-pointer rounded-sm px-2.5 py-1.5 font-mono text-xs tracking-[0.04em] whitespace-nowrap text-foreground underline underline-offset-4 transition-colors hover:text-match-ink pointer-coarse:py-2.5"
-                  >
-                    {t.work.clear}
-                  </button>
-                </li>
-              )}
             </ul>
           </div>
         </div>

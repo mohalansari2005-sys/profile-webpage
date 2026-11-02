@@ -115,6 +115,24 @@ test.describe("on a phone", () => {
     await expect(page.getByRole("button", { name: "Previous project" })).toBeDisabled();
   });
 
+  test("paging to the end by keyboard keeps focus on the chevron", async ({ page }) => {
+    await page.goto("/");
+    const next = page.getByRole("button", { name: "Next project" });
+    const rail = page.locator("[data-project-rail]");
+    await next.focus();
+    await page.keyboard.press("Enter");
+    await settle(page);
+    // The end of the rail disables Next; a natively disabled button would
+    // have dropped focus to <body>.
+    await expect(next).toBeDisabled();
+    await expect(next).toBeFocused();
+    // ...and pressing it there does nothing.
+    const end = await rail.evaluate((el) => el.scrollLeft);
+    await page.keyboard.press("Enter");
+    await settle(page);
+    expect(await rail.evaluate((el) => el.scrollLeft)).toBe(end);
+  });
+
   test("citing the off-screen project scrolls the rail sideways to it", async ({ page }) => {
     await page.route("http://chat.test/api/chat/", (route) =>
       route.fulfill({
