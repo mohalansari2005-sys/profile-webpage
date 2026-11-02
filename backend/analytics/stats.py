@@ -18,17 +18,16 @@ from chat.models import ChatLog
 RANGES = (7, 30, 90, 365)
 DEFAULT_DAYS = 30
 
-# What chat logs for a turn the AI provider failed: "generation unavailable"
-# (the gate or generate), "retrieval unavailable" (the embedding) and
-# "condense unavailable; <the refusal that caused>". Kept apart from refusals:
-# on 2026-10-23 a retired model made every question fail this way for ten
-# days, and as "refused" it looked like visitors asking off-topic.
-SERVICE_ERROR = (Q(refusal_reason__endswith=" unavailable")
-                 | Q(refusal_reason__startswith="condense unavailable"))
+# What chat logs for a turn the AI provider failed: "condense unavailable",
+# "generation unavailable" (the gate or generate) and "retrieval unavailable"
+# (the embedding). Kept apart from refusals: on 2026-10-23 a retired model made
+# every question fail this way for ten days, and as "refused" it looked like
+# visitors asking off-topic.
+SERVICE_ERROR = Q(refusal_reason__endswith=" unavailable")
 
 
 def _is_service_error(reason: str) -> bool:
-    return reason.endswith(" unavailable") or reason.startswith("condense unavailable")
+    return reason.endswith(" unavailable")
 
 BREAKDOWN_ROWS = 10
 LATEST_QUESTIONS = 25

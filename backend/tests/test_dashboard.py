@@ -358,10 +358,9 @@ def test_visitor_supplied_strings_are_escaped(db, client, password):
 
 
 def test_every_outage_label_chat_writes_is_a_service_error(db):
-    """chat logs three: the gate or generate, the embedding, and a refusal
-    that followed a failed condense. None of them is the bot declining."""
-    for reason in ("generation unavailable", "retrieval unavailable",
-                   "condense unavailable; general: no subject"):
+    """chat logs three, one per call that can fail. None of them is the bot
+    declining."""
+    for reason in ("condense unavailable", "generation unavailable", "retrieval unavailable"):
         chat(refused=True, reason=reason)
     chat(refused=True, reason="general: weather")
     stats = collect(30)
