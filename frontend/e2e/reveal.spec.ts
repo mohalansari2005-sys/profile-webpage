@@ -31,6 +31,16 @@ test("with the app's script blocked, everything is still shown", async ({ page }
   await expect.poll(() => hiddenReveals(page)).toBe(0);
 });
 
+test("with the app's script stalled, everything is shown before load fires", async ({ page }) => {
+  // A chunk request that hangs instead of failing holds back `load` until the
+  // browser gives up on it, which can take minutes.
+  await page.route("**/_next/static/chunks/*.js", () => {});
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveClass(/\breveal-fallback\b/, { timeout: 12_000 });
+  expect(await page.evaluate(() => document.readyState)).not.toBe("complete");
+  await expect.poll(() => hiddenReveals(page)).toBe(0);
+});
+
 test("with the app running, the watchdog leaves the scroll reveal alone", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-reveal-ready", "");

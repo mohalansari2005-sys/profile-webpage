@@ -17,9 +17,12 @@ const arabicPageScript = `try{localStorage.setItem("lang","ar")}catch(e){}`;
 // on a flaky connection, a browser below Next's targets) the <noscript> rule
 // does not apply, so everything below the hero would stay invisible. Reveal
 // marks <html> as soon as it runs; if it has not two seconds after load, show
-// everything (.reveal-fallback in globals.css). A false alarm on a very slow
-// device only costs the fade-in.
-const revealWatchdogScript = `try{addEventListener("load",function(){setTimeout(function(){var r=document.documentElement;if(!r.hasAttribute("data-reveal-ready"))r.classList.add("reveal-fallback")},2000)})}catch(e){}`;
+// everything (.reveal-fallback in globals.css). A chunk request that hangs
+// rather than fails holds `load` back until the browser gives up on it, which
+// can take minutes, so the same check also runs eight seconds after this
+// script, whatever `load` is doing. A false alarm on a very slow connection
+// only costs the fade-in.
+const revealWatchdogScript = `try{var c=function(){var r=document.documentElement;if(!r.hasAttribute("data-reveal-ready"))r.classList.add("reveal-fallback")};addEventListener("load",function(){setTimeout(c,2000)});setTimeout(c,8000)}catch(e){}`;
 
 /** Contents of <head> shared by both languages' root layouts, so the two cannot
     drift apart. */

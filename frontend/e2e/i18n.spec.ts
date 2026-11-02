@@ -56,22 +56,35 @@ test.describe("Arabic page", () => {
   });
 
   // The computed family string looked right while the glyphs came from Arial,
-  // so this asks Chrome which fonts actually drew the text. (Linux has no
-  // Arial, so only a macOS or Windows run can catch the regression.)
-  test("mono labels draw Arabic letters in Plex, not a system fallback", async ({ page }) => {
+  // so this asks Chrome which fonts actually drew the text. Linux has no
+  // Arial, so on CI only the first check can catch the old rule coming back;
+  // the last one guards the literal "JetBrains Mono" name globals.css relies
+  // on, which next/font could one day emit differently.
+  test("mono labels draw Arabic in Plex and Latin in JetBrains Mono", async ({ page }) => {
     await page.goto("/ar");
     await page.evaluate(() => document.fonts.ready);
+    const label = page.locator("#about .field-label").first();
+    expect(await label.evaluate((el) => getComputedStyle(el).fontFamily)).not.toContain(
+      "JetBrains Mono Fallback",
+    );
+
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("DOM.enable");
     await cdp.send("CSS.enable");
     const { root } = await cdp.send("DOM.getDocument");
-    for (const selector of ["#about .field-label", "#work p[aria-live]"]) {
+    const fontsOf = async (selector: string) => {
       const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector });
       const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
-      const names = fonts.map((font) => font.familyName);
+      return fonts.map((font) => font.familyName);
+    };
+    for (const selector of ["#about .field-label", "#work p[aria-live]"]) {
+      const names = await fontsOf(selector);
       expect(names.some((name) => /Plex/i.test(name)), `${selector}: ${names}`).toBe(true);
       expect(names.some((name) => /Arial/i.test(name)), `${selector}: ${names}`).toBe(false);
     }
+    // A tool chip is all Latin ("Python").
+    const chip = await fontsOf(".tool-strip button");
+    expect(chip.some((name) => /JetBrains Mono/i.test(name)), `chip: ${chip}`).toBe(true);
   });
 
   test("the English page does not preload the Arabic typeface", async ({ page }) => {
@@ -235,7 +248,8 @@ test.describe("chat in Arabic", () => {
 
   test("the daily cap is explained in Arabic", async ({ page }) => {
     await page.route(CHAT_API, (route) =>
-      route.fulfill({ status: 429, json: { detail: "Request was throttled.", code: "daily_cap" } }),
+      // DRF's body for the daily cap: no "Expected available in" (chat.spec.ts).
+      route.fulfill({ status: 429, json: { detail: "Request was throttled." } }),
     );
     await page.goto("/ar");
     await ask(page, "سؤال");

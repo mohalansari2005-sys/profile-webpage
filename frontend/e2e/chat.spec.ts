@@ -123,10 +123,14 @@ test("an Arabic question stays on the question side of an English page", async (
   expect(q!.x + q!.width / 2).toBeGreaterThan(a!.x + a!.width / 2);
 });
 
+// Exactly what the backend sends: DRF's own 429 body. The daily cap has no
+// wait to report (GlobalDailyThrottle.wait() is None); the per-visitor limit
+// always has one.
+const DAILY_CAP_BODY = { detail: "Request was throttled." };
+const PER_VISITOR_BODY = { detail: "Request was throttled. Expected available in 42 seconds." };
+
 test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
-  await page.route(CHAT_API, (route) =>
-    route.fulfill({ status: 429, json: { detail: "Request was throttled.", code: "daily_cap" } }),
-  );
+  await page.route(CHAT_API, (route) => route.fulfill({ status: 429, json: DAILY_CAP_BODY }));
   await page.goto("/");
   await ask(page, "Anything?");
   await expect(page.getByText(en.ask.errors.dailyCap)).toBeVisible();
@@ -138,6 +142,10 @@ test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
 test("after an error, focus lands on Try again, and again when the retry fails", async ({ page }) => {
   await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
   await page.goto("/");
+  // A reader typing has the input on screen; focus only moves to a chat the
+  // reader is still at. (Playwright's own focus would start a smooth scroll
+  // that the instant error beats.)
+  await page.locator("#ask-input").scrollIntoViewIfNeeded();
   await page.locator("#ask-input").fill("question");
   await page.locator("#ask-input").press("Enter");
   const retry = page.getByRole("button", { name: en.ask.tryAgain });
@@ -156,19 +164,46 @@ function delayedAnswer(page: Page, answer: string) {
   });
 }
 
-test("an answer arriving after the reader scrolled away does not pull the page back", async ({ page }) => {
+// The reader scrolled off with the mouse while waiting, so focus sits on
+// <body> and Space is how they page down. Focusing the off-screen chat there,
+// even without scrolling, turned that Space into a typed space (and a jump
+// back to the input) or a click on Try again.
+async function expectSpaceToPageDown(page: Page) {
+  // The refocus runs in an effect after the reply renders; give it the chance
+  // to run before reading where the keyboard is.
+  await page.waitForTimeout(300);
+  await expect(page.locator("#ask *:focus")).toHaveCount(0);
+  await page.keyboard.press("Space");
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(100);
+  // Paged down, not pulled ~3000px back to the chat.
+  const input = await page.locator("#ask-input").boundingBox();
+  expect(input!.y).toBeGreaterThan(page.viewportSize()!.height);
+}
+
+test("an answer arriving after the reader scrolled away leaves the page to them", async ({ page }) => {
   await delayedAnswer(page, "A late answer.");
   await page.goto("/");
   await ask(page, "Take your time?");
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
   await expect(page.getByText("A late answer.")).toBeVisible();
-  // The refocus runs in an effect after the answer renders.
-  await expect(page.locator("#ask-input")).toBeFocused();
-  // Still at the top: the input stays far below the fold (a plain focus()
-  // scrolled it back into view, about 3000px down).
-  expect(await page.evaluate(() => scrollY)).toBeLessThan(50);
-  const input = await page.locator("#ask-input").boundingBox();
-  expect(input!.y).toBeGreaterThan(page.viewportSize()!.height);
+  await expectSpaceToPageDown(page);
+  await expect(page.locator("#ask-input")).toHaveValue("");
+});
+
+test("a failure after the reader scrolled away does not arm Space as a retry", async ({ page }) => {
+  let requests = 0;
+  await page.route(CHAT_API, async (route) => {
+    requests++;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await route.fulfill({ status: 500, body: "boom" });
+  });
+  await page.goto("/");
+  await ask(page, "Take your time?");
+  await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+  await expect(page.getByText(en.ask.errors.server)).toBeVisible();
+  await expectSpaceToPageDown(page);
+  // Every retry counts against the visitor's and the day's limits.
+  expect(requests).toBe(1);
 });
 
 test("an answer does not take focus from what the reader moved to", async ({ page }) => {
@@ -191,8 +226,13 @@ test("a long answer offers a named button back to the latest message", async ({ 
 });
 
 for (const [name, body] of [
-  ["the per-visitor limit", JSON.stringify({ detail: "Request was throttled. Expected available in 42 seconds." })],
+  ["the per-visitor limit", JSON.stringify(PER_VISITOR_BODY)],
+  [
+    "the per-visitor limit, one second left",
+    JSON.stringify({ detail: "Request was throttled. Expected available in 1 second." }),
+  ],
   ["an unreadable body", "<html>Too Many Requests</html>"],
+  ["a body with no detail", "{}"],
 ] as const) {
   test(`any other 429 (${name}) is the one-minute limit`, async ({ page }) => {
     await page.route(CHAT_API, (route) => route.fulfill({ status: 429, body }));

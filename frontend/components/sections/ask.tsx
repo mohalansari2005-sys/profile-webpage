@@ -54,13 +54,22 @@ function scrollToRecord(recordId: string) {
   row.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
-/** Whether the chat may take focus back: it is on the page itself (a disabled
-    input or an unmounted button drops it there) or still inside the chat. A
-    reader who moved it elsewhere while waiting, say to a record through a
-    source chip, keeps it. */
-function focusIsFree(): boolean {
+/** Whether the chat may hand focus to `target`. Focus has to be free: on the
+    page itself (a disabled input or an unmounted button drops it there) or
+    still inside the chat. A reader who moved it elsewhere while waiting, say
+    to a record through a source chip, keeps it.
+
+    And `target` has to be on screen. Focus on <body> is also where a reader
+    who scrolled off with the mouse while waiting has it, and there the keys
+    page through the site: an off-screen input took their Space as a typed
+    space (and scrolled back to show it), an off-screen Try again took it as
+    a click that sent the question again. */
+function mayFocus(target: HTMLElement | null): target is HTMLElement {
+  if (!target) return false;
   const active = document.activeElement;
-  return !active || active === document.body || active.closest("#ask") !== null;
+  const free = !active || active === document.body || active.closest("#ask") !== null;
+  const { top, bottom } = target.getBoundingClientRect();
+  return free && bottom > 0 && top < window.innerHeight;
 }
 
 /** The chip shows the record's title in the page's language. Records with a row
@@ -199,12 +208,13 @@ export function Ask() {
   // focus() beside setPending(null) targets an input React has not re-enabled
   // yet, and focusing a disabled element silently does nothing.
   //
-  // `preventScroll` because an answer takes seconds and the reader may have
-  // scrolled off to read meanwhile: a plain focus() yanked the page back to
-  // the input, ~2000px on a phone.
+  // A reader who scrolled away while waiting keeps their place and their keys
+  // (mayFocus). `preventScroll` covers one with the input only partly in
+  // view, whom a plain focus() would still scroll.
   useEffect(() => {
-    if (turns.length && focusIsFree()) {
-      inputRef.current?.focus({ preventScroll: true });
+    const input = inputRef.current;
+    if (turns.length && mayFocus(input)) {
+      input.focus({ preventScroll: true });
     }
   }, [turns.length]);
 
@@ -214,8 +224,9 @@ export function Ask() {
   // when there is nothing to retry. `failed` is a new object every time, so
   // this runs again after a retry fails again.
   useEffect(() => {
-    if (failed && focusIsFree()) {
-      (retryRef.current ?? inputRef.current)?.focus({ preventScroll: true });
+    const target = retryRef.current ?? inputRef.current;
+    if (failed && mayFocus(target)) {
+      target.focus({ preventScroll: true });
     }
   }, [failed]);
 
@@ -354,7 +365,7 @@ export function Ask() {
                             ref={retryRef}
                             type="button"
                             onClick={() => void ask(failed.question)}
-                            className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
+                            className="mt-3 cursor-pointer self-start rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
                           >
                             {t.ask.tryAgain}
                           </button>

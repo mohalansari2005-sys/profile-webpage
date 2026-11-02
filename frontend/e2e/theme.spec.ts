@@ -111,4 +111,20 @@ test.describe("toggle", () => {
     await expect(toggle(page)).toHaveAttribute("data-mode", "system");
     await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
   });
+
+  test("still cycles when storage reads but will not write", async ({ page }) => {
+    // Storage full, or a private mode with no quota: getItem works, setItem
+    // throws. Reading storage back said "system" while the page went light.
+    await page.addInitScript(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      };
+    });
+    await page.goto("/");
+    for (const mode of ["light", "dark", "system"]) {
+      await toggle(page).click();
+      await expect(toggle(page)).toHaveAttribute("data-mode", mode);
+    }
+    await expect(page.locator("html")).not.toHaveClass(/\b(dark|light)\b/);
+  });
 });

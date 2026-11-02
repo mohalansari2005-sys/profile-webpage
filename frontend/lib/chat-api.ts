@@ -67,16 +67,19 @@ function parseAnswer(value: unknown): ChatAnswer | null {
   };
 }
 
-/** A 429 body is only a hint: anything unreadable, or without the code, is
-    treated as the ordinary rate limit. */
+/** Tells the two 429s apart by DRF's own body, which is all the backend
+    sends, always in English (it has no LocaleMiddleware). The per-visitor
+    limit always knows its wait, so its `detail` reads "Request was
+    throttled. Expected available in 42 seconds."; the daily cap has none to
+    give (GlobalDailyThrottle.wait() is None) and stops at "Request was
+    throttled." The body is only a hint: anything unreadable or without a
+    `detail` is treated as the ordinary rate limit. */
 async function isDailyCap(response: Response): Promise<boolean> {
   try {
     const body: unknown = await response.json();
-    return (
-      typeof body === "object" &&
-      body !== null &&
-      (body as Record<string, unknown>).code === "daily_cap"
-    );
+    if (typeof body !== "object" || body === null) return false;
+    const detail = (body as Record<string, unknown>).detail;
+    return typeof detail === "string" && !detail.includes("Expected available");
   } catch {
     return false;
   }
@@ -104,10 +107,9 @@ export async function askChat(input: {
 
     if (response.status === 429) {
       // Two limits answer 429. The per-visitor rate clears within a minute;
-      // the site-wide daily cap holds until tomorrow, and the server marks it
-      // with `code: "daily_cap"` so a reader is not told "a minute" all day.
-      // DRF's own `detail` is machine copy ("Expected available in 42
-      // seconds."), so the reader gets ours either way.
+      // the site-wide daily cap holds until tomorrow, and a reader must not
+      // be told "a minute" all day. DRF's `detail` is machine copy, so the
+      // reader gets ours either way.
       return {
         ok: false,
         error: (await isDailyCap(response)) ? "dailyCap" : "throttled",

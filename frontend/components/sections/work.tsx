@@ -207,6 +207,7 @@ function ProjectRail({
   const railRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [overflows, setOverflows] = useState(false);
 
   const sync = useCallback(() => {
     const el = railRef.current;
@@ -215,6 +216,7 @@ function ProjectRail({
     const max = el.scrollWidth - el.clientWidth;
     setCanPrev(position > 1);
     setCanNext(position < max - 1);
+    setOverflows(max > 1);
   }, []);
 
   useEffect(() => {
@@ -235,7 +237,9 @@ function ProjectRail({
 
   // aria-disabled, not `disabled`: paging to the end disables the chevron the
   // reader just pressed, and a natively disabled button drops keyboard focus
-  // to <body>. This one keeps it and ignores the press.
+  // to <body>. This one keeps it and ignores the press. When every card fits,
+  // though, neither chevron can ever page, so both are natively disabled and
+  // Tab skips them.
   const chevron =
     "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-rule pointer-coarse:size-11";
 
@@ -250,6 +254,7 @@ function ProjectRail({
             type="button"
             aria-label={t.work.previousProject}
             aria-disabled={!canPrev}
+            disabled={!overflows}
             onClick={() => canPrev && page("prev")}
             className={chevron}
           >
@@ -259,6 +264,7 @@ function ProjectRail({
             type="button"
             aria-label={t.work.nextProject}
             aria-disabled={!canNext}
+            disabled={!overflows}
             onClick={() => canNext && page("next")}
             className={chevron}
           >
@@ -436,11 +442,16 @@ export function Work() {
                             setHoveredTool(tool.id);
                             // The browser only scrolls a focused chip that is
                             // wholly out of view, so one half under the edge
-                            // fade stayed there. Bring it fully in.
-                            event.currentTarget.scrollIntoView({
-                              block: "nearest",
-                              inline: "nearest",
-                            });
+                            // fade stayed there. Bring it fully in, but only
+                            // for the keyboard: a mouse press or a tap focuses
+                            // the chip too, and sliding it away before the
+                            // release made the press miss it.
+                            if (event.currentTarget.matches(":focus-visible")) {
+                              event.currentTarget.scrollIntoView({
+                                block: "nearest",
+                                inline: "nearest",
+                              });
+                            }
                           }}
                           onBlur={() => setHoveredTool(null)}
                           onClick={() => toggleTool(tool.id)}

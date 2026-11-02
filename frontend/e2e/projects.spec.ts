@@ -50,10 +50,15 @@ test("projects are rounded cards in a horizontal rail", async ({ page }) => {
   expect(await rail.evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
 });
 
-test("when every card fits, both chevrons are disabled", async ({ page }) => {
+test("when every card fits, both chevrons are disabled and skipped by Tab", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Previous project" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Next project" })).toBeDisabled();
+  for (const name of ["Previous project", "Next project"]) {
+    const chevron = page.getByRole("button", { name });
+    await expect(chevron).toBeDisabled();
+    // Natively disabled, not just aria-disabled: neither can ever page here,
+    // so a keyboard reader should not stop on them.
+    await expect(chevron).toHaveJSProperty("disabled", true);
+  }
 });
 
 test("chevrons page the rail and disable at the ends", async ({ page }) => {
