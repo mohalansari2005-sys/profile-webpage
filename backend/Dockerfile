@@ -22,6 +22,13 @@ USER app
 # DB connection, so neither is shared between turns; the fast-model fallback is
 # per process, so each worker pays one failed call. 8 connections at most, far
 # under Postgres's default of 100.
+# 8 turns at once is a ceiling, not what a burst gets: each worker accepts more
+# connections than it has threads and queues the rest itself, so one can hold
+# twice the other's share while the other has threads idle. In a test, 24
+# simultaneous turns took 5 rounds to answer, where an even 8-way split takes 3;
+# 1 worker x 8 threads has no such imbalance. A queued turn's CHAT_TURN_BUDGET
+# starts only when a thread picks it up, so the queueing comes on top of the
+# 25s, against the browser's 30s.
 # --timeout 120 was set because a turn's calls could outlast gunicorn's 30s
 # default. Under gthread it only restarts a worker that stops responding, not a
 # slow request: CHAT_TURN_BUDGET (25s) is what bounds a turn.
