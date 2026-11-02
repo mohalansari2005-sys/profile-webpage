@@ -3,17 +3,21 @@ FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app
 WORKDIR /app
 
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir ".[dev]"
-
-COPY . .
-
 # Not root: gunicorn is what the internet reaches through Caddy, and a hole in
 # it should not come with the whole container. uid 1000 is usually the first
 # user on a Linux host too, so the dev compose's ./backend bind mount stays
-# writable for `docker compose run --rm web pytest`.
+# writable for `docker compose run --rm web pytest`. Created before anything
+# is copied, so a code change does not rebuild this layer.
 RUN useradd --create-home --uid 1000 app
+
+COPY pyproject.toml ./
+# As root: pip installs into the system site-packages.
+RUN pip install --no-cache-dir ".[dev]"
+
+# COPY writes root-owned files whatever USER is, which is all the app needs:
+# it only reads its code.
 USER app
+COPY . .
 
 # gthread workers, 2 processes x 4 threads: a turn spends most of its time
 # waiting on OpenAI, and gunicorn's default -- one sync worker -- answered
