@@ -3,9 +3,11 @@ import math
 import httpx
 import pytest
 from openai import (
+    BadRequestError,
     ContentFilterFinishReasonError,
     LengthFinishReasonError,
     NotFoundError,
+    PermissionDeniedError,
     RateLimitError,
 )
 from openai.types.chat import ChatCompletion
@@ -56,31 +58,22 @@ def _rate_limit_error():
     )
 
 
-def _not_found_error():
-    return NotFoundError(
-        "The model `gpt-4.1-nano` does not exist or you do not have access to it.",
-        response=httpx.Response(404, request=httpx.Request("POST", "https://api.openai.com")),
-        body={"code": "model_not_found"},
-    )
+def _status_error(cls, status, code, message="error"):
+    return cls(message, response=httpx.Response(
+        status, request=httpx.Request("POST", "https://api.openai.com")), body={"code": code})
 
 
-def _client_missing(*models):
-    """A client on which the named models are gone, the rest answer."""
+def _missing(*models, cls=NotFoundError, status=404):
+    """A parse_hook under which the named models are gone; it records every
+    model and temperature the client was asked for."""
     seen = []
 
     def hook(model, messages, fmt, kwargs):
-        seen.append(model)
-
-    class FakeCompletions:
-        def parse(self, *, model, messages, response_format, **kwargs):
-            hook(model, messages, response_format, kwargs)
-            if model in models:
-                raise _not_found_error()
-            return _fake_client().chat.completions.parse(
-                model=model, messages=messages, response_format=response_format, **kwargs)
-
-    client = type("Client", (), {"chat": type("Chat", (), {"completions": FakeCompletions()})()})()
-    return client, seen
+        seen.append((model, kwargs.get("temperature")))
+        if model in models:
+            raise _status_error(cls, status, "model_not_found",
+                                f"The model `{model}` does not exist or you do not have access to it.")
+    return hook, seen
 
 
 def test_normalize_returns_a_unit_vector():
@@ -291,15 +284,15 @@ def test_generate_keeps_the_default_temperature(monkeypatch):
 
 def test_a_retired_fast_model_falls_back_to_the_strong_model(monkeypatch, settings):
     """gpt-4.1-nano was shut down on 2026-10-23 while backend/.env could still
-    name it. The gate must keep answering on OPENAI_MODEL, and stop paying a 404
-    per call once it knows."""
+    name it. The gate must keep answering on OPENAI_MODEL -- at the classifier
+    temperature -- and stop paying a failed call once it knows."""
     from chat import openai_client
 
     settings.OPENAI_MODEL = "strong-model"
     settings.OPENAI_FAST_MODEL = "retired-model"
     monkeypatch.setattr(openai_client, "_fast_model_gone", False)
-    client, seen = _client_missing("retired-model")
-    monkeypatch.setattr(openai_client, "_client", client)
+    hook, seen = _missing("retired-model")
+    monkeypatch.setattr(openai_client, "_client", _fake_client(parse_hook=hook))
 
     parsed, usage = openai_client.structured("prompt", Shape, fast=True)
     assert parsed == SHAPE
@@ -307,30 +300,36 @@ def test_a_retired_fast_model_falls_back_to_the_strong_model(monkeypatch, settin
     assert openai_client.fast_model() == "strong-model"
 
     openai_client.structured("prompt", Shape, fast=True)
-    assert seen == ["retired-model", "strong-model", "strong-model"]
+    assert seen == [("retired-model", 0), ("strong-model", 0), ("strong-model", 0)]
 
 
-def test_the_fallback_keeps_the_classifier_temperature(monkeypatch, settings):
+def test_a_model_the_project_cannot_use_falls_back_too(monkeypatch, settings):
+    """OpenAI answers 403, not 404, with the same model_not_found code when a
+    key's project has no access to a model; the code is what decides."""
     from chat import openai_client
 
     settings.OPENAI_MODEL = "strong-model"
-    settings.OPENAI_FAST_MODEL = "retired-model"
+    settings.OPENAI_FAST_MODEL = "blocked-model"
     monkeypatch.setattr(openai_client, "_fast_model_gone", False)
-    temps = []
+    hook, _ = _missing("blocked-model", cls=PermissionDeniedError, status=403)
+    monkeypatch.setattr(openai_client, "_client", _fake_client(parse_hook=hook))
 
-    class FakeCompletions:
-        def parse(self, *, model, messages, response_format, **kwargs):
-            temps.append(kwargs.get("temperature"))
-            if model == "retired-model":
-                raise _not_found_error()
-            return _fake_client().chat.completions.parse(
-                model=model, messages=messages, response_format=response_format)
+    parsed, _ = openai_client.structured("prompt", Shape, fast=True)
+    assert parsed == SHAPE
 
-    monkeypatch.setattr(openai_client, "_client", type("Client", (), {
-        "chat": type("Chat", (), {"completions": FakeCompletions()})()})())
 
-    openai_client.structured("prompt", Shape, fast=True)
-    assert temps == [0, 0]
+def test_an_unrelated_404_does_not_abandon_the_fast_model(monkeypatch, settings):
+    from chat import openai_client
+
+    settings.OPENAI_MODEL = "strong-model"
+    settings.OPENAI_FAST_MODEL = "fast-model"
+    monkeypatch.setattr(openai_client, "_fast_model_gone", False)
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        raises=_status_error(NotFoundError, 404, None, "Not Found")))
+
+    parsed, usage = openai_client.structured("prompt", Shape, fast=True)
+    assert (parsed, usage["api_error"]) == (None, True)
+    assert openai_client.fast_model() == "fast-model"
 
 
 def test_a_missing_strong_model_is_an_outage_not_a_loop(monkeypatch, settings):
@@ -339,13 +338,13 @@ def test_a_missing_strong_model_is_an_outage_not_a_loop(monkeypatch, settings):
     settings.OPENAI_MODEL = "strong-model"
     settings.OPENAI_FAST_MODEL = "retired-model"
     monkeypatch.setattr(openai_client, "_fast_model_gone", False)
-    client, seen = _client_missing("retired-model", "strong-model")
-    monkeypatch.setattr(openai_client, "_client", client)
+    hook, seen = _missing("retired-model", "strong-model")
+    monkeypatch.setattr(openai_client, "_client", _fake_client(parse_hook=hook))
 
     parsed, usage = openai_client.structured("prompt", Shape, fast=True)
     assert parsed is None
     assert usage["api_error"] is True
-    assert seen == ["retired-model", "strong-model"]
+    assert [m for m, _ in seen] == ["retired-model", "strong-model"]
 
 
 def test_a_missing_generate_model_does_not_touch_the_fast_one(monkeypatch, settings):
@@ -354,12 +353,25 @@ def test_a_missing_generate_model_does_not_touch_the_fast_one(monkeypatch, setti
     settings.OPENAI_MODEL = "strong-model"
     settings.OPENAI_FAST_MODEL = "fast-model"
     monkeypatch.setattr(openai_client, "_fast_model_gone", False)
-    client, seen = _client_missing("strong-model")
-    monkeypatch.setattr(openai_client, "_client", client)
+    hook, _ = _missing("strong-model")
+    monkeypatch.setattr(openai_client, "_client", _fake_client(parse_hook=hook))
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert (parsed, usage["api_error"]) == (None, True)
     assert openai_client.fast_model() == "fast-model"
+
+
+def test_a_rejected_request_is_not_an_outage(monkeypatch):
+    """A flagged prompt fails the same way on every retry. Reported as an
+    outage, the visitor would be told to try again, forever."""
+    from chat import openai_client
+
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        raises=_status_error(BadRequestError, 400, "invalid_prompt")))
+
+    parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed is None
+    assert "api_error" not in usage
 
 
 def test_an_api_error_is_logged_without_its_message(monkeypatch, caplog):

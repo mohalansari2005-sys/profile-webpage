@@ -40,8 +40,10 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # prompt-injection attempt, until OpenAI shut that model down on 2026-10-23:
 # every gate call then failed and, failing closed, refused every visitor as
 # off-topic. It is now gpt-4.1-mini, the model `generate` already runs, at ~4x
-# nano's price -- at ~600 in / ~30 out per gate call and the 200/day cap, about
-# $3/month more in the worst case. gpt-5.4-nano is cheaper-looking but was
+# nano's price. The gate is ~600 tokens in; condense runs only on follow-ups
+# and Arabic, up to ~3.5k with a full history. If every one of the 200/day
+# capped questions were a long follow-up that is ~$8/month more; a first-turn
+# English question costs ~$0.0002 more. gpt-5.4-nano is cheaper-looking but was
 # rejected: on the relevance gate it returned in_scope=False for a plainly
 # in-scope question on one trial and True on the next -- with a reason string
 # arguing the question WAS in scope. relevance fails closed, so an unstable
@@ -110,6 +112,9 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "WARNING"},
+    # django.request logs every 4xx as a WARNING -- each throttled request and
+    # each bot probing /wp-login.php. Only 5xx are worth a line.
+    "loggers": {"django.request": {"level": "ERROR"}},
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

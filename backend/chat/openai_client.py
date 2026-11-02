@@ -4,10 +4,12 @@ import math
 from django.conf import settings
 from openai import (
     APIError,
+    BadRequestError,
+    ConflictError,
     ContentFilterFinishReasonError,
     LengthFinishReasonError,
-    NotFoundError,
     OpenAI,
+    UnprocessableEntityError,
 )
 from pydantic import BaseModel
 
@@ -16,13 +18,21 @@ logger = logging.getLogger(__name__)
 # Named openai_client, not openai, so it can never shadow the SDK it imports.
 _client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-# Set the first time OPENAI_FAST_MODEL comes back "not found". OpenAI retires
+# Set the first time OPENAI_FAST_MODEL comes back model_not_found. OpenAI retires
 # models on a schedule -- gpt-4.1-nano was shut down on 2026-10-23 -- and
 # backend/.env can pin a retired name, so a new default alone cannot be relied
 # on. With nowhere to send the gate's call, it failed closed and refused every
 # visitor; falling back to OPENAI_MODEL keeps it answering at a higher price
-# until the env is fixed. Per process, so each gunicorn worker pays one 404.
+# until the env is fixed. Per process, so each gunicorn worker pays one failed
+# call. Keyed on the error code, not the 404: OpenAI also answers 403 with it
+# when a project cannot use a model, and an unrelated 404 must not flip this.
 _fast_model_gone = False
+
+# A request the API judged bad (a flagged prompt, an oversized context) fails
+# the same way on every retry -- a bad response, not an outage, so no
+# api_error and no "try again". Auth, quota, rate limits, 5xx, timeouts and a
+# retired model are the service, and are.
+_NOT_AN_OUTAGE = (BadRequestError, ConflictError, UnprocessableEntityError)
 
 
 def fast_model() -> str:
@@ -98,8 +108,8 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     `fast=True` selects OPENAI_FAST_MODEL for the cheap classifier calls
     (condense, relevance), or OPENAI_MODEL once the fast one is not found.
 
-    A failed API call (quota exhausted, rate limited, transient 5xx) returns
-    parsed=None with usage["api_error"] -- every caller already fails closed on
+    A failed API call (quota exhausted, rate limited, transient 5xx, a retired
+    model with nowhere to fall back) returns parsed=None with usage["api_error"] -- every caller already fails closed on
     parsed=None, and the flag is what stops a refusal log from calling an
     outage an "unparseable response".
     """
@@ -118,16 +128,15 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             # enforced in Python regardless.
             **({"temperature": 0} if fast else {}),
         )
-    except NotFoundError as exc:
+    except APIError as exc:
         _log_api_error(model, exc)
-        if model != settings.OPENAI_MODEL:
+        if exc.code == "model_not_found" and model != settings.OPENAI_MODEL:
             logger.error("OPENAI_FAST_MODEL %s is gone; classifier calls now use "
                          "OPENAI_MODEL %s. Update backend/.env.", model, settings.OPENAI_MODEL)
             _fast_model_gone = True
             return structured(prompt, schema, fast=fast)
-        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
-    except APIError as exc:
-        _log_api_error(model, exc)
+        if isinstance(exc, _NOT_AN_OUTAGE):
+            return None, {"prompt_tokens": None, "completion_tokens": None}
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
     except (LengthFinishReasonError, ContentFilterFinishReasonError):
         # Neither subclasses APIError, so an `except APIError` alone lets these

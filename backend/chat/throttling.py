@@ -21,6 +21,10 @@ class ChatRateThrottle(ScopedRateThrottle):
         return rates.get(self.scope) or super().get_rate()
 
 
+def _daily_key() -> str:
+    return f"chat:daily:{date.today().isoformat()}"
+
+
 class GlobalDailyThrottle(BaseThrottle):
     """One counter for the whole service. It was sized below a free-tier daily
     quota; on a metered provider it is the daily **spend** limit instead, and
@@ -34,7 +38,7 @@ class GlobalDailyThrottle(BaseThrottle):
 
     def allow_request(self, request, view):
         cap = settings.CHAT_DAILY_CAP
-        key = f"chat:daily:{date.today().isoformat()}"
+        key = _daily_key()
         used = cache.get_or_set(key, 0, timeout=60 * 60 * 48)
         if used >= cap:
             return False
@@ -46,3 +50,15 @@ class GlobalDailyThrottle(BaseThrottle):
 
     def wait(self):
         return None
+
+    @staticmethod
+    def refund():
+        """Give back the slot of a turn OpenAI never answered. The UI asks
+        the visitor to try again after an outage; counting those retries would
+        leave the day's cap spent on failures by the time the service is back."""
+        key = _daily_key()
+        try:
+            if (cache.get(key) or 0) > 0:
+                cache.decr(key)
+        except ValueError:  # expired since it was counted: nothing to give back
+            pass

@@ -54,9 +54,8 @@ DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=<your domain, e.g. api.yourdomain.com>
 
 OPENAI_API_KEY=<your OpenAI key>
-OPENAI_MODEL=gpt-4.1-mini
-OPENAI_FAST_MODEL=gpt-4.1-mini
-OPENAI_EMBED_MODEL=text-embedding-3-small
+# No OPENAI_*MODEL lines: the defaults in backend/config/settings.py apply and
+# move with the code. A pinned name kept the retired gpt-4.1-nano in use.
 
 POSTGRES_DB=chat
 POSTGRES_USER=chat

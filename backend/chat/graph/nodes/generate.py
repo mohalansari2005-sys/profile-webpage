@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from chat.graph.state import ChatState
 from chat.language import NAME_GLOSSARY, is_arabic
-from chat.openai_client import structured
+from chat.openai_client import fast_model, structured
 
 REFUSAL = (
     "I can only answer from what Mohammed has written about his own work, "
@@ -81,8 +81,10 @@ def generate(state: ChatState) -> dict:
     retrieved = state.get("retrieved") or []
     if not retrieved:
         if state.get("unavailable"):
-            # retrieve's embedding call failed; generate never ran a model.
-            return _refuse(state, "generation unavailable", unavailable=True)
+            # retrieve's embedding call failed and generate never ran: the
+            # gate's tokens are the only ones spent, so its model owns the row.
+            return {**_refuse(state, "retrieval unavailable", state.get("usage"), unavailable=True),
+                    "model": fast_model()}
         return _refuse(state, "nothing retrieved")
 
     context = "\n\n".join(f"[{c['chunk_id']}] {c['text']}" for c in retrieved)

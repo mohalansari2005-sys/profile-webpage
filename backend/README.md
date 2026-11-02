@@ -94,13 +94,23 @@ rejected for `OPENAI_FAST_MODEL` on those grounds — see `config/settings.py`.
 
 `gpt-4.1-nano` held that slot until OpenAI shut it down on 2026-10-23. The gate
 fails closed, so for ten days every question was refused as off-topic and
-nothing said why. Three things now stop a repeat: the default is `gpt-4.1-mini`;
-a fast model that comes back "not found" makes `openai_client` fall back to
-`OPENAI_MODEL` (an env file can still name a retired model); and any failed
-OpenAI call answers **503** -- the UI's "service hit an error, try again" --
-instead of a refusal, and is logged to stderr (`docker compose logs web`) with
-its status and error code. Check OpenAI's deprecations page before a model's
-shutdown date, not after.
+nothing said why. What now stops a repeat:
+
+- The default is `gpt-4.1-mini`, and the env templates no longer pin model
+  names, so a new default actually reaches the server.
+- A fast model that comes back `model_not_found` makes `openai_client` fall back
+  to `OPENAI_MODEL` for the life of that worker (an env file can still name a
+  retired model).
+- An outage -- auth, quota, rate limit, 5xx, timeout, a retired model with
+  nowhere to fall back -- answers **503**, the UI's "service hit an error, try
+  again", instead of a refusal. The turn is logged with `refusal_reason`
+  `generation unavailable` (or `retrieval unavailable` for embeddings) and does
+  not count against `CHAT_DAILY_CAP`. A request OpenAI rejects as bad (400/409/
+  422) fails the same way on retry, so it stays a refusal.
+- Every OpenAI failure is logged to stderr (`docker compose logs web`) with its
+  status and error code.
+
+Check OpenAI's deprecations page before a model's shutdown date, not after.
 
 ## Secrets
 

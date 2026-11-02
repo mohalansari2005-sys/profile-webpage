@@ -172,15 +172,16 @@ def test_an_answered_turn_reports_only_the_answer_model_s_tokens(db, stub_nodes,
     assert (row.prompt_tokens, row.completion_tokens) == (500, 80)
 
 
-def test_an_embedding_outage_is_logged_and_flagged_not_called_empty(db, stub_nodes, monkeypatch):
+def test_an_embedding_outage_is_logged_and_flagged_not_called_empty(db, stub_nodes, monkeypatch, settings):
     """embed_query returns None when the API call fails. Treated as an empty
     search, that told the visitor "I don't have that" during an outage."""
     from chat.graph.build import build_graph
     from chat.graph.nodes.relevance import Relevance
     from chat.models import ChatLog
 
-    monkeypatch.setattr(stub_nodes["relevance"], "structured",
-                        lambda *a, **k: (Relevance(subject="mohammed", reason="ok"), {}))
+    settings.OPENAI_FAST_MODEL = "fast-model"
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", lambda *a, **k: (
+        Relevance(subject="mohammed", reason="ok"), {"prompt_tokens": 40, "completion_tokens": 9}))
     monkeypatch.setattr(stub_nodes["retrieve"], "embed_query", lambda q: None)
 
     def no_generate(*a, **k):
@@ -191,7 +192,10 @@ def test_an_embedding_outage_is_logged_and_flagged_not_called_empty(db, stub_nod
     out = build_graph().invoke({"question": "what did he build", "history": [],
                                 "ip_hash": "h" * 64, "started_at": 0.0})
     assert out["unavailable"] is True
-    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+    row = ChatLog.objects.get()
+    # Says what failed, and keeps the gate's spend on the gate's model.
+    assert (row.refusal_reason, row.model) == ("retrieval unavailable", "fast-model")
+    assert (row.prompt_tokens, row.completion_tokens) == (40, 9)
 
 
 def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
@@ -204,5 +208,27 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
 
     out = build_graph().invoke({"question": "What is Keyraa?", "history": [],
                                 "ip_hash": "h" * 64, "started_at": 0.0})
+    assert out["unavailable"] is True
+    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+
+
+def test_a_condense_outage_ends_the_turn_without_a_gate_call(db, stub_nodes, monkeypatch):
+    """Without the rewrite, a follow-up's pronoun or an Arabic question would
+    reach retrieval unresolved and come back "I don't have that"."""
+    from chat.graph.build import build_graph
+    from chat.models import ChatLog
+
+    monkeypatch.setattr(stub_nodes["condense"], "structured", lambda *a, **k: (
+        None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}))
+
+    def no_gate(*a, **k):
+        raise AssertionError("the gate must not be paid for after condense failed")
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", no_gate)
+
+    out = build_graph().invoke({
+        "question": "and there?", "ip_hash": "h" * 64, "started_at": 0.0,
+        "history": [{"role": "user", "content": "tell me about Majara"},
+                    {"role": "assistant", "content": "He works there."}]})
     assert out["unavailable"] is True
     assert ChatLog.objects.get().refusal_reason == "generation unavailable"
