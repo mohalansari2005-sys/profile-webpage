@@ -4,6 +4,7 @@ import httpx
 import pytest
 from openai import (
     APITimeoutError,
+    OpenAIError,
     BadRequestError,
     ConflictError,
     ContentFilterFinishReasonError,
@@ -14,7 +15,7 @@ from openai import (
     RateLimitError,
 )
 from openai.types.chat import ChatCompletion
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 class Shape(BaseModel):
@@ -209,6 +210,32 @@ def test_finish_reason_errors_do_not_escape(monkeypatch, error):
     assert parsed is None
     assert usage == {"prompt_tokens": None, "completion_tokens": None}
     assert "api_error" not in usage
+
+
+def _validation_error():
+    try:
+        Shape.model_validate_json("{}")
+    except ValidationError as exc:
+        return exc
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(_validation_error, id="pydantic-validation"),
+    pytest.param(lambda: OpenAIError("unexpected"), id="other-openai-error"),
+])
+def test_an_unusable_response_is_refused_not_a_500(monkeypatch, caplog, error):
+    """parse validates the content with pydantic, whose ValidationError is no
+    OpenAIError at all, so it escaped every except here as a 500 with no
+    ChatLog row. A bad response, not an outage -- and logged, with its
+    traceback, so it is not a silent refusal either."""
+    from chat import openai_client
+
+    monkeypatch.setattr(openai_client, "_client", _fake_client(raises=error()))
+    with caplog.at_level("ERROR", logger="chat.openai_client"):
+        parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed is None
+    assert usage == {"prompt_tokens": None, "completion_tokens": None}
+    assert caplog.records[-1].exc_info is not None
 
 
 def test_every_call_caps_its_output(monkeypatch):

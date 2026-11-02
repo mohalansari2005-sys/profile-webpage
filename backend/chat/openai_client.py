@@ -13,9 +13,10 @@ from openai import (
     InternalServerError,
     LengthFinishReasonError,
     OpenAI,
+    OpenAIError,
     Timeout,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,14 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
         usage = getattr(getattr(exc, "completion", None), "usage", None)
         return None, {"prompt_tokens": getattr(usage, "prompt_tokens", None),
                       "completion_tokens": getattr(usage, "completion_tokens", None)}
+    except (OpenAIError, ValidationError):
+        # Anything else raised once a response is in hand -- above all
+        # pydantic's ValidationError when parse validates the content, which
+        # is no OpenAIError at all and escaped as a 500 with no log row. A bad
+        # response, not an outage; logged with its traceback so it is not a
+        # silent refusal either.
+        logger.exception("OpenAI response unusable: model=%s", model)
+        return None, {"prompt_tokens": None, "completion_tokens": None}
 
     usage = getattr(resp, "usage", None)
     counts = {

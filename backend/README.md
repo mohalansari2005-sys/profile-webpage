@@ -91,6 +91,12 @@ Pydantic class itself and enforces the schema server-side.
 `except APIError` alone lets a truncated or filtered response escape as a 500.
 See `chat/openai_client.py` — both are caught and mapped to a refusal, without
 the `api_error` flag, because they mean a bad response rather than an outage.
+So is any other `OpenAIError`, and pydantic's `ValidationError` -- which `parse`
+raises when the content fails the schema, and which is no `OpenAIError` at all
+-- logged with its traceback.
+
+The `log` node is just as defensive: a failed `ChatLog` write is logged to
+stderr and the visitor still gets the answer, which by then has been paid for.
 
 Model names are not stable. **Listing a model does not prove it works** — call
 it once before depending on it, with the real node prompt rather than a toy one.

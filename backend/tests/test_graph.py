@@ -258,3 +258,35 @@ def test_the_turn_budget_reaches_the_nodes(db, stub_nodes, monkeypatch):
         build_graph().invoke({"question": "weather", "history": [],
                               "ip_hash": "h" * 64, "started_at": 0.0})
     assert seen["deadline"] is not None
+
+
+def test_a_failed_log_write_still_returns_the_answer(db, stub_nodes, monkeypatch, caplog):
+    """The answer is generated -- and billed -- before log runs. A failed write
+    (a full disk, a dropped connection) turned it into a 500 with no row."""
+    from django.db import OperationalError
+
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.generate import Answer
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog, ContentChunk
+
+    ContentChunk.objects.create(
+        chunk_id="exp-a#summary", record_id="exp-a", kind="experience",
+        title="Engineer", text="Built services.", content_hash="h",
+        embedding=[0.0] * 1536,
+    )
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (Relevance(subject="mohammed", reason="ok"), {}))
+    monkeypatch.setattr(stub_nodes["generate"], "structured", lambda *a, **k: (
+        Answer(answer="He built services.", used_chunk_ids=["exp-a#summary"],
+               sufficient=True), {}))
+
+    def broken(**kwargs):
+        raise OperationalError("could not connect to server")
+
+    monkeypatch.setattr(ChatLog.objects, "create", broken)
+    with caplog.at_level("ERROR", logger="chat.graph.nodes.log"):
+        out = build_graph().invoke({"question": "what did he build", "history": [],
+                                    "ip_hash": "h" * 64, "started_at": 0.0})
+    assert (out["refused"], out["answer"]) == (False, "He built services.")
+    assert "ChatLog write failed" in caplog.text
