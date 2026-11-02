@@ -98,6 +98,9 @@ def test_device_browser_country_and_source_are_derived(db, api):
      "desktop", "Firefox"),
     ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
      "Chrome/130.0.0.0 Safari/537.36 OPR/115.0.0.0", "desktop", "Other"),
+    # A phone brand with "bot" in its name: counted, not filtered as a bot.
+    ("Mozilla/5.0 (Linux; Android 10; CUBOT X30) AppleWebKit/537.36 (KHTML, like Gecko) "
+     "Chrome/120.0.0.0 Mobile Safari/537.36", "mobile", "Chrome"),
 ])
 def test_the_user_agent_is_reduced_to_coarse_families(db, api, ua, device, browser):
     beacon(api, {"path": "/"}, ua=ua)
@@ -201,6 +204,37 @@ def test_a_malformed_body_is_ignored(db, api, body):
     r = beacon(api, body)
     assert r.status_code == 204
     assert stored() == []
+
+
+# Raw JSON text, so the escapes reach the server as a browser would send them.
+@pytest.mark.parametrize("body, field, cleaned", [
+    (r'{"path": "/\u0000ar"}', "path", "/ar"),
+    (r'{"path": "/", "source": "a\u0000b"}', "source", "ab"),
+    (r'{"path": "/", "referrer": "https://a\u0000b.example/"}', "referrer_host", "ab.example"),
+    (r'{"path": "/ar\ud800"}', "path", "/ar"),
+    (r'{"path": "/", "source": "x\udfff"}', "source", "x?"),
+])
+def test_strings_postgres_cannot_store_are_cleaned_not_a_500(db, api, body, field, cleaned):
+    # Postgres refuses NUL in text, and a lone surrogate has no UTF-8 form.
+    # Uncleaned, either was a 500 and a logged traceback on every hit.
+    r = beacon(api, body)
+    assert r.status_code == 204
+    assert getattr(stored()[0], field) == cleaned
+
+
+def test_a_body_too_big_for_django_is_ignored_without_reading_it(db, api, settings):
+    # Past DATA_UPLOAD_MAX_MEMORY_SIZE, reading request.body raises and Django
+    # answers 400; the declared length has to turn it away first.
+    big = {"path": "/", "source": "x" * (settings.DATA_UPLOAD_MAX_MEMORY_SIZE + 1)}
+    r = beacon(api, big)
+    assert r.status_code == 204
+    assert stored() == []
+
+
+def test_an_accept_header_without_a_wildcard_still_gets_the_204(db, api):
+    r = beacon(api, {"path": "/"}, HTTP_ACCEPT="text/html")
+    assert r.status_code == 204
+    assert len(stored()) == 1
 
 
 def test_a_json_content_type_is_accepted_too(db, api):

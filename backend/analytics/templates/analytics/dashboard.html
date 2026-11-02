@@ -29,6 +29,8 @@
     /* The grey bars are --dim thinned toward the ground, so the green series
        nested in them stands apart; navy needs less thinning to stay visible. */
     --outer-opacity: 0.4;
+    /* The shading for days before tracking began stays lighter than any bar. */
+    --untracked-opacity: 0.55;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -40,6 +42,7 @@
       --signal: #4bbd8e;
       --match: #f0b558;
       --outer-opacity: 0.65;
+      --untracked-opacity: 1;
       color-scheme: dark;
     }
   }
@@ -57,20 +60,22 @@
   h2 { font-size: 1.15rem; }
   h3 { font-size: 1rem; }
   section { margin-top: 2.5rem; }
-  .label, th, .tick, .axis, .legend, nav, .meta, .when, .num {
+  .label, th, .plot, .axis, .legend, nav, .meta, .when, .num {
     font-family: var(--mono);
     font-size: 0.75rem;
     letter-spacing: 0.02em;
   }
   .dim, .meta, .tick, .axis, th { color: var(--dim); }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .when { white-space: nowrap; }
 
   header { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: end; }
   .meta { margin: 0.4rem 0 0; }
-  nav ul { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
+  /* A narrow screen wraps whole buttons, never the words inside one. */
+  nav ul { display: flex; flex-wrap: wrap; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
   nav a {
     display: block; padding: 0.35rem 0.6rem; border: 1px solid var(--rule); border-radius: 4px;
-    color: var(--ink); text-decoration: none;
+    color: var(--ink); text-decoration: none; white-space: nowrap;
   }
   nav a[aria-current="page"] { border-color: var(--signal); box-shadow: inset 0 -2px 0 var(--signal); }
   nav a:focus-visible, summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
@@ -97,13 +102,26 @@
   .key-outer { opacity: var(--outer-opacity); }
   .key-inner, .inner { fill: var(--signal); background: var(--signal); }
   .key-hi, .hi { fill: var(--match); background: var(--match); }
+  /* Days before anything was recorded, so they do not read as zero days. */
+  .key-untracked, .untracked { fill: var(--rule); background: var(--rule); fill-opacity: var(--untracked-opacity); }
+  .key-untracked { opacity: var(--untracked-opacity); }
+  /* The scale sits in a gutter left of the plot, as wide as its longest label
+     (--gutter, set per chart), so a label never covers a bar. */
+  .plot, .axis { margin-left: calc(var(--gutter) + 0.75rem); }
   .plot { position: relative; margin-top: 1.25rem; border-bottom: 1px solid var(--rule); }
   .plot svg { display: block; width: 100%; height: 10rem; overflow: visible; }
-  .tick { position: absolute; left: 0; top: -1.1rem; }
+  .tick { position: absolute; right: calc(100% + 0.5rem); transform: translateY(-50%); line-height: 1; }
+  .tick-top { top: 0; }
+  .tick-mid { top: 50%; }
+  .tick-zero { top: 100%; }
+  .plot-note { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font: italic 0.95rem var(--body); color: var(--dim); }
+  .plot-note span { background: var(--paper); padding: 0 0.5rem; }
   .grid { stroke: var(--rule); stroke-width: 1; }
   .hit { fill: transparent; }
   .day:hover .hit { fill: var(--rule); fill-opacity: 0.5; }
   .axis { display: flex; justify-content: space-between; margin-top: 0.35rem; }
+  /* A week names every bar, each label centred under its own. */
+  .axis.every { display: grid; text-align: center; }
   details { margin-top: 1.25rem; }
   summary { cursor: pointer; font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
 
@@ -114,6 +132,10 @@
   .breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem 2.5rem; margin-top: 1rem; }
   .latest { margin-top: 1rem; }
   .breakdowns h3 { margin-bottom: 0.5rem; }
+  /* Fixed layout and fixed number columns: the label column, and so the share
+     underline in it, is the same width in every table, and 100% is one length. */
+  .breakdowns table { table-layout: fixed; }
+  .breakdowns th.num { width: 5rem; }
   .share { display: block; height: 2px; margin-top: 0.3rem; background: var(--signal); }
   .wrap { overflow-wrap: anywhere; }
   .empty { color: var(--dim); font-style: italic; }
@@ -125,11 +147,18 @@
   footer ul { padding-left: 1.1rem; }
   footer code { font-family: var(--mono); font-size: 0.85em; color: var(--ink); }
 
-  /* Phones: one column throughout, and each latest-question row stacks
-     (when, outcome, latency on one line; the question under them). */
+  /* Phones: tiles two to a row so the charts start nearer the top; one
+     column for the rest; the daily table without weekdays and with headers
+     free to wrap, so all six columns fit a 390px screen; and each
+     latest-question row stacked (when, outcome, latency on one line; the
+     question under them). */
   @media (max-width: 640px) {
     main { padding: 1.25rem 1rem 2.5rem; }
-    .tiles, .breakdowns { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .breakdowns { grid-template-columns: 1fr; }
+    .daily th.num { white-space: normal; }
+    .daily th.num, .daily td.num { padding-left: 0.4rem; }
+    .daily .weekday { display: none; }
     .latest thead { display: none; }
     .latest tr { display: grid; grid-template-columns: auto 1fr auto; gap: 0.25rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
     .latest td { border: 0; padding: 0; }
@@ -164,44 +193,57 @@
   </ul>
   {% with a=stats.all_time %}
   <p class="alltime">All time:
-    <b>{{ a.visitors|floatformat:"g" }}</b> visitors ·
-    <b>{{ a.page_views|floatformat:"g" }}</b> page views{% if a.first_view %} since {{ a.first_view|date:"d M Y" }}{% endif %} ·
-    <b>{{ a.chat_users|floatformat:"g" }}</b> chatbot users ·
-    <b>{{ a.questions|floatformat:"g" }}</b> questions{% if a.first_question %} since {{ a.first_question|date:"d M Y" }}{% endif %}
+    <b>{{ a.visitors|floatformat:"g" }}</b> visitor{{ a.visitors|pluralize }} ·
+    <b>{{ a.page_views|floatformat:"g" }}</b> page view{{ a.page_views|pluralize }}{% if a.first_view %} since {{ a.first_view|date:"d M Y" }}{% endif %} ·
+    <b>{{ a.chat_users|floatformat:"g" }}</b> chatbot user{{ a.chat_users|pluralize }} ·
+    <b>{{ a.questions|floatformat:"g" }}</b> question{{ a.questions|pluralize }}{% if a.first_question %} since {{ a.first_question|date:"d M Y" }}{% endif %}
   </p>
   {% endwith %}
 
   {% for chart in stats.charts %}
   <section aria-labelledby="chart-{{ forloop.counter }}">
-    <figure>
+    <figure style="--gutter: {{ chart.top|length }}ch">
       <figcaption>
         <h2 id="chart-{{ forloop.counter }}">{{ chart.title }}</h2>
         <ul class="legend">
           <li><span class="key key-outer"></span>{{ chart.outer_label }}</li>
           <li><span class="key key-inner"></span>{{ chart.inner_label }}</li>
           {% if chart.hi_label %}<li><span class="key key-hi"></span>{{ chart.hi_label }}</li>{% endif %}
+          {% if chart.untracked_w %}<li><span class="key key-untracked"></span>Before tracking began</li>{% endif %}
         </ul>
       </figcaption>
       <div class="plot">
-        <span class="tick">{{ chart.top }}</span>
+        {% if chart.empty %}
+        <p class="plot-note"><span>No {{ chart.outer_label|lower }} in this range.</span></p>
+        {% else %}
+        <span class="tick tick-top">{{ chart.top }}</span>
+        <span class="tick tick-mid">{{ chart.mid }}</span>
+        <span class="tick tick-zero">0</span>
+        {% endif %}
         {% localize off %}{# SVG coordinates need a "." decimal whatever the locale #}
         <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img"
              aria-label="{{ chart.title }}, one bar per day; the exact numbers are under Daily numbers">
           <line class="grid" x1="0" y1="0" x2="{{ chart.width }}" y2="0" vector-effect="non-scaling-stroke"/>
           <line class="grid" x1="0" y1="{{ chart.mid_y }}" x2="{{ chart.width }}" y2="{{ chart.mid_y }}" vector-effect="non-scaling-stroke"/>
+          {% if chart.untracked_w %}<rect class="untracked" x="0" y="0" width="{{ chart.untracked_w }}" height="{{ chart.height }}"/>{% endif %}
           {% for b in chart.bars %}
           <g class="day">
             <title>{{ b.title }}</title>
             <rect class="hit" x="{{ b.slot_x }}" y="0" width="{{ b.slot_w }}" height="{{ chart.height }}"/>
             {% if b.h %}<rect class="outer" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"/>{% endif %}
-            {% if b.hi_h %}<rect class="hi" x="{{ b.x }}" y="{{ b.hi_y }}" width="{{ b.w }}" height="{{ b.hi_h }}"/>{% endif %}
             {% if b.inner_h %}<rect class="inner" x="{{ b.inner_x }}" y="{{ b.inner_y }}" width="{{ b.inner_w }}" height="{{ b.inner_h }}"/>{% endif %}
+            {# Amber last, over the green: on a day when every question failed it fills the whole bar, so an outage cannot hide behind the users bar. #}
+            {% if b.hi_h %}<rect class="hi" x="{{ b.x }}" y="{{ b.hi_y }}" width="{{ b.w }}" height="{{ b.hi_h }}"/>{% endif %}
           </g>
           {% endfor %}
         </svg>
         {% endlocalize %}
       </div>
-      <div class="axis"><span>{{ chart.first|date:"D d M" }}</span><span>{{ chart.last|date:"D d M" }}</span></div>
+      {% if chart.every_day %}
+      <div class="axis every" style="grid-template-columns: repeat({{ chart.labels|length }}, minmax(0, 1fr))">{% for day in chart.labels %}<span>{{ day|date:"D d" }}</span>{% endfor %}</div>
+      {% else %}
+      <div class="axis">{% for day in chart.labels %}<span>{{ day|date:"D d M" }}</span>{% endfor %}</div>
+      {% endif %}
     </figure>
   </section>
   {% endfor %}
@@ -209,7 +251,7 @@
   <details>
     <summary>Daily numbers</summary>
     <div class="scroll">
-      <table>
+      <table class="daily">
         <thead>
           <tr>
             <th scope="col">Day</th>
@@ -223,7 +265,7 @@
         <tbody>
           {% for d in stats.daily reversed %}
           <tr>
-            <td class="when">{{ d.day|date:"D d M" }}</td>
+            <td class="when"><span class="weekday">{{ d.day|date:"D" }} </span>{{ d.day|date:"d M" }}</td>
             <td class="num">{{ d.visitors }}</td>
             <td class="num">{{ d.page_views }}</td>
             <td class="num">{{ d.chat_users }}</td>
@@ -243,9 +285,11 @@
       <div>
         <h3>{{ b.title }}</h3>
         <table>
+          {% if b.rows %}
           <thead>
             <tr><th scope="col">Top {{ b.rows|length }}</th><th scope="col" class="num">Visitors</th><th scope="col" class="num">Views</th></tr>
           </thead>
+          {% endif %}
           <tbody>
             {% for r in b.rows %}
             <tr>
@@ -264,7 +308,9 @@
   </section>
 
   <section aria-labelledby="latest">
-    <h2 id="latest">Latest {{ stats.latest|length }} questions</h2>
+    {% with n=stats.latest|length %}
+    <h2 id="latest">{% if n %}Latest {% if n > 1 %}{{ n }} questions{% else %}question{% endif %}{% else %}Latest questions{% endif %} <span class="dim">· any date, not only this range</span></h2>
+    {% endwith %}
     <table class="latest">
       <thead>
         <tr><th scope="col">When</th><th scope="col">Question</th><th scope="col">Outcome</th><th scope="col" class="num">Took</th></tr>
@@ -273,8 +319,9 @@
         {% for q in stats.latest %}
         <tr>
           <td class="when">{{ q.when }}</td>
-          <td class="q wrap">{{ q.question }}</td>
-          <td>{% if q.outcome == "service error" %}<span class="flag" aria-hidden="true"></span>{% endif %}{{ q.outcome }}{% if q.reason %}<span class="reason wrap">{{ q.reason }}</span>{% endif %}</td>
+          {# dir="auto": an Arabic question reads right to left, Latin words and all, while an English one stays as it is. #}
+          <td class="q wrap" dir="auto">{{ q.question }}</td>
+          <td>{% if q.outcome == "service error" %}<span class="flag" aria-hidden="true"></span>{% endif %}{{ q.outcome }}{% if q.reason %}<span class="reason wrap" dir="auto">{{ q.reason }}</span>{% endif %}</td>
           <td class="num">{{ q.latency }}</td>
         </tr>
         {% empty %}

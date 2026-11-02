@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, VISIT_API } from "./fixtures";
 
 // Phone and iPad sizes, each on both language pages. The first bug this guards
 // against: on a phone the page was wider than the screen (scrollWidth 643 on a
@@ -115,6 +115,8 @@ test.describe("chat height follows the device", () => {
   test("taller on an iPad than on a phone or a laptop", async ({ browser }) => {
     const heightAt = async (width: number, height: number) => {
       const ctx = await browser.newContext({ viewport: { width, height } });
+      // Its own context, so the fixture that answers the beacon does not reach it.
+      await ctx.route(VISIT_API, (route) => route.fulfill({ status: 204 }));
       const page = await ctx.newPage();
       await page.goto("/");
       const h = await boxHeight(page);

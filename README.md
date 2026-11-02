@@ -251,7 +251,8 @@ nothing is sent when that is unset.
   (`DASHBOARD_PASSWORD`; the page 404s until it is set). Visitors, page views,
   chatbot use, service errors, sources and the latest questions. See
   `DEPLOYMENT.md` to switch it on, and open the site once with
-  `?analytics=off` to stop counting your own browser.
+  `?analytics=off` to stop counting your own browser (and any browser that
+  runs QA against the live site).
 
 ## Languages and theme
 

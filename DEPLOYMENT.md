@@ -138,9 +138,16 @@ password: the username can be anything, the password is the one above.
 `Asia/Riyadh` unless `DASHBOARD_TZ` says otherwise.
 
 To keep your own visits out of the numbers, open the site once in each browser
-you use with `?analytics=off` (e.g. `https://yourdomain.com/ar?analytics=off`);
-`?analytics=on` undoes it. Use the `/ar` form if that browser normally opens
-the Arabic page: visiting `/` there redirects to `/ar` and drops the query.
+you use with `?analytics=off` (e.g. `https://yourdomain.com/?analytics=off`);
+`?analytics=on` undoes it. The page takes the parameter back out of the address
+bar once it has read it, so a link you copy afterwards does not opt out whoever
+opens it.
+
+Automated QA against the live site counts as a real visitor too: Playwright's
+desktop Chrome does not identify itself as headless, so the bot filter lets it
+through. Opt that browser out first, by opening a page with `?analytics=off`
+or by setting the flag before any page script runs:
+`page.addInitScript(() => localStorage.setItem("analytics", "off"))`.
 
 ## Updating the deployment
 

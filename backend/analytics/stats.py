@@ -58,6 +58,7 @@ def collect(days: int, now: datetime | None = None) -> dict:
     chats = ChatLog.objects.filter(created_at__gte=start, created_at__lt=end)
     totals = _totals(views, chats)
     daily = _daily(views, chats, tz, day_list)
+    all_time = _all_time(tz)
 
     return {
         "days": days,
@@ -67,17 +68,19 @@ def collect(days: int, now: datetime | None = None) -> dict:
         "today": today,
         "totals": totals,
         "tiles": _tiles(totals),
-        "all_time": _all_time(tz),
+        "all_time": all_time,
         "daily": daily,
         "charts": [
             _chart(daily, "Visitors and page views per day",
                    outer=("page_views", "Page views"), inner=("visitors", "Visitors"),
-                   describe="{visitors} visitors, {page_views} page views"),
+                   describe="{visitors} visitors, {page_views} page views",
+                   since=all_time["first_view"]),
             _chart(daily, "Chatbot users and questions per day",
                    outer=("questions", "Questions"), inner=("chat_users", "Chatbot users"),
                    highlight=("service_errors", "Service errors"),
                    describe="{chat_users} chatbot users, {questions} questions, "
-                            "{service_errors} service errors"),
+                            "{service_errors} service errors",
+                   since=all_time["first_question"]),
         ],
         "breakdowns": _breakdowns(views),
         "latest": _latest(tz),
@@ -151,15 +154,19 @@ def _all_time(tz) -> dict:
     }
 
 
-def _chart(daily, title, outer, inner, describe, highlight=(None, "")) -> dict:
+def _chart(daily, title, outer, inner, describe, highlight=(None, ""), since=None) -> dict:
     """Daily bars: `outer` wide and grey, `inner` (a subset of it) narrow and
     green inside it, `highlight` (also a subset) amber across the outer bar's
-    top. Each field is a (key in `daily`, legend label) pair."""
+    top. Each field is a (key in `daily`, legend label) pair. Days before
+    `since`, the first day anything was recorded, are shaded: they are not
+    zero, they were not counted."""
     (outer, outer_label), (inner, inner_label), (highlight, hi_label) = outer, inner, highlight
-    top = _nice_ceiling(max((d[outer] for d in daily), default=0))
+    busiest = max((d[outer] for d in daily), default=0)
+    top = _nice_ceiling(busiest)
     slot = CHART_WIDTH / len(daily)
     outer_w = min(OUTER_BAR, slot * 0.8)
     inner_w = min(INNER_BAR, slot * 0.45)
+    untracked = sum(1 for d in daily if since and d["day"] < since)
     bars = []
     for i, d in enumerate(daily):
         centre = slot * i + slot / 2
@@ -174,13 +181,17 @@ def _chart(daily, title, outer, inner, describe, highlight=(None, "")) -> dict:
             "inner_x": _r(centre - inner_w / 2), "inner_w": _r(inner_w),
             "inner_y": _r(CHART_HEIGHT - inner_h), "inner_h": _r(inner_h),
             "hi_y": _r(CHART_HEIGHT - h), "hi_h": _r(hi_h),
-            "title": f"{d['day']:%a %d %b}: " + describe.format(**d),
+            "title": f"{d['day']:%a %d %b}: " + (
+                "before tracking began" if i < untracked else describe.format(**d)),
         })
+    # A week has room to name every bar; longer ranges name the two ends.
+    labels = [d["day"] for d in daily] if len(daily) <= 7 else [daily[0]["day"], daily[-1]["day"]]
     return {
         "title": title, "outer_label": outer_label, "inner_label": inner_label,
-        "hi_label": hi_label,
-        "bars": bars, "top": _n(top), "width": CHART_WIDTH, "height": CHART_HEIGHT,
-        "mid_y": CHART_HEIGHT / 2, "first": daily[0]["day"], "last": daily[-1]["day"],
+        "hi_label": hi_label, "empty": not busiest,
+        "bars": bars, "top": _n(top), "mid": _n(top // 2),
+        "width": CHART_WIDTH, "height": CHART_HEIGHT, "mid_y": CHART_HEIGHT / 2,
+        "untracked_w": _r(slot * untracked), "labels": labels, "every_day": len(daily) <= 7,
     }
 
 
@@ -238,14 +249,16 @@ def _height(value: int, top: int) -> float:
 
 
 def _nice_ceiling(n: int) -> int:
-    """The smallest 1, 2 or 5 x 10^k at or above n, for a round top gridline."""
-    if n <= 1:
-        return 1
-    magnitude = 10 ** (len(str(n)) - 1)
-    for step in (1, 2, 5, 10):
+    """The smallest 2, 4, 6, 8 or 10 x 10^k at or above n: a round top gridline
+    with at most about half the plot left empty above the busiest day, and an
+    even one, so the labelled midline is a whole number too."""
+    if n <= 2:
+        return 2
+    magnitude = 10 ** (len(str(n - 1)) - 1)
+    for step in (2, 4, 6, 8, 10):
         if step * magnitude >= n:
             return step * magnitude
-    return n  # unreachable: 10 x magnitude always exceeds n
+    return n  # unreachable: 10 x magnitude always reaches n
 
 
 def _r(x: float) -> float:

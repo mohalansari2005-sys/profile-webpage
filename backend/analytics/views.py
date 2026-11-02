@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from rest_framework import status
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,8 +21,10 @@ from chat.throttling import ChatRateThrottle
 # Best-effort, not security: a script that lies about its User-Agent is still
 # counted. This catches crawlers, link-preview fetchers, audit tools and the
 # usual HTTP libraries, which between them are most non-human traffic.
+# "(?<!cu)": Cubot is an Android phone brand, and its model names ("CUBOT X30")
+# would otherwise read as a bot.
 BOT_UA = re.compile(
-    r"bot|crawl|spider|slurp|headless|lighthouse|preview|curl|wget|python|"
+    r"(?<!cu)bot|crawl|spider|slurp|headless|lighthouse|preview|curl|wget|python|"
     r"http-?client|okhttp|go-http|java/|node-fetch|axios|scrapy|facebookexternalhit",
     re.IGNORECASE,
 )
@@ -89,7 +92,23 @@ def country_of(request) -> str:
 
 
 def text(value) -> str:
-    return value.strip() if isinstance(value, str) else ""
+    """A visitor-supplied string made safe to store, or "" if it is not a string.
+
+    The chat gets this from DRF's CharField; this view reads the body itself,
+    so it cleans the two things Postgres cannot store: NUL, which it refuses
+    in text, and a lone surrogate ("\\ud800" is valid JSON), which has no UTF-8
+    form. Either would make the save a 500 with a logged traceback.
+    """
+    if not isinstance(value, str):
+        return ""
+    return value.replace("\x00", "").encode("utf-8", "replace").decode("utf-8").strip()
+
+
+def declared_length(request) -> int:
+    try:
+        return int(request.META.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        return 0
 
 
 def page_view_from(request) -> PageView | None:
@@ -100,7 +119,10 @@ def page_view_from(request) -> PageView | None:
     origin = request.META.get("HTTP_ORIGIN", "")
     if origin and not origin_allowed(origin):
         return None
-    if len(request.body) > MAX_BODY:
+    # The declared length first: reading request.body loads all of it, and
+    # past DATA_UPLOAD_MAX_MEMORY_SIZE Django answers 400 instead of our 204.
+    # The length of what was actually read stays as the backstop.
+    if declared_length(request) > MAX_BODY or len(request.body) > MAX_BODY:
         return None
     try:
         body = json.loads(request.body)
@@ -115,13 +137,28 @@ def page_view_from(request) -> PageView | None:
     referrer = host_of(text(body.get("referrer")))
     return PageView(
         ip_hash=hash_ip(client_ip(request)),
-        path=normalise_path(body["path"]),
+        path=normalise_path(text(body["path"])),
         referrer_host="" if referrer in own_hosts else referrer[:200],
         source=text(body.get("source"))[:100],
         country=country_of(request),
         device=device_of(ua),
         browser=browser_of(ua),
     )
+
+
+class IgnoreAccept(BaseContentNegotiation):
+    """Both views below write their own answers (an empty 204, the page, a
+    plain-text 401), so DRF only ever renders the throttle's 429. Its default
+    negotiation would first refuse, with a 406, any client whose Accept header
+    lacks */* -- breaking the beacon's always-204 and turning away a strict
+    client that has the dashboard password. DRF's documented recipe for
+    ignoring Accept."""
+
+    def select_parser(self, request, parsers):
+        return parsers[0]
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return renderers[0], renderers[0].media_type
 
 
 class VisitView(APIView):
@@ -137,6 +174,7 @@ class VisitView(APIView):
 
     authentication_classes = []
     permission_classes = []
+    content_negotiation_class = IgnoreAccept
     throttle_scope = "visit"
     # ChatRateThrottle is keyed on client_ip and reads the rate for the view's
     # own throttle_scope, so it serves here unchanged. The chat's
@@ -177,6 +215,7 @@ class DashboardView(APIView):
     # Authorization header, look for a Django user and reject the request.
     authentication_classes = []
     permission_classes = []
+    content_negotiation_class = IgnoreAccept
     throttle_scope = "dashboard"
     throttle_classes = [ChatRateThrottle]
     http_method_names = ["get", "head"]

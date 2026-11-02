@@ -6,10 +6,12 @@ const themeScript = `try{var t=localStorage.getItem("theme"),r=document.document
 // to English, and /ar records itself on load, so the choice is stored however
 // the link was opened.
 //  - English page: `?lang=en` stores English and is cleaned from the URL; a
-//    reader who chose Arabic earlier is sent to /ar when they open `/`.
+//    reader who chose Arabic earlier is sent to /ar when they open `/`, with
+//    the query and hash kept, so a campaign tag (`?utm_source=`) or the
+//    analytics switch (`?analytics=off`) still reaches the page-view beacon.
 //  - Arabic page: stores Arabic.
 // First-time visitors are never redirected.
-const englishPageScript = `try{if(/[?&]lang=en\\b/.test(location.search)){localStorage.setItem("lang","en");history.replaceState(null,"",location.pathname+location.hash)}else if(localStorage.getItem("lang")==="ar"&&location.pathname==="/")location.replace("/ar"+location.hash)}catch(e){}`;
+const englishPageScript = `try{if(/[?&]lang=en\\b/.test(location.search)){localStorage.setItem("lang","en");history.replaceState(null,"",location.pathname+location.hash)}else if(localStorage.getItem("lang")==="ar"&&location.pathname==="/")location.replace("/ar"+location.search+location.hash)}catch(e){}`;
 const arabicPageScript = `try{localStorage.setItem("lang","ar")}catch(e){}`;
 
 /** Contents of <head> shared by both languages' root layouts, so the two cannot

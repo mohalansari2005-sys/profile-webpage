@@ -95,6 +95,14 @@ def test_the_right_password_opens_it_whatever_the_username(db, client, password)
         assert r["Content-Type"].startswith("text/html")
 
 
+def test_a_client_that_accepts_only_html_gets_the_page(db, client, password):
+    # Browsers add */*, but a stricter client (an uptime checker, curl -H) got
+    # a 406 from DRF before the password was even looked at.
+    r = client.get("/dashboard/", HTTP_AUTHORIZATION=basic("me", password),
+                   HTTP_ACCEPT="text/html")
+    assert r.status_code == 200
+
+
 def test_responses_are_never_cached_or_indexed(db, client, password):
     for r in (client.get("/dashboard/"), open_dashboard(client, password)):
         assert r["Cache-Control"] == "no-store"
@@ -233,13 +241,69 @@ def test_the_chart_is_one_bar_per_day_scaled_to_the_busiest(db):
     assert 0 < today["inner_h"] < today["h"]  # 1 visitor, nested inside
 
 
+@pytest.mark.parametrize("busiest, top", [
+    (0, 2), (1, 2), (2, 2), (3, 4), (9, 10), (10, 10), (11, 20), (28, 40), (367, 400),
+    (1001, 2000),
+])
+def test_the_scale_tops_out_at_a_round_even_number(busiest, top):
+    # Even, so the midline gets a whole-number label; finer than 1-2-5, so a
+    # 28-view day is not drawn against a scale of 50.
+    from analytics.stats import _nice_ceiling
+
+    assert _nice_ceiling(busiest) == top
+
+
+def test_the_midline_is_labelled(db):
+    for _ in range(3):
+        view(at=NOW)
+    chart = collect()["charts"][0]
+    assert (chart["top"], chart["mid"]) == ("4", "2")
+
+
+def test_days_before_the_first_record_are_marked_untracked(db, settings):
+    settings.DASHBOARD_TZ = "Asia/Riyadh"
+    view(at=NOW - timedelta(days=2))  # the first page view ever: Sat 31 Oct
+    chat(at=NOW - timedelta(days=30))  # the chat logged long before this range
+    views, chats = collect()["charts"]
+    # 27-30 Oct were not counted at all, which is not the same as zero visits.
+    assert views["untracked_w"] == round(views["width"] / 7 * 4, 2)
+    assert views["bars"][3]["title"] == "Fri 30 Oct: before tracking began"
+    assert "before tracking" not in views["bars"][4]["title"]
+    assert chats["untracked_w"] == 0
+
+
+def test_a_week_names_every_day_and_longer_ranges_their_ends(db, settings):
+    settings.DASHBOARD_TZ = "Asia/Riyadh"
+    assert collect(days=7)["charts"][0]["labels"] == [
+        date(2026, 10, 27) + timedelta(days=i) for i in range(7)]
+    assert collect(days=30)["charts"][0]["labels"] == [date(2026, 10, 4), date(2026, 11, 2)]
+
+
 # --- the page -------------------------------------------------------------
 
 
 def test_an_empty_dashboard_still_renders(db, client, password):
     r = open_dashboard(client, password)
     assert r.status_code == 200
-    assert "Visitors" in r.content.decode()
+    html = r.content.decode()
+    assert "Visitors" in html
+    # What the owner sees on the first day: said in words, not as a scale of
+    # "2" over blank bars or a "Top 0" / "Latest 0 questions" heading.
+    assert "<span>No page views in this range.</span>" in html  # the chart, not a table
+    assert "<span>No questions in this range.</span>" in html
+    assert 'class="tick' not in html
+    assert "Top 0" not in html
+    assert "Latest 0" not in html
+
+
+def test_one_of_each_reads_in_the_singular(db, client, password):
+    view()
+    chat()
+    html = open_dashboard(client, password).content.decode()
+    assert "<b>1</b> visitor ·" in html
+    assert "<b>1</b> chatbot user ·" in html
+    assert "<b>1</b> question since" in html
+    assert "Latest question <span" in html
 
 
 def test_service_errors_are_highlighted_only_when_there_are_some(db, client, password):
@@ -255,8 +319,30 @@ def test_the_latest_questions_show_how_each_ended(db, client, password):
     html = open_dashboard(client, password).content.decode()
     for text in ("what did he build", "answered", "1.5 s",
                  "weather?", "refused", "weather: unrelated to him",
-                 "and Majara?", "service error"):
+                 "and Majara?", "service error",
+                 "Latest 3 questions", "any date, not only this range"):
         assert text in html
+
+
+def test_questions_and_reasons_take_their_own_direction(db, client, password):
+    # On the page's LTR, an Arabic question with Latin words came out in the
+    # wrong word order; dir="auto" lets each cell follow its first letter.
+    chat(question="كم سنة خبرة لديه في Python و Django؟", refused=True, reason="خارج الموضوع")
+    html = open_dashboard(client, password).content.decode()
+    assert '<td class="q wrap" dir="auto">كم سنة' in html
+    assert '<span class="reason wrap" dir="auto">خارج الموضوع</span>' in html
+
+
+def test_a_full_outage_day_stays_amber_over_the_green(db, client, password):
+    # Every question failed and each came from its own user, the 2026-10-23
+    # pattern: amber covers the whole bar. Drawn under the green users bar it
+    # showed only as two slivers at 90 days, so the amber must come last.
+    chat(ip="203.0.113.1", refused=True, reason="generation unavailable")
+    chat(ip="203.0.113.2", refused=True, reason="generation unavailable")
+    html = open_dashboard(client, password, "?days=90").content.decode()
+    today = html.split('<g class="day">')[-1]  # the chat chart's last bar
+    assert 'class="inner"' in today
+    assert today.index('class="inner"') < today.index('class="hi"')
 
 
 def test_visitor_supplied_strings_are_escaped(db, client, password):

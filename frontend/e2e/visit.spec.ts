@@ -74,15 +74,49 @@ test("?analytics=off stops this browser counting, ?analytics=on resumes it", asy
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("analytics")))
     .toBe("off");
+  // ...and the switch leaves the address bar, so a copy of this link cannot
+  // opt out whoever opens it.
+  await expect(page).toHaveURL((url) => url.pathname === "/" && url.search === "");
   await page.goto("/");
   await page.goto("/ar");
   await page.waitForTimeout(QUIET_MS);
   expect(visits).toHaveLength(0);
 
-  await page.goto("/ar?analytics=on");
+  await page.goto("/ar?ref=cv&analytics=on#work");
   await expect.poll(() => visits.length).toBe(1);
   expect(await page.evaluate(() => localStorage.getItem("analytics"))).toBeNull();
+  // Only the switch goes; the other parameters and the hash stay.
+  await expect(page).toHaveURL((url) => url.search === "?ref=cv" && url.hash === "#work");
   await page.goto("/ar");
   await expect.poll(() => visits.length).toBe(2);
-  expect(visits.map((v) => v.path)).toEqual(["/ar", "/ar"]);
+  expect(visits.map((v) => [v.path, v.source])).toEqual([["/ar", "cv"], ["/ar", ""]]);
+});
+
+// A reader who chose Arabic is sent from / to /ar by a script in <head>
+// (site-head.tsx). That redirect used to drop the query.
+test.describe("a returning Arabic reader who opens /", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/ar");
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("lang"))).toBe("ar");
+  });
+
+  test("keeps the campaign source", async ({ page }) => {
+    const { visits } = await recordVisits(page);
+    await page.goto("/?utm_source=linkedin");
+    await expect.poll(() => visits.length).toBe(1);
+    expect(visits[0]).toMatchObject({ path: "/ar", source: "linkedin" });
+    await page.waitForTimeout(QUIET_MS);
+    expect(visits).toHaveLength(1);
+  });
+
+  test("can still switch analytics off", async ({ page }) => {
+    const { visits } = await recordVisits(page);
+    await page.goto("/?analytics=off");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("analytics")))
+      .toBe("off");
+    await expect(page).toHaveURL((url) => /^\/ar\/?$/.test(url.pathname) && url.search === "");
+    await page.waitForTimeout(QUIET_MS);
+    expect(visits).toHaveLength(0);
+  });
 });

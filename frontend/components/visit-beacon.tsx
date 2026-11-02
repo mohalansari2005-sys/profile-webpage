@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { optedOut, sendVisit } from "@/lib/visit";
+import { forgetSwitch, optedOut, sendVisit } from "@/lib/visit";
 
 // Module scope, not a ref: dev-mode Strict Mode mounts every component twice
 // and a ref would reset with it. A real page load starts a fresh module (the
@@ -15,7 +15,9 @@ export function VisitBeacon() {
     if (sent) return;
     sent = true;
     try {
-      if (optedOut(location.search)) return;
+      const off = optedOut(location.search);
+      forgetSwitch();
+      if (off) return;
       const params = new URLSearchParams(location.search);
       sendVisit({
         path: location.pathname,

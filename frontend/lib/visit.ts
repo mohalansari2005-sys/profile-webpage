@@ -34,10 +34,28 @@ export function optedOut(search: string): boolean {
   }
 }
 
+/**
+ * Takes `analytics=` back out of the address bar once optedOut() has read it,
+ * so a copied, bookmarked or autocompleted link cannot quietly opt out
+ * everyone who opens it. Other parameters and the hash stay, as `?lang=en`'s
+ * clean-up in site-head.tsx does.
+ */
+export function forgetSwitch(): void {
+  try {
+    const url = new URL(location.href);
+    if (!url.searchParams.has(OPT_OUT_KEY)) return;
+    url.searchParams.delete(OPT_OUT_KEY);
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  } catch {
+    // The parameter stays; this page view was still decided correctly.
+  }
+}
+
 export type Visit = { path: string; referrer: string; source: string };
 
-/** Fire and forget. Never throws and never logs: analytics must not be able
-    to break or clutter the page. */
+/** Fire and forget. Never throws and never logs from here: analytics must not
+    be able to break or clutter the page. The browser itself still reports a
+    beacon that fails (backend down, 429, an ad blocker) in the console. */
 export function sendVisit(visit: Visit): void {
   if (!VISIT_URL) return;
   // A string body goes out as text/plain, which needs no CORS preflight; the
