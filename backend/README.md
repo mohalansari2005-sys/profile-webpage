@@ -46,6 +46,15 @@ never disagree about what the corpus says. `ingest_content` chunks each record
 (summary + one chunk per `##` section), embeds the changed ones, and deletes
 orphans — re-running costs nothing when the corpus has not moved.
 
+The summary chunk leads with the record's frontmatter -- title, organisation,
+period, tool labels and repository -- because the page shows them and a
+visitor asks about them ("when did he work at SEET?"). Kept only in
+frontmatter they never reached the embedding or the prompt, and dates the page
+shows were refused as unknown. Sections stay prose only; retrieval hands
+`generate` whole records, so the fields come along with any hit. Adding this
+header changed the 7 summary chunks' text, so the first `ingest_content` after
+it re-embeds those 7 (of 23) once: a few thousand tokens, well under a cent.
+
 A request runs through `condense → relevance → retrieve → generate → log`.
 Grounding is enforced in Python: if the model cites a chunk id retrieval did
 not return, cites nothing at all, or reports insufficient context, the answer
