@@ -30,5 +30,15 @@
 		# sent; a Django that still reads that header -- the one running when
 		# the deploy reloads this file -- must see the visitor here as well.
 		header_up X-Forwarded-For {client_ip}
+		# Caddy keeps idle connections to gunicorn for reuse (2 minutes by
+		# default), and gunicorn closes one idle past its --keep-alive (2s by
+		# default). A request Caddy wrote into a connection gunicorn was
+		# closing failed, and a POST is never retried: the visitor got a 502.
+		# So Caddy drops an idle connection first. Keep this well below
+		# gunicorn's --keep-alive (150s, backend/Dockerfile); the gap covers
+		# gthread checking its idle connections only about once a second.
+		transport http {
+			keepalive 60s
+		}
 	}
 }

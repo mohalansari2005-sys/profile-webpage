@@ -35,5 +35,11 @@ USER app
 # instead: CHAT_TURN_BUDGET (25s) covers its OpenAI calls, statement_timeout
 # and lock_timeout its queries, and socket timeouts its Redis calls
 # (config/settings.py).
+# --keep-alive 150 keeps an idle connection from Caddy open longer than Caddy
+# keeps it (60s, the Caddyfile's transport keepalive), so Caddy is always the
+# side that closes it. At gthread's default of 2s, gunicorn closed connections
+# Caddy still meant to reuse, and a POST Caddy wrote into one as it closed was
+# a 502. Only Caddy connects here, so the idle connections held are its pool.
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
-     "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120"]
+     "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120", \
+     "--keep-alive", "150"]
