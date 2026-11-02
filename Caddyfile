@@ -1,3 +1,29 @@
+{
+	servers {
+		# The DNS record is proxied, so every request reaches Caddy from a
+		# Cloudflare edge: the connecting address is Cloudflare's, not the
+		# visitor's, and the per-IP chat limit was shared by everyone behind
+		# the same edge. Cloudflare names the visitor in CF-Connecting-IP.
+		# That header is believed only from Cloudflare's own ranges -- a
+		# request that hits the origin IP directly keeps its own address, and
+		# whatever header it sends is ignored.
+		#
+		# Cloudflare's published ranges as of 2026-11-02, from
+		# https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6.
+		# They change rarely and the stock image cannot fetch them, so refresh
+		# them by hand. A range missing here does not open a spoof: visitors
+		# arriving through it just share their edge's address again. One line
+		# because a repeated trusted_proxies replaces the first, and `caddy fmt`
+		# mangles a continued one.
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
 {$DOMAIN} {
-	reverse_proxy web:8000
+	reverse_proxy web:8000 {
+		# backend/chat/ip.py keys the per-IP limit and ChatLog's ip_hash on
+		# this. Set, not appended: an X-Real-IP the client sent is replaced.
+		header_up X-Real-IP {client_ip}
+	}
 }

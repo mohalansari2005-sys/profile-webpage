@@ -25,3 +25,10 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --build
             docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate
             docker compose -f docker-compose.prod.yml exec -T web python manage.py ingest_content
+            # `up` does not recreate Caddy for a Caddyfile change, and the file
+            # is a single-file bind mount: `git pull` replaces it with a new
+            # file, so the running container keeps reading the old one. Hand
+            # Caddy the pulled file on stdin instead. reload validates it first
+            # and keeps serving the old config if it is invalid -- and fails
+            # this job, so the canary does not run against it.
+            docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile

@@ -126,4 +126,16 @@ git pull
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec web python manage.py migrate
 docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
+docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
 ```
+
+The last line is how a `Caddyfile` change reaches Caddy. `up` does not recreate the
+`caddy` container for it, and because `git pull` replaces the file rather than
+rewriting it, the container's single-file bind mount keeps showing the old one — so
+the file goes in on stdin. `caddy reload` validates it first and keeps the running
+config if it is invalid.
+
+The `Caddyfile` trusts Cloudflare's `CF-Connecting-IP` header from Cloudflare's
+published IP ranges only, so the chat's per-IP limit sees the visitor rather than a
+Cloudflare edge. The ranges are listed by hand with the date they were fetched;
+refresh them from <https://www.cloudflare.com/ips/> now and then.

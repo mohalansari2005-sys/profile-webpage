@@ -160,7 +160,14 @@ runtime key and proves nothing about the image.
 ## Limits
 
 `CHAT_RATE` is per IP; `CHAT_DAILY_CAP` is one counter for the whole service.
-It was sized against a free-tier daily quota. OpenAI is billed per token, not
+The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
+`CF-Connecting-IP` -- trusted only from Cloudflare's ranges, see the root
+`Caddyfile` -- and passes it on as `X-Real-IP`, which `chat/ip.py` reads first.
+`X-Forwarded-For` is only the fallback without Caddy, in local dev: Cloudflare
+appends to whatever the visitor sent, so its first entry is the visitor's to
+choose.
+
+The daily cap was sized against a free-tier daily quota. OpenAI is billed per token, not
 capped, so this counter is now the **spend** limit — it is the only thing
 between a scripted abuser and a real bill. Size it against what you are willing
 to pay per day, not against a quota.
