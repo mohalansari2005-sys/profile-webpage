@@ -207,7 +207,6 @@ function ProjectRail({
   const railRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const [overflows, setOverflows] = useState(false);
 
   const sync = useCallback(() => {
     const el = railRef.current;
@@ -216,7 +215,6 @@ function ProjectRail({
     const max = el.scrollWidth - el.clientWidth;
     setCanPrev(position > 1);
     setCanNext(position < max - 1);
-    setOverflows(max > 1);
   }, []);
 
   useEffect(() => {
@@ -239,7 +237,9 @@ function ProjectRail({
   // reader just pressed, and a natively disabled button drops keyboard focus
   // to <body>. This one keeps it and ignores the press. When every card fits,
   // though, neither chevron can ever page, so both are natively disabled and
-  // Tab skips them.
+  // Tab skips them. Paging never gets there: a rail that pages has always
+  // somewhere to go back to, so the pressed chevron keeps its focus.
+  const fits = !canPrev && !canNext;
   const chevron =
     "flex size-9 items-center justify-center rounded-full border border-rule bg-foreground/[0.04] transition-colors hover:border-foreground aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-rule pointer-coarse:size-11";
 
@@ -254,7 +254,7 @@ function ProjectRail({
             type="button"
             aria-label={t.work.previousProject}
             aria-disabled={!canPrev}
-            disabled={!overflows}
+            disabled={fits}
             onClick={() => canPrev && page("prev")}
             className={chevron}
           >
@@ -264,7 +264,7 @@ function ProjectRail({
             type="button"
             aria-label={t.work.nextProject}
             aria-disabled={!canNext}
-            disabled={!overflows}
+            disabled={fits}
             onClick={() => canNext && page("next")}
             className={chevron}
           >
@@ -295,7 +295,7 @@ function ProjectRail({
 
 export function Work() {
   const { t } = useI18n();
-  const { activeTool, citedRecordIds, pinnedTool, setHoveredTool, toggleTool, clear } =
+  const { join, activeTool, citedRecordIds, pinnedTool, setHoveredTool, toggleTool, clear } =
     useJoin();
 
   // The strip is wider than the column, so it scrolls sideways. Fade only the
@@ -398,8 +398,14 @@ export function Work() {
               {/* Beside the status it resets, not at the end of the strip,
                   which runs 1,400px or more past the column: there it was
                   always scrolled out of sight. The negative margins give it
-                  a finger-sized target without making the bar taller. */}
-              {(pinnedTool || citedRecordIds.length > 0) && (
+                  a finger-sized target without making the bar taller.
+
+                  It follows the committed join, not what is lit this
+                  instant: hovering or focusing a chip previews over a
+                  citation and empties citedRecordIds, which made Clear
+                  flicker under the pointer and vanish under keyboard focus,
+                  so Shift+Tab from a chip could never reach it. */}
+              {(pinnedTool || join?.kind === "cited") && (
                 <button
                   type="button"
                   onClick={clearJoin}

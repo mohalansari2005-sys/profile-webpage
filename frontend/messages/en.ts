@@ -72,18 +72,11 @@ export const en = {
       "Answers come only from what Mohammed has written about his own work. Anything outside that, it declines.",
     thinking: "Thinking…",
     sources: "Sources",
-    /** Chip titles for records the chat can cite but the page has no row for,
-        keyed by record id. */
-    sourceTitles: {
-      "about-bio": "About",
-      "about-education": "Education",
-      "faq-availability": "Are you available for work?",
-    },
     scrollToLatest: "Scroll to the latest message",
     tryAgain: "Try again",
     errors: {
       throttled: "Too many questions right now — try again in a minute.",
-      dailyCap: "The assistant has reached today’s question limit. Try again tomorrow.",
+      dailyCap: "The assistant has answered all it can for today. Try again later.",
       server: "The answer service hit an error. Try again in a moment.",
       network: "Couldn’t reach the answer service.",
       malformed: "The answer service sent back something unexpected.",

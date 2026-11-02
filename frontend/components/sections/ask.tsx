@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowUp, Bot } from "lucide-react";
-import { useStickToBottomContext } from "use-stick-to-bottom";
+import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
   Conversation,
   ConversationContent,
@@ -13,8 +13,8 @@ import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { useI18n } from "@/components/i18n-provider";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
-import { experience, projects } from "@/lib/content";
-import { localize, type Locale } from "@/lib/i18n";
+import { experience, offPageRecords, projects } from "@/lib/content";
+import type { Locale } from "@/lib/i18n";
 import {
   askChat,
   MAX_HISTORY,
@@ -27,6 +27,9 @@ import {
     records can be cited but are not rendered anywhere on the page, so their
     chips stay inert rather than pointing at nothing. */
 const ROW_IDS = new Set([...experience, ...projects].map((record) => record.id));
+
+/** Every record the chat can cite, for naming its chip. */
+const CITABLE = [...experience, ...projects, ...offPageRecords];
 
 type Turn = {
   id: number;
@@ -54,36 +57,50 @@ function scrollToRecord(recordId: string) {
   row.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
+/** Whether any of `target` lies between `top` and `bottom` (viewport y). */
+function overlaps(target: HTMLElement, top: number, bottom: number): boolean {
+  const rect = target.getBoundingClientRect();
+  return rect.bottom > top && rect.top < bottom;
+}
+
 /** Whether the chat may hand focus to `target`. Focus has to be free: on the
     page itself (a disabled input or an unmounted button drops it there) or
     still inside the chat. A reader who moved it elsewhere while waiting, say
     to a record through a source chip, keeps it.
 
-    And `target` has to be on screen. Focus on <body> is also where a reader
+    And `target` has to be in view. Focus on <body> is also where a reader
     who scrolled off with the mouse while waiting has it, and there the keys
     page through the site: an off-screen input took their Space as a typed
     space (and scrolled back to show it), an off-screen Try again took it as
-    a click that sent the question again. */
-function mayFocus(target: HTMLElement | null): target is HTMLElement {
+    a click that sent the question again.
+
+    In view of the window is not enough for what sits in the conversation:
+    a reader who scrolled the chat back up has Try again below its bottom
+    edge, hidden, though the window still holds it. While the chat follows
+    the newest message (`isAtBottom`), it is scrolling Try again in itself,
+    and may still be on its way when this runs, so only then does the
+    window alone decide. */
+function mayFocus(
+  target: HTMLElement | null,
+  chat: StickToBottomContext | null,
+): target is HTMLElement {
   if (!target) return false;
   const active = document.activeElement;
   const free = !active || active === document.body || active.closest("#ask") !== null;
-  const { top, bottom } = target.getBoundingClientRect();
-  return free && bottom > 0 && top < window.innerHeight;
+  if (!free || !overlaps(target, 0, window.innerHeight)) return false;
+  const scroller = chat?.scrollRef.current;
+  if (!chat || !scroller?.contains(target) || chat.state.isAtBottom) return true;
+  const { top, bottom } = scroller.getBoundingClientRect();
+  return overlaps(target, top, bottom);
 }
 
-/** The chip shows the record's title in the page's language. Records with a row
-    on the page carry it in content.ts; the ones without (the bio, education,
-    the FAQ) never reach the page, so theirs are in the dictionary. A record
-    neither knows keeps the title the server sent. */
-function sourceTitle(
-  source: ChatSource,
-  locale: Locale,
-  titles: Record<string, string | undefined>,
-): string {
-  const record = [...experience, ...projects].find((r) => r.id === source.record_id);
-  if (record) return localize(record, locale).title;
-  return titles[source.record_id] ?? source.title;
+/** The chip shows the record's title in the page's language, from content/
+    (`title`, `title_ar`), row on the page or not. A record the site does not
+    know keeps the title the server sent. */
+function sourceTitle(source: ChatSource, locale: Locale): string {
+  const record = CITABLE.find((r) => r.id === source.record_id);
+  if (!record) return source.title;
+  return (locale === "ar" ? record.ar?.title : undefined) ?? record.title;
 }
 
 function historyFrom(turns: Turn[]): ChatMessage[] {
@@ -172,6 +189,7 @@ export function Ask() {
   const [failed, setFailed] = useState<{ question: string; error: ChatError } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const retryRef = useRef<HTMLButtonElement>(null);
+  const chatRef = useRef<StickToBottomContext>(null);
   const nextId = useRef(1);
   // `pending` only disables the input after a re-render, and a seed chip
   // supplies its own question rather than reading the (now-cleared) field, so
@@ -213,7 +231,7 @@ export function Ask() {
   // view, whom a plain focus() would still scroll.
   useEffect(() => {
     const input = inputRef.current;
-    if (turns.length && mayFocus(input)) {
+    if (turns.length && mayFocus(input, chatRef.current)) {
       input.focus({ preventScroll: true });
     }
   }, [turns.length]);
@@ -221,13 +239,14 @@ export function Ask() {
   // A failure needs the same: the disabled input (or the Try again button,
   // which unmounts on a retry) dropped focus to <body>, and the next Tab went
   // past the chat. Land on Try again, the thing to do next, or on the input
-  // when there is nothing to retry. `failed` is a new object every time, so
-  // this runs again after a retry fails again.
+  // when there is nothing to retry, or Try again is out of view. `failed` is
+  // a new object every time, so this runs again after a retry fails again.
   useEffect(() => {
-    const target = retryRef.current ?? inputRef.current;
-    if (failed && mayFocus(target)) {
-      target.focus({ preventScroll: true });
-    }
+    if (!failed) return;
+    const target = [retryRef.current, inputRef.current].find((element) =>
+      mayFocus(element, chatRef.current),
+    );
+    target?.focus({ preventScroll: true });
   }, [failed]);
 
   function onSubmit(event: FormEvent) {
@@ -272,7 +291,11 @@ export function Ask() {
                 </div>
               </div>
 
-              <Conversation className="min-h-0 flex-1" aria-busy={pending !== null}>
+              <Conversation
+                className="min-h-0 flex-1"
+                aria-busy={pending !== null}
+                contextRef={chatRef}
+              >
                 <ConversationContent className="gap-5 p-5">
                   <AssistantMessage>
                     <p>{t.ask.greeting}</p>
@@ -311,7 +334,7 @@ export function Ask() {
                             <ul className="flex flex-wrap gap-2">
                               {turn.sources.map((source) => {
                                 const hasRow = ROW_IDS.has(source.record_id);
-                                const title = sourceTitle(source, locale, t.ask.sourceTitles);
+                                const title = sourceTitle(source, locale);
                                 return (
                                   <li key={source.record_id}>
                                     {hasRow ? (
@@ -358,8 +381,8 @@ export function Ask() {
                       <UserMessage dim>{failed.question}</UserMessage>
                       <AssistantMessage>
                         <p className="text-dim">{t.ask.errors[failed.error]}</p>
-                        {/* The daily cap holds until tomorrow: a retry would
-                            only be refused again. */}
+                        {/* The daily cap holds until the server's midnight: a
+                            retry would only be refused again. */}
                         {failed.error !== "dailyCap" && (
                           <button
                             ref={retryRef}

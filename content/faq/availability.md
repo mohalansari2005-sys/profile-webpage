@@ -6,6 +6,7 @@ org: ""
 period: ""
 tools: []
 summary: "Currently interning at Majara; open to hearing about new opportunities, best reached through the contact details on this site."
+title_ar: "هل أنت متاح للعمل؟"
 ---
 
 ## Availability

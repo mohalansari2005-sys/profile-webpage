@@ -8,11 +8,19 @@ import { loadGoogleFont } from "@/lib/google-font";
 const PAPER = "#ebeef3";
 const INK = "#0f1626";
 
+// Both icons draw the same two letters, so they share one download: the first
+// to render starts it, the other awaits the same promise. Started on first
+// use, not at import: Next also imports the icon routes just to read `size`
+// for the pages' <link> tags, where a download nobody awaits is wasted, and
+// a failed one an unhandled rejection.
+let monogramFont: Promise<ArrayBuffer> | undefined;
+
 /** Rendered at build time by app/icon.tsx and app/apple-icon.tsx. Heavier
     than the hero's semibold, as in the OG image: at 16px a lighter stroke
     thins to nothing. */
 export async function monogramIcon(size: number, radius: number) {
-  const font = await loadGoogleFont("Bricolage+Grotesque", 800, "MA");
+  monogramFont ??= loadGoogleFont("Bricolage+Grotesque", 800, "MA");
+  const font = await monogramFont;
   return new ImageResponse(
     (
       <div

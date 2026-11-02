@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { experience } from "../lib/content";
+import { experience, offPageRecords } from "../lib/content";
 import { format } from "../lib/i18n";
 import { ar } from "../messages/ar";
 
@@ -87,14 +87,20 @@ test.describe("Arabic page", () => {
     expect(chip.some((name) => /JetBrains Mono/i.test(name)), `chip: ${chip}`).toBe(true);
   });
 
-  test("the English page does not preload the Arabic typeface", async ({ page }) => {
-    const html = await (await page.request.get("/")).text();
-    const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+\.woff2)"/g)].map(
-      (match) => match[1].split("/").pop(),
-    );
-    expect(preloads.length).toBeGreaterThan(0);
+  // Read from the HTML each page ships, as a first visit gets it. Next
+  // preloads the fonts in a page's stylesheets, so a chunking change that
+  // merges the Arabic @font-face rules back into the shared stylesheet (see
+  // next.config.ts) shows up here as Plex preloads on `/`.
+  test("only the Arabic page preloads the Arabic typeface", async ({ page }) => {
+    const fontPreloads = async (path: string) => {
+      const html = await (await page.request.get(path)).text();
+      return [...html.matchAll(/<link rel="preload" href="([^"]+\.woff2)"[^>]*as="font"/g)].map(
+        (match) => match[1].split("/").pop()!,
+      );
+    };
+    const arHtml = await (await page.request.get("/ar")).text();
     const plexFiles: string[] = [];
-    for (const [, href] of html.matchAll(/<link rel="stylesheet" href="([^"]+\.css)"/g)) {
+    for (const [, href] of arHtml.matchAll(/<link rel="stylesheet" href="([^"]+\.css)"/g)) {
       const css = await (await page.request.get(href)).text();
       for (const [, url] of css.matchAll(
         /@font-face\s*\{[^}]*font-family:\s*["']?IBM Plex Sans Arabic["']?;[^}]*url\(([^)]+)\)/g,
@@ -103,7 +109,13 @@ test.describe("Arabic page", () => {
       }
     }
     expect(plexFiles.length).toBeGreaterThan(0);
-    expect(preloads.filter((file) => plexFiles.includes(file!))).toEqual([]);
+
+    const english = await fontPreloads("/");
+    // The Latin faces are still preloaded: this is not passing for want of any.
+    expect(english.length).toBeGreaterThan(0);
+    expect(english.filter((file) => plexFiles.includes(file))).toEqual([]);
+    expect((await fontPreloads("/ar")).filter((file) => plexFiles.includes(file)).length)
+      .toBeGreaterThan(0);
   });
 
   test("translates the work records and the project link", async ({ page }) => {
@@ -221,9 +233,10 @@ test.describe("chat in Arabic", () => {
     // Scoped to the chat: the About section's own heading has the same words.
     const chat = page.locator("#ask");
     for (const [id, title] of Object.entries(english)) {
-      await expect(
-        chat.getByText(ar.ask.sourceTitles[id as keyof typeof english], { exact: true }),
-      ).toBeVisible();
+      // Each one's `title_ar` in content/, through the generated content.ts.
+      const arabic = offPageRecords.find((record) => record.id === id)?.ar?.title;
+      expect(arabic, id).toBeTruthy();
+      await expect(chat.getByText(arabic!, { exact: true })).toBeVisible();
       await expect(chat.getByText(title, { exact: true })).toHaveCount(0);
     }
   });

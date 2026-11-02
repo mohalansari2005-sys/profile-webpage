@@ -125,11 +125,12 @@ test("an Arabic question stays on the question side of an English page", async (
 
 // Exactly what the backend sends: DRF's own 429 body. The daily cap has no
 // wait to report (GlobalDailyThrottle.wait() is None); the per-visitor limit
-// always has one.
+// always has one. Only this exact body or `code: "daily_cap"` means the cap;
+// every other 429 is the ordinary limit (the loop further down).
 const DAILY_CAP_BODY = { detail: "Request was throttled." };
 const PER_VISITOR_BODY = { detail: "Request was throttled. Expected available in 42 seconds." };
 
-test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
+test("the daily cap says so and offers no retry", async ({ page }) => {
   await page.route(CHAT_API, (route) => route.fulfill({ status: 429, json: DAILY_CAP_BODY }));
   await page.goto("/");
   await ask(page, "Anything?");
@@ -214,6 +215,79 @@ test("a failure after the reader scrolled away does not arm Space as a retry", a
   expect(requests).toBe(1);
 });
 
+test.describe("on a tall screen", () => {
+  // Tall enough that the window still holds what the chat box scrolls past.
+  test.use({ viewport: { width: 1280, height: 1100 } });
+
+  test("a failure after the reader scrolled up inside the chat does not arm Space as a retry", async ({
+    page,
+  }) => {
+    let failures = 0;
+    await page.route(CHAT_API, async (route) => {
+      const question = JSON.parse(route.request().postData()!).question as string;
+      if (question.includes("long")) {
+        return route.fulfill({ json: { answer: LONG, sources: [], refused: false } });
+      }
+      failures++;
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+      await route.fulfill({ status: 500, body: "boom" });
+    });
+    await page.goto("/");
+    // The chat box near the top of the window, with room below it.
+    await page.locator("#ask [role='log']").evaluate((el) =>
+      scrollBy({ top: el.getBoundingClientRect().top - 120, behavior: "instant" }),
+    );
+    const log = scroller(page);
+    // Smooth scrolls overlapping each other land anywhere; wait out each one.
+    const settle = () =>
+      expect
+        .poll(async () => {
+          const before = await log.evaluate((el) => el.scrollTop);
+          await page.waitForTimeout(150);
+          return (await log.evaluate((el) => el.scrollTop)) - before;
+        })
+        .toBe(0);
+
+    await ask(page, "the long one?");
+    await expect(page.getByText("Sentence 1 about")).toBeVisible();
+    await settle();
+
+    await ask(page, "Take your time?");
+    // Let the chat follow the question to the bottom, then scroll back up
+    // through the long answer, as a reader rereading it while waiting would.
+    // The wheel is what tells the chat to stop following the newest message;
+    // the exact distance after it puts Try again just below the box, still
+    // inside the window, whatever the wheel's own step was.
+    await expect
+      .poll(() => log.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
+      .toBeLessThan(2);
+    const box = (await log.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -100);
+    await settle();
+    await log.evaluate((el) => {
+      el.scrollTop = el.scrollHeight - el.clientHeight - 300;
+    });
+    await expect(page.getByText(en.ask.errors.server)).toBeVisible({ timeout: 10_000 });
+
+    // The case this guards: Try again hidden below the chat's bottom edge,
+    // yet inside the window, which was all the old check asked.
+    const retry = page.getByRole("button", { name: en.ask.tryAgain });
+    const [r, b] = [(await retry.boundingBox())!, (await log.boundingBox())!];
+    expect(r.y).toBeGreaterThanOrEqual(b.y + b.height);
+    expect(r.y + r.height).toBeLessThan(page.viewportSize()!.height);
+
+    await page.waitForTimeout(300);
+    await expect(retry).not.toBeFocused();
+    // The input, in view, takes focus instead: Space is a typed space there.
+    await expect(page.locator("#ask-input")).toBeFocused();
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(500);
+    await expect(retry).not.toBeFocused();
+    expect(failures).toBe(1);
+  });
+});
+
 test("an answer does not take focus from what the reader moved to", async ({ page }) => {
   await delayedAnswer(page, "A late answer.");
   await page.goto("/");
@@ -241,6 +315,25 @@ for (const [name, body] of [
   ],
   ["an unreadable body", "<html>Too Many Requests</html>"],
   ["a body with no detail", "{}"],
+  // A CDN or proxy in front of the backend answers with its own JSON, which
+  // can carry a `detail` that is not DRF's.
+  [
+    "a proxy's own JSON",
+    JSON.stringify({
+      title: "Error 1015: You are being rate limited",
+      status: 429,
+      detail: "You are being rate limited.",
+      error_code: 1015,
+    }),
+  ],
+  ["DRF's wording, translated", JSON.stringify({ detail: "Die Anfrage wurde gedrosselt." })],
+  [
+    "DRF's wording with a wait of None spelled out",
+    JSON.stringify({ detail: "Request was throttled. Expected available in None seconds." }),
+  ],
+  ["DRF's wording without its full stop", JSON.stringify({ detail: "Request was throttled" })],
+  ["the daily-cap wording as a bare string", JSON.stringify("Request was throttled.")],
+  ["a code that is not daily_cap", JSON.stringify({ detail: "Slow down.", code: "throttled" })],
 ] as const) {
   test(`any other 429 (${name}) is the one-minute limit`, async ({ page }) => {
     await page.route(CHAT_API, (route) => route.fulfill({ status: 429, body }));

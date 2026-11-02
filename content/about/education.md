@@ -6,6 +6,7 @@ org: "King Saud University — Riyadh"
 period: "Aug 2024 — Expected June 2028"
 tools: []
 summary: "Bachelor's in Information Systems at King Saud University, in the Data Science and Management track, started August 2024 and graduating June 2028 with a 4.7 out of 5.0 GPA. Outside coursework I lead a 7-person Innovation Lab team at the Future Technology Club, taking ideas through to projects the club and university actually run."
+title_ar: "التعليم"
 ---
 
 ## Degree and track

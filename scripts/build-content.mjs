@@ -25,6 +25,13 @@ function renderRecord(r) {
   return lines.join("\n");
 }
 
+// A record with no row on the page ships its title alone: the chat can still
+// cite it, and its source chip needs a name in the page's language.
+function renderTitleOnly(r) {
+  const ar = r.ar?.title ? `, ar: { title: ${s(r.ar.title)} }` : "";
+  return `  { id: ${s(r.id)}, title: ${s(r.title)}${ar} },`;
+}
+
 export function renderModule(corpus) {
   return `/**
  * GENERATED FILE — DO NOT EDIT.
@@ -72,6 +79,12 @@ ${corpus.byKind.experience.map(renderRecord).join("\n")}
 
 export const projects: WorkRecord[] = [
 ${corpus.byKind.projects.map(renderRecord).join("\n")}
+];
+
+/** The records the chat can cite that have no row on the page (the about and
+    faq records). Only their titles ship, for the answer's source chips. */
+export const offPageRecords: Pick<WorkRecord, "id" | "title" | "ar">[] = [
+${[...corpus.byKind.about, ...corpus.byKind.faq].map(renderTitleOnly).join("\n")}
 ];
 
 export const toolById = new Map(tools.map((tool) => [tool.id, tool]));

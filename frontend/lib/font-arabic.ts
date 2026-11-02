@@ -5,17 +5,15 @@ import { IBM_Plex_Sans_Arabic } from "next/font/google";
 // Latin names inside Arabic text in the same family instead of falling back to
 // another face.
 //
-// Not preloaded: Turbopack puts every @font-face in one CSS chunk shared by
-// both layouts, and Next then preloads every font in it on both pages, so `/`
-// fetched all eight Plex files (~197 KB) for text it never shows. Without the
-// preload, /ar fetches the files once its CSS asks for them, and `swap` shows
-// the size-matched fallback until they arrive.
+// Preloaded, on /ar only. Next preloads the fonts in a page's stylesheets, and
+// nothing in the English layout imports this file: `/` used to preload Plex
+// too because Turbopack's default CSS chunking merged these @font-face rules
+// into the stylesheet both layouts share. next.config.ts keeps them apart.
 const plexArabic = IBM_Plex_Sans_Arabic({
   variable: "--font-arabic",
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
-  preload: false,
 });
 
 export const arabicFontClass = plexArabic.variable;

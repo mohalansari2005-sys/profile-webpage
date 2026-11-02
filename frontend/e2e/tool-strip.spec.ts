@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { en } from "../messages/en";
 
+const CHAT_API = "http://chat.test/api/chat/";
+
 const strip = (page: Page) => page.locator(".tool-strip");
 const chips = (page: Page) => strip(page).getByRole("button");
 
@@ -84,11 +86,68 @@ test("Clear hands keyboard focus to the strip, without lighting a tool", async (
   await expect(chips(page).first()).toBeFocused();
 });
 
+test("with a citation lit, Clear stays while a chip is previewed, and Shift+Tab reaches it", async ({
+  page,
+}) => {
+  await page.route(CHAT_API, (route) =>
+    route.fulfill({
+      json: {
+        answer: "A booking platform.",
+        sources: [{ record_id: "proj-keyraa", title: "Keyraa" }],
+        refused: false,
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.locator("#ask-input").fill("What is Keyraa?");
+  await page.locator("#ask-input").press("Enter");
+  const clear = page.getByRole("button", { name: en.work.clear });
+  await expect(clear).toHaveCount(1);
+
+  // A preview hides the citation's highlight, not the citation: Clear stays.
+  const first = chips(page).first();
+  await first.hover();
+  await expect(page.locator("#work p[aria-live]")).toContainText((await first.textContent())!);
+  await expect(clear).toHaveCount(1);
+  await page.mouse.move(0, 0);
+  await first.focus();
+  await expect(page.locator("#work p[aria-live]")).toContainText((await first.textContent())!);
+  await expect(clear).toHaveCount(1);
+
+  // Clear sits just before the strip in tab order.
+  await page.keyboard.press("Shift+Tab");
+  await expect(clear).toBeFocused();
+});
+
+// Each faded edge of the strip and how far the focused chip stands from it,
+// in px. The fade covers the 3rem along an edge with more tags behind it.
+async function clearanceFromFade(page: Page) {
+  return strip(page).evaluate((el) => {
+    const chip = el.querySelector("button:focus")!.getBoundingClientRect();
+    const s = el.getBoundingClientRect();
+    const rtl = getComputedStyle(el).direction === "rtl";
+    const edge = el.dataset.edge;
+    // The start edge is the left in LTR and the right in RTL.
+    const fadedStart = edge === "start" || edge === "both";
+    const fadedEnd = edge === "end" || edge === "both";
+    const fadedLeft = rtl ? fadedEnd : fadedStart;
+    const fadedRight = rtl ? fadedStart : fadedEnd;
+    return [
+      ...(fadedLeft ? [chip.left - s.left] : []),
+      ...(fadedRight ? [s.right - chip.right] : []),
+    ];
+  });
+}
+
+const FADE = 48; // 3rem
+
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
 
   for (const path of ["/", "/ar"]) {
-    test(`tabbing through the strip on ${path} keeps each chip fully in view`, async ({ page }) => {
+    test(`tabbing through the strip on ${path} keeps each chip clear of the fade`, async ({
+      page,
+    }) => {
       await page.goto(path);
       await chips(page).first().focus();
       const count = await chips(page).count();
@@ -98,6 +157,11 @@ test.describe("on a phone", () => {
         const label = (await focused.textContent()) ?? "";
         expect(c!.x, label).toBeGreaterThanOrEqual(s!.x - 1);
         expect(c!.x + c!.width, label).toBeLessThanOrEqual(s!.x + s!.width + 1);
+        // Inside the strip is not enough: half under the fade it still reads
+        // as cut off. The faded edges are re-read after the strip scrolls.
+        await expect
+          .poll(async () => Math.min(FADE, ...(await clearanceFromFade(page))), { message: label })
+          .toBeGreaterThanOrEqual(FADE - 1);
         await page.keyboard.press("Tab");
       }
     });

@@ -86,6 +86,11 @@ export writes without an extension, and the security headers on every path.
 The only Content-Security-Policy is `frame-ancestors 'none'`: a `script-src`
 would also block the inline theme and language scripts in `<head>`.
 
+`frontend/app/favicon.ico` is the `/icon` image (`app/icon.tsx`) in an .ico
+container, for clients that fetch `/favicon.ico` regardless of the page's
+links. It is committed rather than built: after changing the icon, build the
+frontend, then run `npm run favicon` from the repo root.
+
 ### Server Components by default
 
 Everything under `frontend/app/` renders at build time. Sections with no
@@ -235,7 +240,8 @@ npm run dev
 An answer's `sources` are `record_id`s — the same keys the tool strip filters
 on — so citing a record lights its row in amber, and each source chip scrolls
 you to it. A cited record with no row on the page (`about-bio`, an faq) renders
-as an inert chip and dims nothing.
+as an inert chip and dims nothing; only its `title` and `title_ar` ship to the
+site (`offPageRecords` in `frontend/lib/content.ts`), to name that chip.
 
 There is **one active join at a time**, owned by `frontend/components/join-context.tsx`:
 asking a question releases a pinned tool, picking a tool releases the citation,
