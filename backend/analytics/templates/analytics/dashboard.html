@@ -338,6 +338,7 @@
       <li>Only browsers that run JavaScript are counted, which leaves out most bots; visitors with strict ad or tracker blockers may be missed too.</li>
       <li>Page views start on the day this shipped; there is no history before it. Chat numbers go back to the first logged question.</li>
       <li>Days run midnight to midnight in {{ stats.tz }}. "Questions refused" counts the bot declining a question; service errors (the AI provider was unavailable) are counted on their own and are not refusals.</li>
+      <li>Chat numbers, charts and the latest questions count only questions asked from the live site. Synthetic ones are left out: the daily canary and other scripted checks (no <code>Origin</code> header) and Vercel preview deployments. Previews send no page views either.</li>
       <li>To stop counting your own visits, open the site once with <code>?analytics=off</code> in that browser; <code>?analytics=on</code> undoes it.</li>
     </ul>
   </footer>

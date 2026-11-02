@@ -43,12 +43,14 @@ def view(ip="203.0.113.1", at=None, **fields):
     return row
 
 
-def chat(ip="203.0.113.1", at=None, refused=False, reason="", question="q", latency_ms=1200):
+def chat(ip="203.0.113.1", at=None, refused=False, reason="", question="q", latency_ms=1200,
+         unavailable=False, synthetic=False):
     from chat.models import ChatLog, hash_ip
 
     row = ChatLog.objects.create(ip_hash=hash_ip(ip), question=question, answer="a",
                                  refused=refused, refusal_reason=reason,
-                                 latency_ms=latency_ms, model="gpt-model")
+                                 latency_ms=latency_ms, model="gpt-model",
+                                 unavailable=unavailable, synthetic=synthetic)
     if at is not None:
         ChatLog.objects.filter(pk=row.pk).update(created_at=at)
     return row
@@ -188,7 +190,8 @@ def test_chat_metrics_come_from_the_chat_log(db, settings):
     view(ip="203.0.113.2", at=NOW)
     chat(ip="203.0.113.1", at=NOW)
     chat(ip="203.0.113.1", at=NOW, refused=True, reason="weather: unrelated")
-    chat(ip="203.0.113.9", at=NOW, refused=True, reason="generation unavailable")
+    chat(ip="203.0.113.9", at=NOW, refused=True, reason="generation unavailable",
+         unavailable=True)
     chat(ip="203.0.113.9", at=NOW - timedelta(days=30))  # outside the range
     totals = collect()["totals"]
     assert totals["chat_users"] == 2
@@ -308,14 +311,15 @@ def test_one_of_each_reads_in_the_singular(db, client, password):
 
 def test_service_errors_are_highlighted_only_when_there_are_some(db, client, password):
     assert 'data-alert="service-errors"' not in open_dashboard(client, password).content.decode()
-    chat(refused=True, reason="generation unavailable")
+    chat(refused=True, reason="generation unavailable", unavailable=True)
     assert 'data-alert="service-errors"' in open_dashboard(client, password).content.decode()
 
 
 def test_the_latest_questions_show_how_each_ended(db, client, password):
     chat(question="what did he build", latency_ms=1500)
     chat(question="weather?", refused=True, reason="weather: unrelated to him")
-    chat(question="and Majara?", refused=True, reason="generation unavailable")
+    chat(question="and Majara?", refused=True, reason="generation unavailable",
+         unavailable=True)
     html = open_dashboard(client, password).content.decode()
     for text in ("what did he build", "answered", "1.5 s",
                  "weather?", "refused", "weather: unrelated to him",
@@ -337,8 +341,8 @@ def test_a_full_outage_day_stays_amber_over_the_green(db, client, password):
     # Every question failed and each came from its own user, the 2026-10-23
     # pattern: amber covers the whole bar. Drawn under the green users bar it
     # showed only as two slivers at 90 days, so the amber must come last.
-    chat(ip="203.0.113.1", refused=True, reason="generation unavailable")
-    chat(ip="203.0.113.2", refused=True, reason="generation unavailable")
+    chat(ip="203.0.113.1", refused=True, reason="generation unavailable", unavailable=True)
+    chat(ip="203.0.113.2", refused=True, reason="generation unavailable", unavailable=True)
     html = open_dashboard(client, password, "?days=90").content.decode()
     today = html.split('<g class="day">')[-1]  # the chat chart's last bar
     assert 'class="inner"' in today
@@ -357,12 +361,71 @@ def test_visitor_supplied_strings_are_escaped(db, client, password):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
 
-def test_every_outage_label_chat_writes_is_a_service_error(db):
-    """chat logs three, one per call that can fail. None of them is the bot
+def test_service_errors_are_counted_by_the_flag_not_the_wording(db):
+    """ChatLog.unavailable is what chat sets when the provider fails. A
+    refusal whose reason happens to end in "unavailable" is still the bot
     declining."""
     for reason in ("condense unavailable", "generation unavailable", "retrieval unavailable"):
-        chat(refused=True, reason=reason)
+        chat(refused=True, reason=reason, unavailable=True)
+    chat(refused=True, reason="general: that product is unavailable")
     chat(refused=True, reason="general: weather")
     stats = collect(30)
-    assert (stats["totals"]["service_errors"], stats["totals"]["refused"]) == (3, 1)
+    assert (stats["totals"]["service_errors"], stats["totals"]["refused"]) == (3, 2)
+    assert stats["daily"][-1]["service_errors"] == 3
     assert [q["outcome"] for q in stats["latest"]].count("service error") == 3
+
+
+def test_synthetic_questions_are_left_out_of_every_chat_number(db):
+    """The canary asks every day; counted, it would be a chatbot user every
+    day and, during an outage, a service error a day of its own."""
+    view(ip="203.0.113.1", at=NOW)
+    chat(ip="203.0.113.1", at=NOW, question="from the live site")
+    chat(ip="198.51.100.5", at=NOW, question="What is Keyraa?", synthetic=True)
+    chat(ip="198.51.100.5", at=NOW, refused=True, reason="generation unavailable",
+         unavailable=True, synthetic=True)
+    chat(ip="203.0.113.1", at=NOW - timedelta(days=200), synthetic=True)  # all time, too
+    stats = collect()
+    t = stats["totals"]
+    assert (t["chat_users"], t["questions"], t["service_errors"]) == (1, 1, 0)
+    assert t["visitors_who_chatted"] == 1
+    today = stats["daily"][-1]
+    assert (today["chat_users"], today["questions"], today["service_errors"]) == (1, 1, 0)
+    assert (stats["all_time"]["chat_users"], stats["all_time"]["questions"]) == (1, 1)
+    assert stats["all_time"]["first_question"] == NOW.date()
+    assert [q["question"] for q in stats["latest"]] == ["from the live site"]
+
+
+def test_the_footer_says_synthetic_questions_are_left_out(db, client, password):
+    html = open_dashboard(client, password).content.decode()
+    assert "Synthetic ones are left out" in html
+
+
+@pytest.mark.parametrize("part, whole, shown", [
+    (0, 0, "–"),
+    (0, 10, "0%"),
+    (1, 1000, "<1%"),
+    (1, 3, "33%"),
+    (989, 1000, "99%"),
+    (199, 200, ">99%"),  # 99.5%: rounded, it would claim everyone
+    (999, 1000, ">99%"),
+    (10, 10, "100%"),
+])
+def test_shares_never_round_to_none_or_all(part, whole, shown):
+    from analytics.stats import _share
+
+    assert _share(part, whole) == shown
+
+
+@pytest.mark.parametrize("days", [7, 365])
+def test_the_dashboard_runs_the_same_queries_however_much_data(db, days, django_assert_num_queries):
+    """One query per aggregate, never one per day, row or breakdown value:
+    totals (2), the visitors-who-chatted join, daily (2), all time with the
+    first days folded in (2), six breakdowns and the latest questions."""
+    with django_assert_num_queries(14):
+        collect(days)
+    for i in range(30):
+        view(ip=f"203.0.113.{i}", at=NOW - timedelta(days=i), path=f"/p{i % 3}")
+        chat(ip=f"203.0.113.{i}", at=NOW - timedelta(days=i), refused=i % 2 == 0,
+             unavailable=i % 5 == 0, synthetic=i % 7 == 0)
+    with django_assert_num_queries(14):
+        collect(days)

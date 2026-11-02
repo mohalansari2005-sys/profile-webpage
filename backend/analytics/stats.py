@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
-from django.db.models import Count, Q
+from django.db.models import Count, Min, Q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
@@ -18,16 +18,10 @@ from chat.models import ChatLog
 RANGES = (7, 30, 90, 365)
 DEFAULT_DAYS = 30
 
-# What chat logs for a turn the AI provider failed: "condense unavailable",
-# "generation unavailable" (the gate or generate) and "retrieval unavailable"
-# (the embedding). Kept apart from refusals: on 2026-10-23 a retired model made
-# every question fail this way for ten days, and as "refused" it looked like
-# visitors asking off-topic.
-SERVICE_ERROR = Q(refusal_reason__endswith=" unavailable")
-
-
-def _is_service_error(reason: str) -> bool:
-    return reason.endswith(" unavailable")
+# A turn the AI provider failed (ChatLog.unavailable). Kept apart from
+# refusals: on 2026-10-23 a retired model made every question fail for ten
+# days, and as "refused" it looked like visitors asking off-topic.
+SERVICE_ERROR = Q(unavailable=True)
 
 BREAKDOWN_ROWS = 10
 LATEST_QUESTIONS = 25
@@ -61,7 +55,7 @@ def collect(days: int, now: datetime | None = None) -> dict:
     day_list = [first + timedelta(days=i) for i in range(days)]
 
     views = PageView.objects.filter(created_at__gte=start, created_at__lt=end)
-    chats = ChatLog.objects.filter(created_at__gte=start, created_at__lt=end)
+    chats = _visitor_chats().filter(created_at__gte=start, created_at__lt=end)
     totals = _totals(views, chats)
     daily = _daily(views, chats, tz, day_list)
     all_time = _all_time(tz)
@@ -88,9 +82,17 @@ def collect(days: int, now: datetime | None = None) -> dict:
                             "{service_errors} service errors",
                    since=all_time["first_question"]),
         ],
-        "breakdowns": _breakdowns(views),
+        "breakdowns": _breakdowns(views, totals["page_views"]),
         "latest": _latest(tz),
     }
+
+
+def _visitor_chats():
+    """Questions from the live site. The canary, curl checks and Vercel
+    previews (ChatLog.synthetic) are left out of every chat number, chart and
+    the latest list: a daily canary question would otherwise be a chatbot
+    "user" every day."""
+    return ChatLog.objects.filter(synthetic=False)
 
 
 def _totals(views, chats) -> dict:
@@ -146,11 +148,10 @@ def _tiles(t: dict) -> list[dict]:
 
 def _all_time(tz) -> dict:
     v = PageView.objects.aggregate(visitors=Count("ip_hash", distinct=True),
-                                   page_views=Count("id"))
-    c = ChatLog.objects.aggregate(chat_users=Count("ip_hash", distinct=True),
-                                  questions=Count("id"))
-    first_view = PageView.objects.order_by("created_at").values_list("created_at", flat=True).first()
-    first_question = ChatLog.objects.order_by("created_at").values_list("created_at", flat=True).first()
+                                   page_views=Count("id"), first=Min("created_at"))
+    c = _visitor_chats().aggregate(chat_users=Count("ip_hash", distinct=True),
+                                   questions=Count("id"), first=Min("created_at"))
+    first_view, first_question = v.pop("first"), c.pop("first")
     return {
         **v, **c,
         # Two dates, not one: the chat has logged since it launched, page views
@@ -201,7 +202,9 @@ def _chart(daily, title, outer, inner, describe, highlight=(None, ""), since=Non
     }
 
 
-def _breakdowns(views) -> list[dict]:
+def _breakdowns(views, total: int) -> list[dict]:
+    """Top values per field. `total` is the range's page views, already
+    counted for the tiles."""
     fields = [
         ("Pages", "path", "/"),
         ("Referrers", "referrer_host", "(direct or internal)"),
@@ -210,7 +213,6 @@ def _breakdowns(views) -> list[dict]:
         ("Devices", "device", "(unknown)"),
         ("Browsers", "browser", "(unknown)"),
     ]
-    total = views.count()
     out = []
     for title, field, blank in fields:
         rows = (views.values(field)
@@ -227,8 +229,8 @@ def _breakdowns(views) -> list[dict]:
 
 def _latest(tz) -> list[dict]:
     rows = []
-    for log in ChatLog.objects.order_by("-created_at")[:LATEST_QUESTIONS]:
-        if _is_service_error(log.refusal_reason):
+    for log in _visitor_chats().order_by("-created_at")[:LATEST_QUESTIONS]:
+        if log.unavailable:
             outcome = "service error"
         elif log.refused:
             outcome = "refused"
@@ -279,6 +281,9 @@ def _share(part: int, whole: int) -> str:
     if not whole:
         return "–"
     pct = 100 * part / whole
+    # Rounded, these would read 0% and 100%: "none" and "all" when it is not.
     if 0 < pct < 1:
         return "<1%"
+    if 99.5 <= pct < 100:
+        return ">99%"
     return f"{round(pct)}%"
