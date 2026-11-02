@@ -183,7 +183,11 @@ content.
 So it checks geometry synchronously on mount and reveals anything already at or
 above the fold, independent of the observer, and the observer's oversized top
 `rootMargin` covers jumps that happen later. A `<noscript>` rule in the layout
-handles the JS-disabled case. All three parts are load-bearing.
+handles the JS-disabled case, and a watchdog script in `site-head.tsx` handles
+JS that is on but never ran the reveal (a blocked or failed chunk): if `<Reveal>`
+has not marked `<html>` two seconds after load, everything is shown. Printing
+is the last case: paper is laid out without scrolling, so a `@media print` rule
+in `globals.css` shows every block. All of these parts are load-bearing.
 
 ## The chat backend
 

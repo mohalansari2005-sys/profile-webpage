@@ -15,15 +15,21 @@ type RevealProps = {
  *
  * Uses a ref callback rather than an effect so the observer attaches exactly
  * when the node does. Where IntersectionObserver is unavailable the content
- * shows immediately, and a <noscript> rule in the layout covers the
- * JS-disabled case — nothing is ever left hidden. Motion itself is disabled
- * in CSS under prefers-reduced-motion.
+ * shows immediately. Three fallbacks live outside this file: a <noscript> rule
+ * in the layout covers the JS-disabled case, a watchdog in site-head.tsx covers
+ * JS that is on but never ran this (it waits for the `data-reveal-ready` mark
+ * set below), and a print rule in globals.css covers paper. Motion itself is
+ * disabled in CSS under prefers-reduced-motion.
  */
 export function Reveal({ children, delay = 0, className }: RevealProps) {
   const [revealed, setRevealed] = useState(false);
 
   const observe = useCallback((element: HTMLDivElement | null) => {
     if (!element) return;
+
+    // Tells the watchdog the reveal script is alive, so it leaves the
+    // scroll reveal alone.
+    document.documentElement.dataset.revealReady = "";
 
     if (typeof IntersectionObserver === "undefined") {
       setRevealed(true);

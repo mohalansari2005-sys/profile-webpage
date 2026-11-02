@@ -282,6 +282,14 @@
   transform: none;
 }
 
+/* Set on <html> by the watchdog in site-head.tsx when JS is on but <Reveal>
+   never came alive (a chunk blocked or failed to load): nothing would ever
+   reveal, so show everything instead, as the <noscript> rule does. */
+.reveal-fallback .reveal {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 /* Content on the deep surface re-derives the palette against navy instead of
    paper — same roles, ground-appropriate values, all measured against
    #0F1626: foreground 13.73:1, dim 4.86:1, signal 7.71:1, match 9.85:1.
@@ -385,5 +393,23 @@ html[lang="ar"] {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Printing lays the page out again without scrolling it, so every block the
+   reader had not yet scrolled to would print at opacity 0: a PDF of the page
+   was the hero and a run of empty bands. Paper gets the finished state. */
+@media print {
+  .reveal,
+  .field-in {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .rule-draw {
+    transform: none !important;
+    animation: none !important;
   }
 }
