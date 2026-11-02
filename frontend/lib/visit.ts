@@ -18,9 +18,10 @@ function visitUrl(chatUrl: string | undefined): string | null {
 
 /**
  * Set on <html> by site-head.tsx's script just before it sends a returning
- * Arabic reader from / on to /ar. A browser may keep running / until /ar
- * arrives, and its beacon would then count the visit a second time; /ar
- * counts it instead.
+ * Arabic reader from / on to /ar; /ar counts the visit. A guard: Chromium,
+ * Firefox and WebKit all stop running / once the redirect starts (seen under
+ * Playwright), but a browser that kept running it until /ar arrived would
+ * send its beacon too and count the visit twice.
  */
 export const REDIRECTING = "data-redirecting";
 

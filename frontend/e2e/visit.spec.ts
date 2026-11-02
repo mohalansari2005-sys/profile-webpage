@@ -97,7 +97,11 @@ test("?analytics=off stops this browser counting, ?analytics=on resumes it", asy
 // (site-head.tsx). That redirect used to drop the query.
 test.describe("a returning Arabic reader who opens /", () => {
   test.beforeEach(async ({ page }) => {
+    // /ar's own beacon is waited for too: arriving late in WebKit, it was
+    // once recorded as the test's visit.
+    const setup = await recordVisits(page);
     await page.goto("/ar");
+    await expect.poll(() => setup.visits.length).toBe(1);
     await expect.poll(() => page.evaluate(() => localStorage.getItem("lang"))).toBe("ar");
   });
 
@@ -113,10 +117,11 @@ test.describe("a returning Arabic reader who opens /", () => {
   test("can still switch analytics off", async ({ page }) => {
     const { visits } = await recordVisits(page);
     await page.goto("/?analytics=off");
-    await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("analytics")))
-      .toBe("off");
+    // The URL first: WebKit can return from goto while / is still leaving,
+    // and an evaluate there fails with the page. The switch leaves the URL
+    // only once /ar has read it, so the flag is stored by then.
     await expect(page).toHaveURL((url) => /^\/ar\/?$/.test(url.pathname) && url.search === "");
+    expect(await page.evaluate(() => localStorage.getItem("analytics"))).toBe("off");
     await page.waitForTimeout(QUIET_MS);
     expect(visits).toHaveLength(0);
   });
@@ -129,10 +134,11 @@ test.describe("a returning Arabic reader who opens /", () => {
     expect(visits.map((v) => v.path)).toEqual(["/ar"]);
   });
 
-  // Chromium stops running / the moment the redirect starts, so the test above
-  // passes there with or without the mark; a browser that lets / carry on
-  // until /ar arrives would send a beacon for each. These two check the mark
-  // itself: the head script sets it, and the beacon stays silent under it.
+  // Under Playwright, Chromium, Firefox and WebKit all stop running / once the
+  // redirect starts, so the test above passes with or without the mark: the
+  // double count was never seen. The mark guards a browser that lets / carry
+  // on until /ar arrives. These two check it directly: the head script sets
+  // it, and the beacon stays silent under it.
   test("is marked as leaving before / is redirected", async ({ page }) => {
     // A 204 cancels the navigation to /ar, so the / page is still there to
     // inspect.
@@ -152,10 +158,14 @@ test.describe("a returning Arabic reader who opens /", () => {
 test("a page marked as leaving sends no beacon", async ({ page }) => {
   const { visits } = await recordVisits(page);
   // Set the mark the way the head script does, on a page that then stays.
+  // Firefox runs init scripts once <html> exists; Chromium and WebKit run
+  // them before, so there the mark waits for it.
   await page.addInitScript((mark) => {
+    const set = () => document.documentElement.setAttribute(mark, "");
+    if (document.documentElement) return set();
     new MutationObserver((_, observer) => {
       if (!document.documentElement) return;
-      document.documentElement.setAttribute(mark, "");
+      set();
       observer.disconnect();
     }).observe(document, { childList: true });
   }, REDIRECTING);
