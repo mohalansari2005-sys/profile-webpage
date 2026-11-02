@@ -9,6 +9,7 @@ from chat.graph.build import build_graph
 from chat.ip import client_ip
 from chat.models import hash_ip
 from chat.openai_client import turn_budget
+from chat.origin import live_site
 from chat.serializers import ChatRequestSerializer
 from chat.throttling import ChatRateThrottle, GlobalDailyThrottle
 
@@ -20,10 +21,10 @@ GRAPH = build_graph()
 def synthetic(request) -> bool:
     """True for a question that did not come from the live site: the daily
     canary and curl checks send no Origin, a Vercel preview sends its own. Only
-    the exact production origins count as real, not the *.vercel.app pattern
-    CORS also lets through. The turn is answered as usual; the dashboard just
-    leaves it out of the numbers."""
-    return request.META.get("HTTP_ORIGIN", "") not in settings.CORS_ALLOWED_ORIGINS
+    CORS_ALLOWED_ORIGINS count as real (chat/origin.py), not the *.vercel.app
+    pattern CORS also lets through. The turn is answered as usual; the
+    dashboard just leaves it out of the numbers."""
+    return not live_site(request.META.get("HTTP_ORIGIN", ""))
 
 
 class ChatView(APIView):

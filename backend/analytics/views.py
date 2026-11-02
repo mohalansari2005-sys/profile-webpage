@@ -14,12 +14,14 @@ from rest_framework.fields import empty
 from rest_framework.negotiation import DefaultContentNegotiation
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
+from rest_framework.utils import json
 from rest_framework.views import APIView
 
 from analytics import stats
 from analytics.models import PageView
 from chat.ip import client_ip
 from chat.models import hash_ip
+from chat.origin import live_site
 from chat.throttling import ChatRateThrottle
 
 logger = logging.getLogger(__name__)
@@ -87,13 +89,6 @@ def host_of(url: str) -> str:
         return ""
 
 
-def origin_allowed(origin: str) -> bool:
-    # The live site's exact origins only. CORS also lets *.vercel.app through
-    # so previews can talk to the chat, but a preview's page views are QA, not
-    # visitors (the chat logs them as synthetic for the same reason).
-    return origin in settings.CORS_ALLOWED_ORIGINS
-
-
 def country_of(request) -> str:
     # Only set when Cloudflare proxies the domain (DEPLOYMENT.md allows it).
     # "XX" is Cloudflare for "unknown"; "T1" (Tor) fails the letters check.
@@ -136,7 +131,24 @@ class VisitSerializer(serializers.Serializer):
     source = OptionalText()
 
 
-class PlainTextJSONParser(JSONParser):
+class BeaconJSONParser(JSONParser):
+    """DRF's JSONParser, minus the charset: the body is read as bytes, the way
+    json.loads reads them (UTF-8, or UTF-16/32 by its own detection), whatever
+    the Content-Type names. DRF decodes with the named charset, and before
+    3.18.2 it took any codec Python has: rot13, zlib and bz2 then raise errors
+    that are not a ParseError -- a 500 and a traceback per beacon -- and the
+    last two decompress the body first. pyproject allows 3.15, and the
+    production image keeps whichever release it was built with."""
+
+    def parse(self, stream, media_type=None, parser_context=None):
+        parse_constant = json.strict_constant if self.strict else None
+        try:
+            return json.loads(stream.read(), parse_constant=parse_constant)
+        except ValueError as exc:  # bad JSON, or bytes that are not UTF-8/16/32
+            raise ParseError(f"JSON parse error - {exc}") from exc
+
+
+class PlainTextJSONParser(BeaconJSONParser):
     """JSON sent as text/plain, the type navigator.sendBeacon can send
     cross-origin without a CORS preflight."""
 
@@ -155,8 +167,12 @@ def page_view_from(request) -> PageView | None:
     ua = request.META.get("HTTP_USER_AGENT", "")
     if not ua or BOT_UA.search(ua):
         return None
+    # The live site's origins only (chat/origin.py). CORS also lets
+    # *.vercel.app through so previews can talk to the chat, but a preview's
+    # page views are QA, not visitors (the chat logs them as synthetic for the
+    # same reason).
     origin = request.META.get("HTTP_ORIGIN", "")
-    if origin and not origin_allowed(origin):
+    if origin and not live_site(origin):
         return None
     # Checked before anything reads the body. The parser reads no further than
     # this length, so it is also the cap on what is read.
@@ -165,8 +181,10 @@ def page_view_from(request) -> PageView | None:
     try:
         body = request.data
     except (ParseError, UnsupportedMediaType, RecursionError):
-        # Not JSON, not a type the beacon sends, or nested past Python's
-        # recursion limit ("[[[[..." fits easily in MAX_BODY).
+        # Not JSON, not a type the beacon sends, or nested past the recursion
+        # limit. CPython's C scanner parses the deepest nesting MAX_BODY
+        # allows (checked on 3.12 and 3.14); its pure-Python fallback does
+        # not, so the catch stays for a build without the C one.
         return None
     visit = VisitSerializer(data=body)
     if not visit.is_valid():
@@ -205,7 +223,7 @@ class VisitView(APIView):
     """POST /api/visit/ -- one page view, sent by the frontend's beacon.
 
     The body is JSON, sent as text/plain by the beacon (PlainTextJSONParser)
-    or as application/json by anything else.
+    or as application/json by anything else (BeaconJSONParser).
 
     Every answer is an empty 204, stored or not, so a caller cannot learn what
     is filtered; only the throttle answers differently (429).
@@ -214,7 +232,7 @@ class VisitView(APIView):
     authentication_classes = []
     permission_classes = []
     content_negotiation_class = IgnoreAccept
-    parser_classes = [JSONParser, PlainTextJSONParser]
+    parser_classes = [BeaconJSONParser, PlainTextJSONParser]
     throttle_scope = "visit"
     # ChatRateThrottle is keyed on client_ip and reads the rate for the view's
     # own throttle_scope, so it serves here unchanged. The chat's

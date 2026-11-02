@@ -189,9 +189,31 @@ def test_the_live_sites_origin_is_stored(db, api, site):
     assert len(stored()) == 1
 
 
+@pytest.mark.parametrize("listed", [
+    " https://www.example.dev",  # CORS_ORIGINS="https://example.dev, https://www.example.dev"
+    "HTTPS://www.example.dev",
+])
+def test_the_live_site_is_matched_the_way_cors_matches_it(db, api, settings, listed):
+    # django-cors-headers compares scheme and host after urlsplit, so either
+    # spelling keeps the chat working; an exact string match then dropped
+    # every real page view without a word.
+    settings.CORS_ALLOWED_ORIGINS = ["https://example.dev", listed]
+    beacon(api, {"path": "/"}, HTTP_ORIGIN="https://www.example.dev")
+    assert len(stored()) == 1
+
+
+def test_a_null_origin_is_not_the_live_site(db, api, settings):
+    # A sandboxed page or a local file sends "Origin: null". A blank entry
+    # ("a, ,b" in CORS_ORIGINS) parses to no scheme and no host either, and
+    # must not make it count.
+    settings.CORS_ALLOWED_ORIGINS = ["https://example.dev", " "]
+    beacon(api, {"path": "/"}, HTTP_ORIGIN="null")
+    assert stored() == []
+
+
 def test_a_preview_deployment_is_ignored(db, api, site):
     # CORS lets *.vercel.app talk to the chat; its page views are QA, not
-    # visitors, so the beacon takes only the live site's exact origins.
+    # visitors, so the beacon takes only the live site's listed origins.
     r = beacon(api, {"path": "/"}, HTTP_ORIGIN="https://profile-webpage-git-feat-x.vercel.app")
     assert r.status_code == 204
     assert stored() == []
@@ -248,17 +270,55 @@ def test_an_overlong_path_is_ignored_and_an_overlong_source_dropped(db, api):
 
 
 def test_deeply_nested_json_is_ignored_not_a_500(db, api):
-    # Fits in the body cap and can pass Python's recursion limit while parsing.
+    # About as deep as the body cap allows. CPython's C scanner parses it
+    # (checked on 3.12 and 3.14), so this is a smoke test: it is
+    # dropped because a list is not a visit. The test below forces the
+    # RecursionError a build without the C scanner would raise.
     r = beacon(api, "[" * 4000 + "]" * 4000)
     assert r.status_code == 204
     assert stored() == []
 
 
-def test_a_form_body_is_ignored(db, api):
-    r = api.post("/api/visit/", "path=/ar", content_type="application/x-www-form-urlencoded",
+def test_json_nested_past_the_recursion_limit_is_ignored_not_a_500(db, api, monkeypatch):
+    from analytics import views
+
+    def too_deep(*args, **kwargs):
+        raise RecursionError("maximum recursion depth exceeded")
+
+    monkeypatch.setattr(views.BeaconJSONParser, "parse", too_deep)
+    r = beacon(api, {"path": "/"})
+    assert r.status_code == 204
+    assert stored() == []
+
+
+@pytest.mark.parametrize("body", [
+    "path=/ar",
+    # Valid JSON, so this one fails if the JSON parser is picked whatever the
+    # Content-Type (as DRF's recipe for ignoring Accept would pick it).
+    json.dumps({"path": "/ar"}),
+])
+def test_a_form_body_is_ignored(db, api, body):
+    r = api.post("/api/visit/", body, content_type="application/x-www-form-urlencoded",
                  HTTP_USER_AGENT=CHROME_DESKTOP)
     assert r.status_code == 204
     assert stored() == []
+
+
+@pytest.mark.parametrize("content_type", [
+    "text/plain; charset=utf-16",
+    "text/plain; charset=rot13",
+    "text/plain; charset=zlib",
+    "text/plain; charset=bz2",
+    "application/json; charset=rot13",
+])
+def test_the_charset_in_the_content_type_is_ignored(db, api, content_type):
+    # The beacon only ever sends UTF-8. DRF decodes with the named charset,
+    # and before 3.18.2 it took any codec: rot13, zlib and bz2 raised errors
+    # that were a 500 per beacon. Read as bytes, the body is the same visit.
+    r = api.post("/api/visit/", json.dumps({"path": "/ar"}), content_type=content_type,
+                 HTTP_USER_AGENT=CHROME_DESKTOP)
+    assert r.status_code == 204
+    assert [v.path for v in stored()] == ["/ar"]
 
 
 def test_a_body_too_big_for_django_is_ignored_without_reading_it(db, api, settings):
