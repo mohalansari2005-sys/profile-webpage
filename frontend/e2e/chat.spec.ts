@@ -139,6 +139,14 @@ test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
   await expect(page.locator("#ask-input")).toBeFocused();
 });
 
+test("the backend's explicit daily_cap code is read before DRF's wording", async ({ page }) => {
+  await page.route(CHAT_API, (route) => route.fulfill({ status: 429, json: {
+    detail: "Request was throttled. Expected available in 42 seconds.", code: "daily_cap" } }));
+  await page.goto("/");
+  await ask(page, "Anything?");
+  await expect(page.getByText(en.ask.errors.dailyCap)).toBeVisible();
+});
+
 test("after an error, focus lands on Try again, and again when the retry fails", async ({ page }) => {
   await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
   await page.goto("/");

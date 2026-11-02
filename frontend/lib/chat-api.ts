@@ -67,8 +67,9 @@ function parseAnswer(value: unknown): ChatAnswer | null {
   };
 }
 
-/** Tells the two 429s apart by DRF's own body, which is all the backend
-    sends, always in English (it has no LocaleMiddleware). The per-visitor
+/** Tells the two 429s apart. The backend marks the daily cap with
+    `code: "daily_cap"`; until that deploys, and as a fallback, DRF's own
+    body, always in English (it has no LocaleMiddleware). The per-visitor
     limit always knows its wait, so its `detail` reads "Request was
     throttled. Expected available in 42 seconds."; the daily cap has none to
     give (GlobalDailyThrottle.wait() is None) and stops at "Request was
@@ -78,7 +79,8 @@ async function isDailyCap(response: Response): Promise<boolean> {
   try {
     const body: unknown = await response.json();
     if (typeof body !== "object" || body === null) return false;
-    const detail = (body as Record<string, unknown>).detail;
+    const { code, detail } = body as Record<string, unknown>;
+    if (code === "daily_cap") return true;
     return typeof detail === "string" && !detail.includes("Expected available");
   } catch {
     return false;
