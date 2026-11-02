@@ -1,7 +1,6 @@
-from datetime import date
-
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.throttling import BaseThrottle, ScopedRateThrottle
 
 from chat.ip import client_ip
@@ -34,7 +33,9 @@ class GlobalDailyThrottle(BaseThrottle):
 
     def allow_request(self, request, view):
         cap = settings.CHAT_DAILY_CAP
-        key = f"chat:daily:{date.today().isoformat()}"
+        # The date in TIME_ZONE (Riyadh), said outright rather than left to
+        # the process clock that Django happens to set from it.
+        key = f"chat:daily:{timezone.localdate().isoformat()}"
         used = cache.get_or_set(key, 0, timeout=60 * 60 * 48)
         if used >= cap:
             return False

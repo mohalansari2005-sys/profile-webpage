@@ -193,3 +193,22 @@ def test_a_refund_never_takes_the_counter_below_zero():
     assert cache.get("chat:daily:test") == 0
     GlobalDailyThrottle.refund(SimpleNamespace(chat_daily_key="chat:daily:gone"))
     GlobalDailyThrottle.refund(SimpleNamespace())
+
+
+def test_the_daily_cap_resets_at_riyadh_midnight(settings):
+    """Unset, TIME_ZONE is Django's default, America/Chicago: the "daily" cap
+    rolled over at 08:00 or 09:00 in Riyadh."""
+    assert settings.TIME_ZONE == "Asia/Riyadh"
+
+
+def test_the_daily_counter_is_keyed_on_the_configured_zone_s_date(db, settings, stub_graph):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    # UTC+14 and UTC-11 are never on the same date.
+    for zone in ("Pacific/Kiritimati", "Pacific/Pago_Pago"):
+        cache.clear()
+        settings.TIME_ZONE = zone
+        APIClient().post("/api/chat/", {"question": "q"}, format="json")
+        today = datetime.now(ZoneInfo(zone)).date().isoformat()
+        assert cache.get(f"chat:daily:{today}") == 1

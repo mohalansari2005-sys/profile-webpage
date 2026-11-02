@@ -185,7 +185,9 @@ choose.
 The daily cap was sized against a free-tier daily quota. OpenAI is billed per
 token, not capped, so this counter is now the **spend** limit — it is the only
 thing between a scripted abuser and a real bill. Size it against what you are
-willing to pay per day, not against a quota.
+willing to pay per day, not against a quota. The day is Riyadh's
+(`TIME_ZONE = "Asia/Riyadh"`): the cap resets at midnight there, while
+`ChatLog.created_at` is stored in UTC like every timestamp.
 
 The counter counts requests, not tokens, so each call also caps its output:
 `MAX_TOKENS_FAST` (1000) for `condense` and `relevance`, `MAX_TOKENS_GENERATE`

@@ -132,3 +132,7 @@ LOGGING = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
+# The local day, for the daily cap: it resets at midnight in Riyadh. Unset,
+# Django's default America/Chicago rolled it over at 08:00-09:00 Riyadh time.
+# Timestamps are still stored in UTC (USE_TZ).
+TIME_ZONE = "Asia/Riyadh"
