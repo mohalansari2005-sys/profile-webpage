@@ -48,8 +48,8 @@ orphans — re-running costs nothing when the corpus has not moved.
 
 A request runs through `condense → relevance → retrieve → generate → log`.
 Grounding is enforced in Python: if the model cites a chunk id retrieval did
-not return, or reports insufficient context, the answer is replaced with a
-refusal before it leaves the server.
+not return, cites nothing at all, or reports insufficient context, the answer
+is replaced with a refusal before it leaves the server.
 
 ## One provider, two models
 

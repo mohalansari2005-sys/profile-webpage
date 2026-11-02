@@ -42,6 +42,22 @@ def test_an_invented_chunk_id_becomes_a_refusal(monkeypatch):
     assert "startup in Dubai" not in out["answer"]
 
 
+def test_an_answer_that_cites_nothing_becomes_a_refusal(monkeypatch):
+    """The empty set is a subset of every set, so the invented-id check alone
+    let an answer citing nothing through -- the cheapest output for an
+    off-corpus or injected answer."""
+    from chat.graph.nodes import generate as node
+
+    monkeypatch.setattr(node, "structured", _fake(_answer(
+        answer="Here is a quicksort in Python...", used_chunk_ids=[], sufficient=True,
+    )))
+    out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
+    assert out["refused"] is True
+    assert out["refusal_reason"] == "ungrounded citation"
+    assert "quicksort" not in out["answer"]
+    assert out["sources"] == []
+
+
 def test_sufficient_false_becomes_a_refusal(monkeypatch):
     from chat.graph.nodes import generate as node
 
