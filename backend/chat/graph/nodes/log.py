@@ -26,5 +26,7 @@ def log(state: ChatState) -> dict:
         # The model that actually decided this turn: the gate refuses on the
         # fast model without ever reaching generate.
         model=state.get("model") or settings.OPENAI_MODEL,
+        unavailable=bool(state.get("unavailable")),
+        synthetic=bool(state.get("synthetic")),
     )
     return {}

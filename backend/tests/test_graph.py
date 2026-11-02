@@ -70,6 +70,23 @@ def test_out_of_scope_question_skips_retrieval_but_still_logs(db, stub_nodes, mo
     assert row.refused is True
     assert row.refusal_reason == "general: weather"
     assert row.retrieved_chunk_ids == []
+    # Declining a question is not an outage.
+    assert row.unavailable is False
+
+
+@pytest.mark.parametrize("synthetic", [True, False])
+def test_the_view_s_synthetic_flag_reaches_the_log_row(db, stub_nodes, monkeypatch, synthetic):
+    """LangGraph drops input keys the state does not declare, so this checks
+    the flag survives the trip from the view to the row."""
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (Relevance(subject="general", reason="weather"), {}))
+    build_graph().invoke({"question": "weather in Riyadh", "history": [], "ip_hash": "h" * 64,
+                          "started_at": 0.0, "synthetic": synthetic})
+    assert ChatLog.objects.get().synthetic is synthetic
 
 
 def test_the_log_row_never_holds_a_raw_ip(db, stub_nodes, monkeypatch):
@@ -209,7 +226,10 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
     out = build_graph().invoke({"question": "What is Keyraa?", "history": [],
                                 "ip_hash": "h" * 64, "started_at": 0.0})
     assert out["unavailable"] is True
-    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+    row = ChatLog.objects.get()
+    assert row.refusal_reason == "generation unavailable"
+    # The flag the dashboard counts outages by, not the wording above.
+    assert row.unavailable is True
 
 
 def _condense_fails(stub_nodes, monkeypatch):

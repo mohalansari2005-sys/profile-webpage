@@ -17,6 +17,15 @@ from chat.throttling import ChatRateThrottle, GlobalDailyThrottle
 GRAPH = build_graph()
 
 
+def synthetic(request) -> bool:
+    """True for a question that did not come from the live site: the daily
+    canary and curl checks send no Origin, a Vercel preview sends its own. Only
+    the exact production origins count as real, not the *.vercel.app pattern
+    CORS also lets through. The turn is answered as usual; the dashboard just
+    leaves it out of the numbers."""
+    return request.META.get("HTTP_ORIGIN", "") not in settings.CORS_ALLOWED_ORIGINS
+
+
 class ChatView(APIView):
     throttle_scope = "chat"
     # Per-IP first, and the first refusal ends the check (below), so a request
@@ -42,6 +51,7 @@ class ChatView(APIView):
                 "history": [dict(m) for m in data["history"]],
                 "ip_hash": hash_ip(client_ip(request)),
                 "started_at": time.monotonic(),
+                "synthetic": synthetic(request),
             })
 
         if result.get("unavailable"):

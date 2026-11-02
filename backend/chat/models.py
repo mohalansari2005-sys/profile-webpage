@@ -38,3 +38,11 @@ class ChatLog(models.Model):
     completion_tokens = models.IntegerField(null=True, blank=True)
     latency_ms = models.IntegerField()
     model = models.CharField(max_length=60)
+    # The AI provider failed this turn, not the question (the graph's
+    # `unavailable`). A column of its own so an outage is counted by what
+    # happened, not by matching the wording of refusal_reason.
+    unavailable = models.BooleanField(default=False)
+    # Not a visitor on the live site: the daily canary and curl checks send no
+    # Origin, a Vercel preview sends its own. Answered and logged like any
+    # turn, but left out of the dashboard's numbers.
+    synthetic = models.BooleanField(default=False)
