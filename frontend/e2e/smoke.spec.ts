@@ -36,3 +36,22 @@ test("the contact list is a valid description list", async ({ page }) => {
   await expect(page.locator("#contact dl > div > dt")).toHaveCount(3);
   await expect(page.locator("#contact dl > div > dd")).toHaveCount(3);
 });
+
+// One page per test: visiting /ar remembers the language, and a later visit
+// to / in the same page would be sent on to /ar.
+for (const path of ["/", "/ar"]) {
+  test(`${path} links the monogram icons, not the default favicon`, async ({ page }) => {
+    await page.goto(path);
+    await expect(page.locator('link[href*="favicon"]')).toHaveCount(0);
+    for (const [rel, size] of [["icon", "32x32"], ["apple-touch-icon", "180x180"]]) {
+      const link = page.locator(`link[rel="${rel}"]`);
+      await expect(link).toHaveCount(1);
+      await expect(link).toHaveAttribute("type", "image/png");
+      await expect(link).toHaveAttribute("sizes", size);
+      const response = await page.request.get((await link.getAttribute("href"))!);
+      expect(response.status()).toBe(200);
+      // PNG signature: the file the export wrote, not a 404 page.
+      expect([...(await response.body()).subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    }
+  });
+}

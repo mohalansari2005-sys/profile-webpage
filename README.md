@@ -80,8 +80,11 @@ This rules out, for anything added later:
 
 Anything needing a backend (a contact form, say) has to call an external service
 from the client rather than a local API route. Response headers Vercel must add
-to the static files go in `frontend/vercel.json` instead; today that is only the
-`Content-Type` of `/opengraph-image`, which the export writes without an extension.
+to the static files go in `frontend/vercel.json` instead: the `Content-Type` of
+the generated images (`/opengraph-image`, `/icon`, `/apple-icon`), which the
+export writes without an extension, and the security headers on every path.
+The only Content-Security-Policy is `frame-ancestors 'none'`: a `script-src`
+would also block the inline theme and language scripts in `<head>`.
 
 ### Server Components by default
 
@@ -268,5 +271,3 @@ build and redeploy automatically — nothing to run by hand.
 
 `frontend/AGENTS.md` is generated and rewritten by `next dev` itself, not by
 hand. It's expected to reappear if deleted; commit it rather than fight it.
-
-`frontend/public/*.svg` are unused `create-next-app` starter assets.
