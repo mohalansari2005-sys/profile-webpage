@@ -14,7 +14,8 @@ def retrieve(state: ChatState) -> dict:
     # what lets each node's tests monkeypatch it without touching the network.
     vector = embed_query(state.get("search_query") or state["condensed"])
     if vector is None:
-        return {"retrieved": []}
+        # An outage, not an empty search: "I don't have that" would be a lie.
+        return {"retrieved": [], "unavailable": True}
 
     rows = (
         ContentChunk.objects.annotate(distance=CosineDistance("embedding", vector))

@@ -55,7 +55,7 @@ DJANGO_ALLOWED_HOSTS=<your domain, e.g. api.yourdomain.com>
 
 OPENAI_API_KEY=<your OpenAI key>
 OPENAI_MODEL=gpt-4.1-mini
-OPENAI_FAST_MODEL=gpt-4.1-nano
+OPENAI_FAST_MODEL=gpt-4.1-mini
 OPENAI_EMBED_MODEL=text-embedding-3-small
 
 POSTGRES_DB=chat

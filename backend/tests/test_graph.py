@@ -170,3 +170,39 @@ def test_an_answered_turn_reports_only_the_answer_model_s_tokens(db, stub_nodes,
 
     row = ChatLog.objects.get()
     assert (row.prompt_tokens, row.completion_tokens) == (500, 80)
+
+
+def test_an_embedding_outage_is_logged_and_flagged_not_called_empty(db, stub_nodes, monkeypatch):
+    """embed_query returns None when the API call fails. Treated as an empty
+    search, that told the visitor "I don't have that" during an outage."""
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (Relevance(subject="mohammed", reason="ok"), {}))
+    monkeypatch.setattr(stub_nodes["retrieve"], "embed_query", lambda q: None)
+
+    def no_generate(*a, **k):
+        raise AssertionError("generate must not call the model with nothing retrieved")
+
+    monkeypatch.setattr(stub_nodes["generate"], "structured", no_generate)
+
+    out = build_graph().invoke({"question": "what did he build", "history": [],
+                                "ip_hash": "h" * 64, "started_at": 0.0})
+    assert out["unavailable"] is True
+    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+
+
+def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
+    from chat.graph.build import build_graph
+    from chat.models import ChatLog
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (None, {"prompt_tokens": None,
+                                                "completion_tokens": None, "api_error": True}))
+
+    out = build_graph().invoke({"question": "What is Keyraa?", "history": [],
+                                "ip_hash": "h" * 64, "started_at": 0.0})
+    assert out["unavailable"] is True
+    assert ChatLog.objects.get().refusal_reason == "generation unavailable"

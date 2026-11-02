@@ -69,6 +69,7 @@ def test_an_api_failure_is_distinguished_from_an_unparseable_response(monkeypatc
     out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
     assert out["refused"] is True
     assert out["refusal_reason"] == "generation unavailable"
+    assert out["unavailable"] is True
 
 
 def test_empty_retrieval_refuses_without_calling_the_model(monkeypatch):

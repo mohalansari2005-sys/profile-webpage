@@ -41,6 +41,14 @@ class ChatView(APIView):
             "started_at": time.monotonic(),
         })
 
+        if result.get("unavailable"):
+            # OpenAI failed, not the question. Answering with a refusal told
+            # every visitor their question was off-topic for ten days after
+            # gpt-4.1-nano was retired; a 503 makes the UI say the service hit
+            # an error and offer a retry. The turn is already in ChatLog.
+            return Response({"detail": "The answer service is temporarily unavailable."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
         return Response(
             {"answer": result.get("answer", ""),
              "sources": result.get("sources", []),

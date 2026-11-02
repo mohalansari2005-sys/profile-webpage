@@ -88,10 +88,13 @@ insufficient, the answer is thrown away and replaced with a refusal before it
 leaves the server. The scope gate fails closed: a response it cannot parse is a
 refusal.
 
-Two models split the work. A small, fast model (gpt-4.1-nano) runs condense and
-relevance, and gpt-4.1-mini writes the answer. OpenAI serves both generation and
-embeddings; Groq was tried first for its free tier and rejected because it has
-no embeddings endpoint, which would have needed a second provider and key.
+Two model settings split the work: a fast one runs condense and relevance, and
+gpt-4.1-mini writes the answer. The fast slot was gpt-4.1-nano until OpenAI
+retired it in October 2026, and is now gpt-4.1-mini too; if that model is ever
+not found, the backend falls back to the answer model instead of refusing.
+OpenAI serves both generation and embeddings; Groq was tried first for its free
+tier and rejected because it has no embeddings endpoint, which would have needed
+a second provider and key.
 
 The API key never reaches the browser, which is the reason the backend exists at
 all. Requests are rate limited per IP (10 a minute by default) with a global

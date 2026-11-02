@@ -30,6 +30,7 @@ def test_an_unparseable_response_fails_closed(monkeypatch):
     out = node.relevance({"condensed": "anything"})
     assert out["in_scope"] is False
     assert out["refusal_reason"] == "scope check failed"
+    assert out["unavailable"] is False
 
 
 def test_an_api_failure_is_distinguished_from_an_unparseable_response(monkeypatch):
@@ -39,6 +40,7 @@ def test_an_api_failure_is_distinguished_from_an_unparseable_response(monkeypatc
     out = node.relevance({"condensed": "anything"})
     assert out["in_scope"] is False
     assert out["refusal_reason"] == "generation unavailable"
+    assert out["unavailable"] is True
 
 
 def test_the_gate_uses_the_fast_model(monkeypatch):
