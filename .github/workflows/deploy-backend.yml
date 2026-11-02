@@ -41,6 +41,13 @@ jobs:
             # the Django still running reads it correctly too, and a reload that
             # fails stops the job before anything else has changed.
             docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
-            docker compose -f docker-compose.prod.yml up -d --build
-            docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate
+            # Migrate before the swap, in a one-off container of the new image,
+            # while the old web keeps serving. Migrated after `up`, the new code
+            # ran against the old schema until migrate finished, and a turn
+            # writing a new ChatLog column got a 500. This order needs each
+            # migration to keep the old code working (a new column carries a
+            # database default), which a rollback needs anyway.
+            docker compose -f docker-compose.prod.yml build web
+            docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate
+            docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T web python manage.py ingest_content

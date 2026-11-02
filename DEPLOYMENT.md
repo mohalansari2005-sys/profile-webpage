@@ -144,10 +144,15 @@ deploy means the server may be part-way through — check `git log -1` and
 cd profile-webpage
 git pull
 docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.yml build web
+docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate
+docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
 ```
+
+Migrations run before the swap, from a one-off container of the new image, while the
+old `web` keeps serving: so a migration must leave the old code working (a new column
+needs a database default — `db_default` on the field), which a rollback needs anyway.
 
 The `caddy reload` line is how a `Caddyfile` change reaches Caddy. `up` does not
 recreate the `caddy` container for it, and because `git pull` replaces the file rather
