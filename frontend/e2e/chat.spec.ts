@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { en } from "../messages/en";
 
 const CHAT_API = "http://chat.test/api/chat/";
 
@@ -121,6 +122,29 @@ test("an Arabic question stays on the question side of an English page", async (
   const a = await answer.boundingBox();
   expect(q!.x + q!.width / 2).toBeGreaterThan(a!.x + a!.width / 2);
 });
+
+test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
+  await page.route(CHAT_API, (route) =>
+    route.fulfill({ status: 429, json: { detail: "Request was throttled.", code: "daily_cap" } }),
+  );
+  await page.goto("/");
+  await ask(page, "Anything?");
+  await expect(page.getByText(en.ask.errors.dailyCap)).toBeVisible();
+  await expect(page.getByRole("button", { name: en.ask.tryAgain })).toHaveCount(0);
+});
+
+for (const [name, body] of [
+  ["the per-visitor limit", JSON.stringify({ detail: "Request was throttled. Expected available in 42 seconds." })],
+  ["an unreadable body", "<html>Too Many Requests</html>"],
+] as const) {
+  test(`any other 429 (${name}) is the one-minute limit`, async ({ page }) => {
+    await page.route(CHAT_API, (route) => route.fulfill({ status: 429, body }));
+    await page.goto("/");
+    await ask(page, "Anything?");
+    await expect(page.getByText(en.ask.errors.throttled)).toBeVisible();
+    await expect(page.getByRole("button", { name: en.ask.tryAgain })).toBeVisible();
+  });
+}
 
 test("a source chip still jumps to its record", async ({ page }) => {
   await mock(page, "It is a booking platform.", [

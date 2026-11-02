@@ -75,6 +75,7 @@ export const en = {
     tryAgain: "Try again",
     errors: {
       throttled: "Too many questions right now — try again in a minute.",
+      dailyCap: "The assistant has reached today’s question limit. Try again tomorrow.",
       server: "The answer service hit an error. Try again in a moment.",
       network: "Couldn’t reach the answer service.",
       malformed: "The answer service sent back something unexpected.",

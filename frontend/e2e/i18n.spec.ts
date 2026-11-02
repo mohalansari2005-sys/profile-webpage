@@ -186,6 +186,15 @@ test.describe("chat in Arabic", () => {
     await expect(page.getByText(ar.ask.errors.server)).toBeVisible();
   });
 
+  test("the daily cap is explained in Arabic", async ({ page }) => {
+    await page.route(CHAT_API, (route) =>
+      route.fulfill({ status: 429, json: { detail: "Request was throttled.", code: "daily_cap" } }),
+    );
+    await page.goto("/ar");
+    await ask(page, "سؤال");
+    await expect(page.getByText(ar.ask.errors.dailyCap)).toBeVisible();
+  });
+
   test("the English page still shows English errors", async ({ page }) => {
     await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
     await page.goto("/");

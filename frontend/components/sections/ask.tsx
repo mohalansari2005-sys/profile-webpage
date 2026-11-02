@@ -303,13 +303,17 @@ export function Ask() {
                       <UserMessage dim>{failed.question}</UserMessage>
                       <AssistantMessage>
                         <p className="text-dim">{t.ask.errors[failed.error]}</p>
-                        <button
-                          type="button"
-                          onClick={() => void ask(failed.question)}
-                          className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
-                        >
-                          {t.ask.tryAgain}
-                        </button>
+                        {/* The daily cap holds until tomorrow: a retry would
+                            only be refused again. */}
+                        {failed.error !== "dailyCap" && (
+                          <button
+                            type="button"
+                            onClick={() => void ask(failed.question)}
+                            className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
+                          >
+                            {t.ask.tryAgain}
+                          </button>
+                        )}
                       </AssistantMessage>
                     </div>
                   )}
