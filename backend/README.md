@@ -132,6 +132,34 @@ runtime key and proves nothing about the image.
 
 `ChatLog` stores a salted SHA-256 of the client IP, never the address.
 
+## Analytics
+
+The `analytics` app answers "how many visitors, and how many used the chat"
+without a third party:
+
+- `POST /api/visit/`: the frontend's beacon. It stores one `PageView` with
+  the path, referrer host, `utm_source`/`ref`, Cloudflare's country header,
+  coarse device and browser families, and `hash_ip(client_ip(request))`, the
+  same key `ChatLog.ip_hash` uses. The raw IP and the User-Agent string are
+  never stored. Bots (by User-Agent), foreign `Origin`s and malformed bodies
+  are dropped, and every answer is an empty 204 either way.
+- `GET /dashboard/`: one server-rendered page: visitors, page views, chatbot
+  users and questions, refusals, **service errors** (`refusal_reason ==
+  "generation unavailable"`, the AI provider failing), daily charts,
+  breakdowns and the latest 25 questions. HTTP Basic; only the password is
+  checked. No JavaScript, no CDN.
+
+| Setting | Default | |
+|---|---|---|
+| `DASHBOARD_PASSWORD` | unset | unset means `/dashboard/` is a 404; collection still runs |
+| `DASHBOARD_TZ` | `Asia/Riyadh` | the timezone the dashboard's days are counted in |
+| `VISIT_RATE` | `60/min` | beacons per IP |
+| `DASHBOARD_RATE` | `30/min` | dashboard requests per IP, right password or wrong |
+
+Both throttles reuse the chat's per-IP `ChatRateThrottle` under their own
+scope. Neither touches `CHAT_DAILY_CAP`, so page views can never spend the
+chat's daily budget.
+
 ## Limits
 
 `CHAT_RATE` is per IP; `CHAT_DAILY_CAP` is one counter for the whole service.

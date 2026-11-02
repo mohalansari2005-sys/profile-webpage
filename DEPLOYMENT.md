@@ -114,6 +114,34 @@ a rebuild — push a commit, or use Vercel's "Redeploy" button. Then confirm on 
 site that the Ask section renders, a real question returns an answer, and the browser
 devtools Network tab shows no CORS errors on the `api/chat/` request.
 
+## 8. Analytics dashboard (optional)
+
+Page views are recorded as soon as this backend and a frontend built with
+`NEXT_PUBLIC_CHAT_API_URL` are deployed; the deploy's `migrate` creates the
+table. The dashboard that shows them stays off (a 404) until it has a password.
+To turn it on, add a line to `backend/.env` on the server:
+
+```
+DASHBOARD_PASSWORD=<new random string, e.g. `openssl rand -hex 24`>
+```
+
+and recreate `web` so it reads the file again (`restart` would keep the old
+environment):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate web
+```
+
+Then open `https://<domain>/dashboard/`. The browser asks for a username and a
+password: the username can be anything, the password is the one above.
+`?days=7`, `30`, `90` or `365` picks the range. Days are counted in
+`Asia/Riyadh` unless `DASHBOARD_TZ` says otherwise.
+
+To keep your own visits out of the numbers, open the site once in each browser
+you use with `?analytics=off` (e.g. `https://yourdomain.com/ar?analytics=off`);
+`?analytics=on` undoes it. Use the `/ar` form if that browser normally opens
+the Arabic page: visiting `/` there redirects to `/ar` and drops the query.
+
 ## Updating the deployment
 
 Pushing to `main` with changes under `backend/**`, `docker-compose.prod.yml`, or
