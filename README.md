@@ -246,11 +246,14 @@ nothing is sent when that is unset.
   who used the chat" is a join.
 - **Not collected:** raw IPs, the User-Agent string, cookies, or anything from
   browsers without JavaScript. Bots are filtered by User-Agent on a best-effort
-  basis.
+  basis, and Vercel preview deployments are not counted: only the exact
+  `CORS_ORIGINS` origins are.
 - **Where to see it:** `https://<backend domain>/dashboard/`, behind a password
   (`DASHBOARD_PASSWORD`; the page 404s until it is set). Visitors, page views,
-  chatbot use, service errors, sources and the latest questions. See
-  `DEPLOYMENT.md` to switch it on, and open the site once with
+  chatbot use, service errors (`ChatLog.unavailable`: the AI provider failed,
+  not a refusal), sources and the latest questions. Chat numbers leave out
+  synthetic questions (`ChatLog.synthetic`: the daily canary, curl checks and
+  previews). See `DEPLOYMENT.md` to switch it on, and open the site once with
   `?analytics=off` to stop counting your own browser (and any browser that
   runs QA against the live site).
 

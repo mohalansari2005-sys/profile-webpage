@@ -75,6 +75,12 @@ DOMAIN=<your domain, e.g. api.yourdomain.com>
 `*.vercel.app` subdomain, so Vercel preview deploys work without extra config; the
 `CORS_ORIGINS` value above is for the production domain specifically.
 
+`CORS_ORIGINS` is also what analytics treats as the live site: list every origin
+the site is served from, exactly (comma-separated, e.g. both the `www.` and the
+bare domain if both serve pages rather than redirect). Questions from any other
+origin, or none (the canary, curl), are answered but logged as synthetic and left
+off the dashboard; page views from any other origin are not recorded.
+
 `DOMAIN` is read by both the `web` and `caddy` services (via `env_file: backend/.env`)
 and substituted into `Caddyfile`'s `{$DOMAIN}`.
 
@@ -136,6 +142,12 @@ Then open `https://<domain>/dashboard/`. The browser asks for a username and a
 password: the username can be anything, the password is the one above.
 `?days=7`, `30`, `90` or `365` picks the range. Days are counted in
 `Asia/Riyadh` unless `DASHBOARD_TZ` says otherwise.
+
+Service errors are chat turns logged with `ChatLog.unavailable` (the AI provider
+failed). Chat numbers leave out synthetic questions (`ChatLog.synthetic`): the
+daily canary, curl checks and Vercel previews; see `CORS_ORIGINS` above. Until
+`migrate` has run on a deploy, page views are dropped with one WARNING line each
+in `docker compose logs web`, not a 500.
 
 To keep your own visits out of the numbers, open the site once in each browser
 you use with `?analytics=off` (e.g. `https://yourdomain.com/?analytics=off`);

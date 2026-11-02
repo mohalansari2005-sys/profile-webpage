@@ -125,11 +125,14 @@ nothing said why. What now stops a repeat:
   status and error code.
 - `.github/workflows/chat-canary.yml` asks the live API one real question every
   day and after every backend deploy, and fails -- which emails the repo owner
-  -- if it is refused or errors.
+  -- if it is refused or errors. It sends no `Origin`, so its questions are
+  logged with `synthetic=True` and stay off the analytics dashboard.
 
-`refusal_reason` on an outage row says which call failed: `condense
+An outage row has `unavailable=True`; that flag is what the dashboard counts
+as a service error. Its `refusal_reason` says which call failed: `condense
 unavailable`, `generation unavailable` (the gate or `generate`) or `retrieval
-unavailable` (the embedding).
+unavailable` (the embedding). Migration `chat.0002` set the flag on rows
+logged before it existed, by those three exact labels.
 
 GitHub disables a scheduled workflow after 60 days without activity in the
 repository; it emails a warning first. Re-enable the canary from the Actions
@@ -166,13 +169,20 @@ without a third party:
   the path, referrer host, `utm_source`/`ref`, Cloudflare's country header,
   coarse device and browser families, and `hash_ip(client_ip(request))`, the
   same key `ChatLog.ip_hash` uses. The raw IP and the User-Agent string are
-  never stored. Bots (by User-Agent), foreign `Origin`s and malformed bodies
-  are dropped, and every answer is an empty 204 either way.
+  never stored. Bots (by User-Agent), any `Origin` other than one listed
+  exactly in `CORS_ORIGINS` (so Vercel previews too, which the CORS regex
+  otherwise lets through) and bodies that fail `VisitSerializer` are dropped,
+  and every answer is an empty 204 either way. So is a body the connection
+  dropped mid-way, and a database error on save (the first deploy serves
+  before `migrate` has run): each logs one WARNING line, no traceback.
 - `GET /dashboard/`: one server-rendered page: visitors, page views, chatbot
-  users and questions, refusals, **service errors** (`refusal_reason ==
-  "generation unavailable"`, the AI provider failing), daily charts,
-  breakdowns and the latest 25 questions. HTTP Basic; only the password is
-  checked. No JavaScript, no CDN.
+  users and questions, refusals, **service errors** (`ChatLog.unavailable`,
+  the AI provider failing), daily charts, breakdowns and the latest 25
+  questions. HTTP Basic; only the password is checked. No JavaScript, no CDN.
+- Chat numbers leave out **synthetic** questions (`ChatLog.synthetic`): those
+  sent with no `Origin` (the canary, curl) or with one not listed exactly in
+  `CORS_ORIGINS` (Vercel previews). The chat still answers them. Rows logged
+  before the flag existed cannot be told apart and still count.
 
 | Setting | Default | |
 |---|---|---|
