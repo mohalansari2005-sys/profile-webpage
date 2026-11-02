@@ -29,3 +29,10 @@ test("chat round-trip shows the mocked answer", async ({ page }) => {
   await page.getByRole("button", { name: "Send question" }).click();
   await expect(page.getByText("Mocked answer about Mohammed.")).toBeVisible();
 });
+
+test("the contact list is a valid description list", async ({ page }) => {
+  await page.goto("/");
+  // A <dl> allows one <div> around each dt/dd pair, never two.
+  await expect(page.locator("#contact dl > div > dt")).toHaveCount(3);
+  await expect(page.locator("#contact dl > div > dd")).toHaveCount(3);
+});

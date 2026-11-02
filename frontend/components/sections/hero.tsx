@@ -26,8 +26,11 @@ export function Hero({ t }: { t: Messages["hero"] }) {
             </span>
           </div>
 
+          {/* Below 320px (a Galaxy Fold cover screen is 280) the 2.75rem floor
+              made "Mohammed" wider than the screen beside the monogram; only
+              those widths get the smaller size. */}
           <h1
-            className="field-in font-display text-[clamp(2.75rem,11vw,6.5rem)] leading-[0.86] font-extrabold tracking-[-0.035em]"
+            className="field-in font-display text-[clamp(2.75rem,11vw,6.5rem)] leading-[0.86] font-extrabold tracking-[-0.035em] max-[319px]:text-[2.25rem]"
             style={{ ...stagger(60), fontStretch: "85%" }}
           >
             {t.nameFirst}
