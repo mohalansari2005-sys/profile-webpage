@@ -79,7 +79,9 @@ This rules out, for anything added later:
 - `next/image`'s default optimizer — there's no image server at runtime
 
 Anything needing a backend (a contact form, say) has to call an external service
-from the client rather than a local API route.
+from the client rather than a local API route. Response headers Vercel must add
+to the static files go in `frontend/vercel.json` instead; today that is only the
+`Content-Type` of `/opengraph-image`, which the export writes without an extension.
 
 ### Server Components by default
 

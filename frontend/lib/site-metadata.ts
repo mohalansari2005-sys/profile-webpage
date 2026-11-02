@@ -3,7 +3,10 @@ import type { Locale } from "@/lib/i18n";
 import { homePath } from "@/lib/i18n";
 import { getMessages } from "@/messages";
 
-const OG_IMAGE = { url: "/opengraph-image", width: 1200, height: 630 };
+// The static export writes this PNG without an extension, so Vercel would
+// serve it as application/octet-stream, which some link-preview crawlers
+// reject; frontend/vercel.json sets its Content-Type, and `type` says so here.
+const OG_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, type: "image/png" };
 
 /** Per-locale metadata. The OG image is referenced explicitly: with one root
     layout per language there is no shared layout for Next to attach the

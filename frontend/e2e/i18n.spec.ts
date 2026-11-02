@@ -88,16 +88,27 @@ test.describe("Arabic page", () => {
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
   });
 
-  test("points search engines at the custom domain, per language", async ({ page }) => {
-    const site = "https://www.alansari.stream";
-    for (const [path, canonical] of [["/", site], ["/ar", `${site}/ar`]]) {
+  // The domain is a literal on purpose: built from site-metadata.ts, this
+  // would still pass if metadataBase went back to a *.vercel.app alias.
+  // One page per test: visiting /ar remembers the language, and a later visit
+  // to / in the same page would be sent on to /ar.
+  const SITE = "https://www.alansari.stream";
+  for (const [path, canonical] of [["/", SITE], ["/ar", `${SITE}/ar`]]) {
+    test(`${path} points search engines and link previews at the custom domain`, async ({ page }) => {
       await page.goto(path);
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", canonical);
       await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", canonical);
-      await expect(page.locator('link[rel="alternate"][hreflang="ar"]'))
-        .toHaveAttribute("href", `${site}/ar`);
-    }
-  });
+      for (const [lang, href] of [["en", SITE], ["ar", `${SITE}/ar`], ["x-default", SITE]]) {
+        await expect(page.locator(`link[rel="alternate"][hreflang="${lang}"]`))
+          .toHaveAttribute("href", href);
+      }
+      await expect(page.locator('meta[property="og:image"]'))
+        .toHaveAttribute("content", `${SITE}/opengraph-image`);
+      await expect(page.locator('meta[property="og:image:type"]')).toHaveAttribute("content", "image/png");
+      await expect(page.locator('meta[name="twitter:image"]'))
+        .toHaveAttribute("content", `${SITE}/opengraph-image`);
+    });
+  }
 });
 
 test.describe("chat in Arabic", () => {
