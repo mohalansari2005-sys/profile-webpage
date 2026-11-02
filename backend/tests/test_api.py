@@ -84,12 +84,15 @@ def test_the_view_hashes_the_ip_before_the_graph_sees_it(db, api, stub_graph):
     assert len(stub_graph["state"]["ip_hash"]) == 64
 
 
-def test_without_a_proxy_x_forwarded_for_takes_the_first_hop(db, api, stub_graph):
+def test_without_x_real_ip_a_forwarded_for_is_ignored(db, api, stub_graph):
+    """Its first entry is whatever the client wrote. Read as a fallback, a
+    Caddyfile that stopped setting X-Real-IP would have let every request
+    pick its own per-IP bucket; the socket address cannot be picked."""
     from chat.models import hash_ip
 
     api.post("/api/chat/", {"question": "q"}, format="json",
              HTTP_X_FORWARDED_FOR="198.51.100.7, 10.0.0.1", REMOTE_ADDR="10.0.0.1")
-    assert stub_graph["state"]["ip_hash"] == hash_ip("198.51.100.7")
+    assert stub_graph["state"]["ip_hash"] == hash_ip("10.0.0.1")
 
 
 def test_the_proxy_s_x_real_ip_wins_over_a_spoofed_x_forwarded_for(db, api, stub_graph):

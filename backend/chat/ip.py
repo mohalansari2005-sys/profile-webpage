@@ -8,18 +8,14 @@ def client_ip(request) -> str:
     Caddyfile): the visitor's address from Cloudflare's CF-Connecting-IP when
     the request came from a Cloudflare range, the connecting address when it
     did not. It overwrites any X-Real-IP the client sent, and gunicorn's port
-    is never published, so only Caddy reaches Django. X-Forwarded-For is no
-    substitute: Cloudflare appends to whatever the visitor sent, so its first
-    entry is the visitor's to choose, and without Caddy's help every request
-    looked like it came from a Cloudflare edge.
+    is never published, so only Caddy reaches Django.
 
-    Without Caddy (local dev) the forwarded header or the socket address is all
-    there is.
+    X-Forwarded-For is never read. Cloudflare appends to whatever the visitor
+    sent, so its first entry is the visitor's to choose unless Caddy rewrites
+    it. As a fallback it served no one -- nothing sends it in local dev -- and
+    a Caddyfile edit that dropped X-Real-IP would have quietly let every
+    request name its own per-IP bucket and ip_hash. Without X-Real-IP the
+    socket address is used: one shared bucket is the safe way to be wrong.
     """
     real = request.META.get("HTTP_X_REAL_IP", "").strip()
-    if real:
-        return real
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "")
+    return real or request.META.get("REMOTE_ADDR", "")

@@ -189,10 +189,12 @@ installs the `[dev]` extras so `docker compose run --rm web pytest` works.
 `CHAT_RATE` is per IP; `CHAT_DAILY_CAP` is one counter for the whole service.
 The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
 `CF-Connecting-IP` -- trusted only from Cloudflare's ranges, see the root
-`Caddyfile` -- and passes it on as `X-Real-IP`, which `chat/ip.py` reads first.
-`X-Forwarded-For` is only the fallback without Caddy, in local dev: Cloudflare
-appends to whatever the visitor sent, so its first entry is the visitor's to
-choose.
+`Caddyfile` -- and passes it on as `X-Real-IP`, which is what `chat/ip.py` reads.
+`X-Forwarded-For` is never read -- Cloudflare appends to whatever the visitor
+sent, so its first entry is the visitor's to choose -- and without `X-Real-IP`
+(local dev) the socket address is used. Caddy still overwrites `X-Forwarded-For`
+with the visitor's address, for the Django that is running while a deploy
+reloads the `Caddyfile`; see DEPLOYMENT.md.
 
 The daily cap was sized against a free-tier daily quota. OpenAI is billed per
 token, not capped, so this counter is now the **spend** limit — it is the only

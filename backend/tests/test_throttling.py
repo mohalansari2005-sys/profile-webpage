@@ -54,15 +54,18 @@ def test_behind_the_proxy_each_visitor_gets_their_own_bucket(db, settings, stub_
                     **via_caddy).status_code == 200
 
 
-def test_a_spoofed_x_forwarded_for_does_not_buy_a_fresh_bucket(db, settings, stub_graph):
+@pytest.mark.parametrize("real_ip", [
+    pytest.param({"HTTP_X_REAL_IP": "198.51.100.1"}, id="behind-caddy"),
+    pytest.param({}, id="no-x-real-ip"),
+])
+def test_a_spoofed_x_forwarded_for_does_not_buy_a_fresh_bucket(db, settings, stub_graph, real_ip):
     settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
                                "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
     api = APIClient()
     body = {"question": "q"}
     for spoofed, expected in (("203.0.113.1", 200), ("203.0.113.2", 429)):
         r = api.post("/api/chat/", body, format="json", REMOTE_ADDR="172.18.0.5",
-                     HTTP_X_REAL_IP="198.51.100.1",
-                     HTTP_X_FORWARDED_FOR=f"{spoofed}, 172.70.1.1")
+                     HTTP_X_FORWARDED_FOR=f"{spoofed}, 172.70.1.1", **real_ip)
         assert r.status_code == expected
 
 
