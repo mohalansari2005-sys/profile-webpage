@@ -16,6 +16,14 @@ function visitUrl(chatUrl: string | undefined): string | null {
   }
 }
 
+/**
+ * Set on <html> by site-head.tsx's script just before it sends a returning
+ * Arabic reader from / on to /ar. A browser may keep running / until /ar
+ * arrives, and its beacon would then count the visit a second time; /ar
+ * counts it instead.
+ */
+export const REDIRECTING = "data-redirecting";
+
 const OPT_OUT_KEY = "analytics";
 
 /**
@@ -37,8 +45,8 @@ export function optedOut(search: string): boolean {
 /**
  * Takes `analytics=` back out of the address bar once optedOut() has read it,
  * so a copied, bookmarked or autocompleted link cannot quietly opt out
- * everyone who opens it. Other parameters and the hash stay, as `?lang=en`'s
- * clean-up in site-head.tsx does.
+ * everyone who opens it. Only that parameter goes; the others and the hash
+ * stay, the same way site-head.tsx takes out `lang=en`.
  */
 export function forgetSwitch(): void {
   try {
