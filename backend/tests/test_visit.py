@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date
 
 import pytest
@@ -183,13 +184,17 @@ def test_a_foreign_origin_is_ignored(db, api, site):
     assert stored() == []
 
 
-@pytest.mark.parametrize("origin", [
-    "https://example.dev",
-    "https://profile-webpage-git-feat-x.vercel.app",  # previews, via the regex
-])
-def test_an_allowed_origin_is_stored(db, api, site, origin):
-    beacon(api, {"path": "/"}, HTTP_ORIGIN=origin)
+def test_the_live_sites_origin_is_stored(db, api, site):
+    beacon(api, {"path": "/"}, HTTP_ORIGIN=site)
     assert len(stored()) == 1
+
+
+def test_a_preview_deployment_is_ignored(db, api, site):
+    # CORS lets *.vercel.app talk to the chat; its page views are QA, not
+    # visitors, so the beacon takes only the live site's exact origins.
+    r = beacon(api, {"path": "/"}, HTTP_ORIGIN="https://profile-webpage-git-feat-x.vercel.app")
+    assert r.status_code == 204
+    assert stored() == []
 
 
 @pytest.mark.parametrize("body", [
@@ -207,19 +212,53 @@ def test_a_malformed_body_is_ignored(db, api, body):
 
 
 # Raw JSON text, so the escapes reach the server as a browser would send them.
-@pytest.mark.parametrize("body, field, cleaned", [
-    (r'{"path": "/\u0000ar"}', "path", "/ar"),
-    (r'{"path": "/", "source": "a\u0000b"}', "source", "ab"),
-    (r'{"path": "/", "referrer": "https://a\u0000b.example/"}', "referrer_host", "ab.example"),
-    (r'{"path": "/ar\ud800"}', "path", "/ar"),
-    (r'{"path": "/", "source": "x\udfff"}', "source", "x?"),
+# Postgres refuses NUL in text, and a lone surrogate has no UTF-8 form; saved,
+# either was a 500 and a logged traceback on every hit. DRF's CharField
+# refuses both, so a bad path drops the beacon and a bad optional field is
+# treated as not sent.
+@pytest.mark.parametrize("body", [
+    r'{"path": "/\u0000ar"}',
+    r'{"path": "/ar\ud800"}',
 ])
-def test_strings_postgres_cannot_store_are_cleaned_not_a_500(db, api, body, field, cleaned):
-    # Postgres refuses NUL in text, and a lone surrogate has no UTF-8 form.
-    # Uncleaned, either was a 500 and a logged traceback on every hit.
+def test_a_path_postgres_cannot_store_is_ignored_not_a_500(db, api, body):
     r = beacon(api, body)
     assert r.status_code == 204
-    assert getattr(stored()[0], field) == cleaned
+    assert stored() == []
+
+
+@pytest.mark.parametrize("body, field", [
+    (r'{"path": "/", "source": "a\u0000b"}', "source"),
+    (r'{"path": "/", "referrer": "https://a\u0000b.example/"}', "referrer_host"),
+    (r'{"path": "/", "source": "x\udfff"}', "source"),
+])
+def test_an_optional_field_postgres_cannot_store_is_dropped_not_a_500(db, api, body, field):
+    r = beacon(api, body)
+    assert r.status_code == 204
+    assert getattr(stored()[0], field) == ""
+
+
+def test_an_overlong_path_is_ignored_and_an_overlong_source_dropped(db, api):
+    from analytics.views import MAX_FIELD
+
+    beacon(api, {"path": "/" + "x" * MAX_FIELD})
+    assert stored() == []
+    beacon(api, {"path": "/ar", "source": "s" * (MAX_FIELD + 1)})
+    [view] = stored()
+    assert (view.path, view.source) == ("/ar", "")
+
+
+def test_deeply_nested_json_is_ignored_not_a_500(db, api):
+    # Fits in the body cap and can pass Python's recursion limit while parsing.
+    r = beacon(api, "[" * 4000 + "]" * 4000)
+    assert r.status_code == 204
+    assert stored() == []
+
+
+def test_a_form_body_is_ignored(db, api):
+    r = api.post("/api/visit/", "path=/ar", content_type="application/x-www-form-urlencoded",
+                 HTTP_USER_AGENT=CHROME_DESKTOP)
+    assert r.status_code == 204
+    assert stored() == []
 
 
 def test_a_body_too_big_for_django_is_ignored_without_reading_it(db, api, settings):
@@ -252,6 +291,57 @@ def test_every_answer_is_an_empty_204(db, api):
     ]
     assert [r.status_code for r in responses] == [204] * 4
     assert [r.content for r in responses] == [b""] * 4
+
+
+def _quiet_warning(caplog, text):
+    """One WARNING from the view saying `text`, without a traceback, and no
+    ERROR (a 500 is logged at ERROR by django.request)."""
+    ours = [r for r in caplog.records if r.name == "analytics.views"]
+    assert [r.levelno for r in ours] == [logging.WARNING]
+    assert text in ours[0].getMessage()
+    assert ours[0].exc_info is None
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+@pytest.mark.parametrize("error", [
+    ConnectionResetError(54, "Connection reset by peer"),
+    OSError("request data read error"),  # what gunicorn raises for a short body
+])
+def test_a_dropped_connection_is_a_204_and_one_warning(db, api, monkeypatch, caplog, error):
+    """A beacon sent as the tab closes can lose its connection mid-body;
+    Django turns that into UnreadablePostError when the body is read."""
+    from django.core.handlers.wsgi import LimitedStream
+
+    def drop(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(LimitedStream, "read", drop)
+    r = beacon(api, {"path": "/"})
+    assert r.status_code == 204
+    assert stored() == []
+    _quiet_warning(caplog, "Page view not read")
+
+
+@pytest.mark.parametrize("error", [
+    # The first deploy serves before `migrate` has created the table.
+    'relation "analytics_pageview" does not exist\nLINE 1: INSERT INTO "analytics_pageview" ...',
+    "connection to server failed: Connection refused",
+])
+def test_a_database_error_is_a_204_and_one_warning(db, api, monkeypatch, caplog, error):
+    from django.db import OperationalError, ProgrammingError
+
+    from analytics.models import PageView
+
+    exc = (ProgrammingError if "relation" in error else OperationalError)(error)
+
+    def fail(self, *args, **kwargs):
+        raise exc
+
+    monkeypatch.setattr(PageView, "save", fail)
+    r = beacon(api, {"path": "/"})
+    assert (r.status_code, r.content) == (204, b"")
+    _quiet_warning(caplog, error.partition("\n")[0])
+    assert "LINE 1" not in caplog.text
 
 
 def test_get_is_not_allowed(db, api):
