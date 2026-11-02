@@ -86,4 +86,29 @@ test.describe("toggle", () => {
     await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
     expect(await page.evaluate(() => localStorage.getItem("theme"))).toBeNull();
   });
+
+  test("still cycles when storage is blocked", async ({ page }) => {
+    // What "block all site data" looks like to the page: every access throws.
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", {
+        get() {
+          throw new DOMException("The operation is insecure.", "SecurityError");
+        },
+      });
+    });
+    await page.goto("/");
+    await expect(toggle(page)).toHaveAttribute("data-mode", "system");
+
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "light");
+    await expect(page.locator("html")).toHaveClass(/\blight\b/);
+
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "dark");
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+
+    await toggle(page).click();
+    await expect(toggle(page)).toHaveAttribute("data-mode", "system");
+    await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
+  });
 });

@@ -12,12 +12,17 @@ const KEY = "theme";
 const ORDER: Theme[] = ["system", "light", "dark"];
 const ICON = { system: Monitor, light: Sun, dark: Moon } as const;
 
+/** The choice made in this page view, for when storage is blocked (site data
+    blocked, some in-app browsers). Without it read() always said "system", so
+    the toggle could switch to light once and never move again. */
+let unsaved: Theme | null = null;
+
 function read(): Theme {
   try {
     const stored = localStorage.getItem(KEY);
     return stored === "light" || stored === "dark" ? stored : "system";
   } catch {
-    return "system";
+    return unsaved ?? "system";
   }
 }
 
@@ -51,6 +56,7 @@ function subscribe(onChange: () => void) {
 }
 
 function choose(theme: Theme) {
+  unsaved = theme;
   try {
     if (theme === "system") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, theme);

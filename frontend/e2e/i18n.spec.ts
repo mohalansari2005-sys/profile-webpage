@@ -104,6 +104,15 @@ test.describe("Arabic page", () => {
     );
   });
 
+  test("the language switch is read in the page's own language", async ({ page }) => {
+    // Its name is written in the page's language, so it must not be tagged
+    // as the other one; hreflang is what names the target.
+    await page.goto("/ar");
+    const link = page.getByRole("link", { name: ar.lang.switchAria });
+    await expect(link).not.toHaveAttribute("lang");
+    await expect(link).toHaveAttribute("hreflang", "en");
+  });
+
   test("the theme toggle speaks Arabic", async ({ page }) => {
     await page.goto("/ar");
     await expect(page.locator("button[data-mode]")).toHaveAttribute(
