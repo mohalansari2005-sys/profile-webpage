@@ -81,3 +81,16 @@ def test_code_from_before_the_flags_can_still_log_a_turn(db):
         )
     row = ChatLog.objects.get()
     assert (row.unavailable, row.synthetic) == (False, False)
+
+
+def test_a_query_cannot_wait_forever(db):
+    """Under gthread nothing else ends a stuck query: gunicorn's --timeout no
+    longer kills a slow request, and the turn budget covers OpenAI only."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW statement_timeout")
+        statement = cursor.fetchone()[0]
+        cursor.execute("SHOW lock_timeout")
+        lock = cursor.fetchone()[0]
+    assert (statement, lock) == ("15s", "5s")

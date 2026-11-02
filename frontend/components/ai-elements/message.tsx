@@ -4,7 +4,9 @@
 // Message and MessageContent are kept. The rest (markdown via `streamdown`,
 // attachments, branching, tooltip actions) added ~170 kB gzipped of JavaScript
 // for features plain-text answers do not use. `ml-auto` is `ms-auto` so the
-// user's side follows the page direction.
+// user's side follows the page direction. `overflow-wrap: anywhere` is added
+// so a token wider than the bubble (a pasted or quoted URL) wraps instead of
+// being cut off by `overflow-hidden`, where nobody can scroll to it.
 
 import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
@@ -33,7 +35,7 @@ export const MessageContent = ({
 }: MessageContentProps) => (
   <div
     className={cn(
-      "flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm",
+      "flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden [overflow-wrap:anywhere] text-sm",
       "group-[.is-user]:ms-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
       "group-[.is-assistant]:text-foreground",
       className

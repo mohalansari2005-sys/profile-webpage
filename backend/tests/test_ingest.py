@@ -59,7 +59,16 @@ def test_changed_text_is_re_embedded(db, corpus_file, fake_embeddings):
     before = fake_embeddings["n"]
     call_command("ingest_content", corpus=str(corpus_file))
     assert fake_embeddings["n"] == before + 1
-    assert ContentChunk.objects.get(chunk_id="exp-a#summary").text == "Did other things."
+    assert ContentChunk.objects.get(chunk_id="exp-a#summary").text.endswith("Did other things.")
+
+
+def test_the_summary_chunk_names_tools_by_their_label(db, corpus_file, fake_embeddings):
+    """The corpus stores tool ids; the page shows labels, and so must the bot."""
+    from chat.models import ContentChunk
+
+    call_command("ingest_content", corpus=str(corpus_file))
+    text = ContentChunk.objects.get(chunk_id="exp-a#summary").text
+    assert "Organisation: Acme\nPeriod: 2025\nTools: Python\n" in text
 
 
 def test_changing_the_embedding_model_re_embeds_everything(db, corpus_file,

@@ -13,9 +13,10 @@ from openai import (
     InternalServerError,
     LengthFinishReasonError,
     OpenAI,
+    OpenAIError,
     Timeout,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,25 @@ _deadline: contextvars.ContextVar[float | None] = contextvars.ContextVar(
 # after OpenAI had started -- and billed -- the work, for nothing.
 MIN_SECONDS_FAST = 2.0
 MIN_SECONDS_GENERATE = 6.0
+
+# Output caps (max_completion_tokens). Without one a call may write up to the
+# model's own maximum -- 32k tokens on gpt-4.1-mini -- from a prompt the visitor
+# helped write, and CHAT_DAILY_CAP counts requests, not tokens. A call that
+# reaches its cap raises LengthFinishReasonError: no usable response, flagged
+# `truncated` with its billed tokens, so generate and relevance log the refusal
+# as "output cap reached" (condense falls back to the raw question).
+# The classifiers return a verdict, or condense's rewrite of a question of at
+# most 1000 characters plus its English version.
+MAX_TOKENS_FAST = 1000
+# A long, detailed Arabic answer (Arabic takes roughly twice the tokens of the
+# same English). The turn budget usually ends a call this long first; the cap
+# is what bounds the bill for one the client gave up on.
+MAX_TOKENS_GENERATE = 2500
+# Both are sized for gpt-4.1-mini, which does not reason. On a reasoning model
+# (the gpt-5 and o-series families) max_completion_tokens counts the hidden
+# reasoning tokens as well as the visible answer, so at these sizes a call can
+# spend its cap thinking and be refused as "output cap reached". Raise both
+# before pointing OPENAI_MODEL or OPENAI_FAST_MODEL at one.
 
 
 @contextmanager
@@ -176,8 +196,9 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     (condense, relevance), or OPENAI_MODEL once the fast one is not found.
 
     A failed API call (quota exhausted, rate limited, a 5xx that a retry did not
-    clear, the turn's budget spent, a retired model with nowhere to fall back)
-    returns parsed=None with usage["api_error"] -- every caller already fails
+    clear, the turn's budget spent, a retired model with nowhere to fall back,
+    an unexpected SDK error or a response that fails the schema) returns
+    parsed=None with usage["api_error"] -- every caller already fails
     closed on parsed=None, and the flag is what stops a refusal log from
     calling an outage an "unparseable response".
     """
@@ -189,6 +210,7 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             model=model,
             messages=[{"role": "user", "content": prompt}],
             response_format=schema,
+            max_completion_tokens=MAX_TOKENS_FAST if fast else MAX_TOKENS_GENERATE,
             # The classifiers are decisions, not prose. At the default
             # temperature the gate samples its verdict: the same question
             # measured 2/5 in_scope across five calls, so a visitor could be
@@ -212,12 +234,32 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
         if exc.code in _REJECTED_CODES:
             return None, {"prompt_tokens": None, "completion_tokens": None, "rejected": True}
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
-    except (LengthFinishReasonError, ContentFilterFinishReasonError):
+    except (LengthFinishReasonError, ContentFilterFinishReasonError) as exc:
         # Neither subclasses APIError, so an `except APIError` alone lets these
         # escape as a 500. They mean the model produced nothing usable -- a bad
-        # response, not an outage -- so they get no api_error flag. Token counts
-        # are unreachable on these, unlike the parse failures below.
-        return None, {"prompt_tokens": None, "completion_tokens": None}
+        # response, not an outage -- so they get no api_error flag. A length
+        # cut-off is billed in full, and carries the completion: its counts
+        # are logged, or the costliest calls would be the ones missing.
+        usage = getattr(getattr(exc, "completion", None), "usage", None)
+        counts = {"prompt_tokens": getattr(usage, "prompt_tokens", None),
+                  "completion_tokens": getattr(usage, "completion_tokens", None)}
+        if isinstance(exc, LengthFinishReasonError):
+            # Its own refusal reason. Logged as "unparseable response", a cut-off
+            # answer could be told from a real parse failure only by its token
+            # count -- and how often the cap is hit is what to resize it by.
+            counts["truncated"] = True
+        return None, counts
+    except (OpenAIError, ValidationError):
+        # Any other SDK error, or pydantic's ValidationError when parse checks
+        # the content against the schema -- no OpenAIError at all, and it
+        # escaped as a 500 with no log row. Either is systematic: an SDK
+        # upgrade or a schema the model cannot meet fails the same way for
+        # every visitor. Called a bad response, each would have been refused
+        # as off-topic or unanswerable, which is how a retired model went
+        # unnoticed for ten days. So it is an outage: a 503, logged with its
+        # traceback.
+        logger.exception("OpenAI call failed unexpectedly: model=%s", model)
+        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
 
     usage = getattr(resp, "usage", None)
     counts = {
@@ -232,9 +274,12 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
 
 def failure_reason(usage: dict, otherwise: str) -> str:
     """The refusal_reason for a call that produced nothing usable: an outage, a
-    request OpenAI rejected for what the visitor sent, or the caller's own."""
+    request OpenAI rejected for what the visitor sent, a response cut off at
+    its output cap, or the caller's own."""
     if usage.get("api_error"):
         return "generation unavailable"
     if usage.get("rejected"):
         return "request rejected"
+    if usage.get("truncated"):
+        return "output cap reached"
     return otherwise

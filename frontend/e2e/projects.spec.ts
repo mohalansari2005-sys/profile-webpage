@@ -50,10 +50,15 @@ test("projects are rounded cards in a horizontal rail", async ({ page }) => {
   expect(await rail.evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
 });
 
-test("when every card fits, both chevrons are disabled", async ({ page }) => {
+test("when every card fits, both chevrons are disabled and skipped by Tab", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Previous project" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Next project" })).toBeDisabled();
+  for (const name of ["Previous project", "Next project"]) {
+    const chevron = page.getByRole("button", { name });
+    await expect(chevron).toBeDisabled();
+    // Natively disabled, not just aria-disabled: neither can ever page here,
+    // so a keyboard reader should not stop on them.
+    await expect(chevron).toHaveJSProperty("disabled", true);
+  }
 });
 
 test("chevrons page the rail and disable at the ends", async ({ page }) => {
@@ -113,6 +118,24 @@ test.describe("on a phone", () => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Next project" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Previous project" })).toBeDisabled();
+  });
+
+  test("paging to the end by keyboard keeps focus on the chevron", async ({ page }) => {
+    await page.goto("/");
+    const next = page.getByRole("button", { name: "Next project" });
+    const rail = page.locator("[data-project-rail]");
+    await next.focus();
+    await page.keyboard.press("Enter");
+    await settle(page);
+    // The end of the rail disables Next; a natively disabled button would
+    // have dropped focus to <body>.
+    await expect(next).toBeDisabled();
+    await expect(next).toBeFocused();
+    // ...and pressing it there does nothing.
+    const end = await rail.evaluate((el) => el.scrollLeft);
+    await page.keyboard.press("Enter");
+    await settle(page);
+    expect(await rail.evaluate((el) => el.scrollLeft)).toBe(end);
   });
 
   test("citing the off-screen project scrolls the rail sideways to it", async ({ page }) => {

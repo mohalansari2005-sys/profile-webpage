@@ -10,9 +10,8 @@ import { VisitBeacon } from "@/components/visit-beacon";
 import type { Locale } from "@/lib/i18n";
 import { getMessages } from "@/messages";
 
-// Inlined at build time. Unset — which is production today — means the section
-// is never rendered, so the live site's markup and behaviour are unchanged
-// until a backend exists for it to talk to.
+// Inlined at build time. Production sets it; unset, the section is never
+// rendered, so a build with no backend to talk to shows no chat.
 //
 // Note this gates rendering, not bundling: Turbopack keeps ask.tsx in a chunk
 // either way, including behind a conditional next/dynamic import. The module

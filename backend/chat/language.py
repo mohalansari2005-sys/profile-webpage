@@ -41,17 +41,20 @@ def is_arabic(text: str) -> bool:
 # Majara; the current one is "مجرة" (below).
 NAME_ALIASES = {
     "Majara": ("ماجرة", "ماجره", "ماجراة", "ماجارا"),
-    "SEET": ("صيت",),
     "Keyraa": ("كيرا", "كايرا", "كيرآ"),
 }
 
 # Spellings that are also ordinary words: "مجرة" (also typed "مجره") is Majara,
-# and also the Arabic word for "galaxy". These are read as the company only
+# and also the Arabic word for "galaxy"; "صيت" is SEET, and also the word for
+# "reputation" ("ذائع الصيت", "renowned"). These are read as the company only
 # when they stand alone as a proper noun: no definite article ("المجرة", "the
 # galaxy") and no "lil-" ("للمجرة", "to the galaxy"), and at most a one-letter
-# and/in/for prefix ("في مجرة", "بمجرة", "ولمجرة").
+# and/in/for prefix ("في مجرة", "بمجرة", "ولمجرة"). "صيت" without the article
+# is still SEET -- "وش صيت محمد؟" (his reputation) and the dialect verbs "وصيت"
+# and "بصيت" are misread -- which is the price of recognising "في صيت".
 AMBIGUOUS_ALIASES = {
     "Majara": ("مجرة", "مجره"),
+    "SEET": ("صيت",),
 }
 
 # Told to the models that read the question, so a spelling not in the tables

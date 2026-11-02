@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowUp, Bot } from "lucide-react";
-import { useStickToBottomContext } from "use-stick-to-bottom";
+import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
   Conversation,
   ConversationContent,
@@ -13,8 +13,8 @@ import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { useI18n } from "@/components/i18n-provider";
 import { Reveal } from "@/components/reveal";
 import { useJoin } from "@/components/join-context";
-import { experience, projects } from "@/lib/content";
-import { localize, type Locale } from "@/lib/i18n";
+import { experience, offPageRecords, projects } from "@/lib/content";
+import type { Locale } from "@/lib/i18n";
 import {
   askChat,
   MAX_HISTORY,
@@ -27,6 +27,9 @@ import {
     records can be cited but are not rendered anywhere on the page, so their
     chips stay inert rather than pointing at nothing. */
 const ROW_IDS = new Set([...experience, ...projects].map((record) => record.id));
+
+/** Every record the chat can cite, for naming its chip. */
+const CITABLE = [...experience, ...projects, ...offPageRecords];
 
 type Turn = {
   id: number;
@@ -46,15 +49,58 @@ function scrollToRecord(recordId: string) {
   // No `behavior` argument on purpose: the page's own `scroll-behavior` is
   // smooth in CSS and forced to `auto` under prefers-reduced-motion, so
   // inheriting it is what makes the reduced-motion case correct.
-  row.scrollIntoView({ block: "center" });
+  //
+  // `start`, not `center`: a project card can be taller than a short phone
+  // screen, and centring it put its title under the sticky tool strip. The
+  // records' `scroll-mt-*` (work.tsx) keeps the start clear of that strip;
+  // `inline: "nearest"` still brings an off-screen card in the rail into view.
+  row.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
-/** The chip shows the record's title in the page's language when the record has
-    a row on the page; records without one (the bio, the FAQ) keep the title the
-    server sent. */
+/** Whether any of `target` lies between `top` and `bottom` (viewport y). */
+function overlaps(target: HTMLElement, top: number, bottom: number): boolean {
+  const rect = target.getBoundingClientRect();
+  return rect.bottom > top && rect.top < bottom;
+}
+
+/** Whether the chat may hand focus to `target`. Focus has to be free: on the
+    page itself (a disabled input or an unmounted button drops it there) or
+    still inside the chat. A reader who moved it elsewhere while waiting, say
+    to a record through a source chip, keeps it.
+
+    And `target` has to be in view. Focus on <body> is also where a reader
+    who scrolled off with the mouse while waiting has it, and there the keys
+    page through the site: an off-screen input took their Space as a typed
+    space (and scrolled back to show it), an off-screen Try again took it as
+    a click that sent the question again.
+
+    In view of the window is not enough for what sits in the conversation:
+    a reader who scrolled the chat back up has Try again below its bottom
+    edge, hidden, though the window still holds it. While the chat follows
+    the newest message (`isAtBottom`), it is scrolling Try again in itself,
+    and may still be on its way when this runs, so only then does the
+    window alone decide. */
+function mayFocus(
+  target: HTMLElement | null,
+  chat: StickToBottomContext | null,
+): target is HTMLElement {
+  if (!target) return false;
+  const active = document.activeElement;
+  const free = !active || active === document.body || active.closest("#ask") !== null;
+  if (!free || !overlaps(target, 0, window.innerHeight)) return false;
+  const scroller = chat?.scrollRef.current;
+  if (!chat || !scroller?.contains(target) || chat.state.isAtBottom) return true;
+  const { top, bottom } = scroller.getBoundingClientRect();
+  return overlaps(target, top, bottom);
+}
+
+/** The chip shows the record's title in the page's language, from content/
+    (`title`, `title_ar`), row on the page or not. A record the site does not
+    know keeps the title the server sent. */
 function sourceTitle(source: ChatSource, locale: Locale): string {
-  const record = [...experience, ...projects].find((r) => r.id === source.record_id);
-  return record ? localize(record, locale).title : source.title;
+  const record = CITABLE.find((r) => r.id === source.record_id);
+  if (!record) return source.title;
+  return (locale === "ar" ? record.ar?.title : undefined) ?? record.title;
 }
 
 function historyFrom(turns: Turn[]): ChatMessage[] {
@@ -142,6 +188,8 @@ export function Ask() {
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ question: string; error: ChatError } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  const chatRef = useRef<StickToBottomContext>(null);
   const nextId = useRef(1);
   // `pending` only disables the input after a re-render, and a seed chip
   // supplies its own question rather than reading the (now-cleared) field, so
@@ -177,9 +225,29 @@ export function Ask() {
   // needs no reaching for the mouse. It has to wait for the re-render: calling
   // focus() beside setPending(null) targets an input React has not re-enabled
   // yet, and focusing a disabled element silently does nothing.
+  //
+  // A reader who scrolled away while waiting keeps their place and their keys
+  // (mayFocus). `preventScroll` covers one with the input only partly in
+  // view, whom a plain focus() would still scroll.
   useEffect(() => {
-    if (turns.length) inputRef.current?.focus();
+    const input = inputRef.current;
+    if (turns.length && mayFocus(input, chatRef.current)) {
+      input.focus({ preventScroll: true });
+    }
   }, [turns.length]);
+
+  // A failure needs the same: the disabled input (or the Try again button,
+  // which unmounts on a retry) dropped focus to <body>, and the next Tab went
+  // past the chat. Land on Try again, the thing to do next, or on the input
+  // when there is nothing to retry, or Try again is out of view. `failed` is
+  // a new object every time, so this runs again after a retry fails again.
+  useEffect(() => {
+    if (!failed) return;
+    const target = [retryRef.current, inputRef.current].find((element) =>
+      mayFocus(element, chatRef.current),
+    );
+    target?.focus({ preventScroll: true });
+  }, [failed]);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -223,7 +291,11 @@ export function Ask() {
                 </div>
               </div>
 
-              <Conversation className="min-h-0 flex-1" aria-busy={pending !== null}>
+              <Conversation
+                className="min-h-0 flex-1"
+                aria-busy={pending !== null}
+                contextRef={chatRef}
+              >
                 <ConversationContent className="gap-5 p-5">
                   <AssistantMessage>
                     <p>{t.ask.greeting}</p>
@@ -275,7 +347,13 @@ export function Ask() {
                                         {title}
                                       </button>
                                     ) : (
-                                      <span className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
+                                      // dir="auto": a server title in English
+                                      // would otherwise take the page's RTL and
+                                      // print its "?" at the front on /ar.
+                                      <span
+                                        dir="auto"
+                                        className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim"
+                                      >
                                         {title}
                                       </span>
                                     )}
@@ -303,13 +381,18 @@ export function Ask() {
                       <UserMessage dim>{failed.question}</UserMessage>
                       <AssistantMessage>
                         <p className="text-dim">{t.ask.errors[failed.error]}</p>
-                        <button
-                          type="button"
-                          onClick={() => void ask(failed.question)}
-                          className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
-                        >
-                          {t.ask.tryAgain}
-                        </button>
+                        {/* The daily cap holds until the server's midnight: a
+                            retry would only be refused again. */}
+                        {failed.error !== "dailyCap" && (
+                          <button
+                            ref={retryRef}
+                            type="button"
+                            onClick={() => void ask(failed.question)}
+                            className="mt-3 cursor-pointer self-start rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
+                          >
+                            {t.ask.tryAgain}
+                          </button>
+                        )}
                       </AssistantMessage>
                     </div>
                   )}
@@ -318,7 +401,7 @@ export function Ask() {
                   turnId={turns[turns.length - 1]?.id}
                   pending={pending !== null}
                 />
-                <ConversationScrollButton />
+                <ConversationScrollButton aria-label={t.ask.scrollToLatest} />
               </Conversation>
 
               <form onSubmit={onSubmit} className="border-t border-rule p-3.5">
@@ -334,7 +417,11 @@ export function Ask() {
                     disabled={pending !== null}
                     maxLength={1000}
                     autoComplete="off"
-                    dir="auto"
+                    // Typed text follows its own direction, but an empty field
+                    // has none to detect and `auto` resolves it to LTR, which
+                    // put the Arabic placeholder on the wrong side of /ar.
+                    // Empty, it inherits the page's direction instead.
+                    dir={value.trim() ? "auto" : undefined}
                     placeholder={t.ask.placeholder}
                     className="w-full bg-transparent py-1.5 text-base outline-none placeholder:text-dim disabled:opacity-50 sm:text-lg"
                   />

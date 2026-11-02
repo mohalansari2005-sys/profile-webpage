@@ -5,6 +5,7 @@ import { expect, test, VISIT_API } from "./fixtures";
 // 390px viewport) because the chat's no-wrap suggestion row stretched an
 // unbounded grid column.
 const SIZES = [
+  { name: "Galaxy Fold cover screen", width: 280, height: 653, klass: "phone" },
   { name: "small phone", width: 320, height: 640, klass: "phone" },
   { name: "iPhone SE", width: 375, height: 667, klass: "phone" },
   { name: "iPhone 14", width: 390, height: 844, klass: "phone" },

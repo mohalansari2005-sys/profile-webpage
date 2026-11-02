@@ -6,6 +6,7 @@ markdown corpus in `content/`, and refuses anything it cannot ground.
 ## Run it
 
     cp backend/.env.example backend/.env    # then fill in the real values
+    echo 'POSTGRES_PASSWORD=<same as backend/.env>' > .env   # see below
     npm run content                          # regenerates backend/corpus.json
     docker compose up -d --build
     docker compose run --rm web python manage.py migrate
@@ -13,6 +14,11 @@ markdown corpus in `content/`, and refuses anything it cannot ground.
 
     curl -X POST localhost:8000/api/chat/ -H 'Content-Type: application/json' \
       -d '{"question":"What did he build at Majara?"}'
+
+The root `.env` is for compose itself: it substitutes `${POSTGRES_PASSWORD}` into
+the `db` service from the shell or a `.env` next to the compose file, never from
+`backend/.env`, which only becomes the containers' environment. Keep the two
+passwords the same.
 
 **After changing `backend/.env`, recreate the container — do not restart it.**
 `docker compose restart` reuses the existing environment and will silently keep
@@ -46,10 +52,19 @@ never disagree about what the corpus says. `ingest_content` chunks each record
 (summary + one chunk per `##` section), embeds the changed ones, and deletes
 orphans — re-running costs nothing when the corpus has not moved.
 
+The summary chunk leads with the record's frontmatter -- title, organisation,
+period, tool labels and repository -- because the page shows them and a
+visitor asks about them ("when did he work at SEET?"). Kept only in
+frontmatter they never reached the embedding or the prompt, and dates the page
+shows were refused as unknown. Sections stay prose only; retrieval hands
+`generate` whole records, so the fields come along with any hit. Adding this
+header changed the 7 summary chunks' text, so the first `ingest_content` after
+it re-embeds those 7 (of 23) once: a few thousand tokens, well under a cent.
+
 A request runs through `condense → relevance → retrieve → generate → log`.
 Grounding is enforced in Python: if the model cites a chunk id retrieval did
-not return, or reports insufficient context, the answer is replaced with a
-refusal before it leaves the server.
+not return, cites nothing at all, or reports insufficient context, the answer
+is replaced with a refusal before it leaves the server.
 
 ## One provider, two models
 
@@ -82,6 +97,19 @@ Pydantic class itself and enforces the schema server-side.
 `except APIError` alone lets a truncated or filtered response escape as a 500.
 See `chat/openai_client.py` — both are caught and mapped to a refusal, without
 the `api_error` flag, because they mean a bad response rather than an outage.
+Any other `OpenAIError`, and pydantic's `ValidationError` -- which `parse`
+raises when the content fails the schema, and which is no `OpenAIError` at all
+-- is an outage instead, a 503 logged with its traceback: an SDK upgrade or a
+schema the model cannot meet fails for every visitor alike, and as a refusal
+it would have turned them all away as off-topic, as the retired model did.
+
+The `log` node is just as defensive about the database being unwell: a write
+that fails on a dropped connection, a full disk or a timeout (`OperationalError`,
+`InterfaceError`) is logged to stderr and the visitor still gets the answer,
+which by then has been paid for. A write the schema or the grants refuse
+(`ProgrammingError`, `IntegrityError`, `DataError`) stays a 500: it would fail
+every turn alike, and answering anyway left `ChatLog` silently empty while the
+canary stayed green.
 
 Model names are not stable. **Listing a model does not prove it works** — call
 it once before depending on it, with the real node prompt rather than a toy one.
@@ -110,7 +138,8 @@ nothing said why. What now stops a repeat:
   the visitor to see the 503. `ingest_content` runs outside a turn and keeps
   the SDK's patient defaults.
 - An outage -- auth, quota, rate limit, 5xx, the budget running out, a retired
-  model with nowhere to fall back -- answers **503**, the UI's "service hit an
+  model with nowhere to fall back, an unexpected SDK error or a response that
+  fails the schema -- answers **503**, the UI's "service hit an
   error, try again", instead of a refusal. A failed `condense` ends the turn the
   same way: unresolved, "what did he build there?" could come back a grounded
   answer about the wrong employer.
@@ -153,12 +182,19 @@ Verify with exit codes, not output:
     git check-ignore -q backend/.env          # 0 = ignored, correct
     git check-ignore -q backend/.env.example  # 1 = committable, correct
     docker run --rm --entrypoint sh profile-webpage-web:latest -c 'printenv | grep -i openai'
+    docker run --rm --entrypoint sh profile-webpage-web:latest -c 'find /app -name "*.env*"'
 
-The last command must print nothing. Use plain `docker run`, not
+The last two commands must print nothing. Use plain `docker run`, not
 `docker compose run` — compose always applies `env_file`, so it prints the
-runtime key and proves nothing about the image.
+runtime key and proves nothing about the image. `.dockerignore` keeps out every
+env file, not just `.env`: a server-side copy such as `.env.prod` is invisible
+to git but `COPY . .` would bake it into a layer.
 
-`ChatLog` stores a salted SHA-256 of the client IP, never the address.
+The image runs as an unprivileged `app` user (uid 1000), not root. It still
+installs the `[dev]` extras so `docker compose run --rm web pytest` works.
+
+`ChatLog` stores a salted SHA-256 of the client IP, never the address -- of
+an IPv6 visitor's /64, the same key the per-IP limit uses (see Limits).
 
 ## Analytics
 
@@ -199,10 +235,48 @@ chat's daily budget.
 ## Limits
 
 `CHAT_RATE` is per IP; `CHAT_DAILY_CAP` is one counter for the whole service.
-It was sized against a free-tier daily quota. OpenAI is billed per token, not
-capped, so this counter is now the **spend** limit — it is the only thing
-between a scripted abuser and a real bill. Size it against what you are willing
-to pay per day, not against a quota.
+Both count with one atomic Redis `INCR` per request (`chat/throttling.py`), so
+requests arriving together cannot slip past either: DRF's own throttle, and the
+cap before it, read the count and wrote it back later, and under gthread a
+burst from one visitor got through together. `CHAT_RATE` is a fixed window --
+`10/min` allows 10 per clock minute -- so a burst that straddles two minutes can
+get up to twice that; the 429 says how many seconds are left in the window.
+The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
+`CF-Connecting-IP` -- trusted only from Cloudflare's ranges, see the root
+`Caddyfile` -- and passes it on as `X-Real-IP`, which is what `chat/ip.py` reads.
+`X-Forwarded-For` is never read -- Cloudflare appends to whatever the visitor
+sent, so its first entry is the visitor's to choose -- and without `X-Real-IP`
+(local dev) the socket address is used. An IPv6 address is keyed by its /64:
+a visitor can pick any address in theirs, a new one per request if they
+like, and keyed on the full address each was a fresh per-IP bucket. IPv4 is
+keyed as it is, and an IPv4-mapped IPv6 address as its IPv4 one. Caddy still
+overwrites `X-Forwarded-For` with the visitor's address, for the Django that is
+running while a deploy recreates Caddy with a new `Caddyfile`; see DEPLOYMENT.md.
+
+The daily cap was sized against a free-tier daily quota. OpenAI is billed per
+token, not capped, so this counter is now the **spend** limit — it is the only
+thing between a scripted abuser and a real bill. Size it against what you are
+willing to pay per day, not against a quota. The day is Riyadh's
+(`TIME_ZONE = "Asia/Riyadh"`): the cap resets at midnight there, while
+`ChatLog.created_at` is stored in UTC like every timestamp.
+
+The counter counts requests, not tokens, so each call also caps its output:
+`MAX_TOKENS_FAST` (1000) for `condense` and `relevance`, `MAX_TOKENS_GENERATE`
+(2500, room for a long Arabic answer) for `generate`, in `chat/openai_client.py`.
+What a call that hits its cap does depends on the node: `generate` refuses
+the turn, logged `output cap reached` with the tokens it was billed; `relevance`
+refuses it the same way, which the visitor reads as off-topic; `condense` falls
+back to the visitor's own question and the turn goes on. Count
+`output cap reached` rows before resizing a cap. With the caps, the worst case
+is about a cent a turn -- ~$2 a day at the default cap of 200.
+
+Only a POST that passes the per-IP limit **and** validates counts against the
+cap; other methods (405) are not throttled at all, and a 400 spends only the
+sender's per-IP budget. A refusal from the cap is a 429 whose body carries
+`"code": "daily_cap"`, so the UI can say "come back tomorrow" rather than "try
+again in a minute"; a per-IP 429 is DRF's own body, with no `code`. The API is
+anonymous: DRF authentication is switched off, so an `Authorization` header is
+ignored rather than checked.
 
 To read the spend, each `ChatLog` row's `prompt_tokens`/`completion_tokens`
 belong to the model in its `model` column, and never mix two rates:

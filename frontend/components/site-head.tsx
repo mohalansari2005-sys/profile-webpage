@@ -18,6 +18,18 @@ const themeScript = `try{var t=localStorage.getItem("theme"),r=document.document
 const englishPageScript = `try{var u=new URL(location.href);if(u.searchParams.get("lang")==="en"){localStorage.setItem("lang","en");u.searchParams.delete("lang");history.replaceState(null,"",u.pathname+u.search+u.hash)}else if(localStorage.getItem("lang")==="ar"&&location.pathname==="/"){document.documentElement.setAttribute("${REDIRECTING}","");location.replace("/ar"+location.search+location.hash)}}catch(e){}`;
 const arabicPageScript = `try{localStorage.setItem("lang","ar")}catch(e){}`;
 
+// Scroll-revealed blocks ship at opacity 0, and only <Reveal> can show them.
+// With JS on but the app's chunks blocked or broken (a proxy, a request dropped
+// on a flaky connection, a browser below Next's targets) the <noscript> rule
+// does not apply, so everything below the hero would stay invisible. Reveal
+// marks <html> as soon as it runs; if it has not two seconds after load, show
+// everything (.reveal-fallback in globals.css). A chunk request that hangs
+// rather than fails holds `load` back until the browser gives up on it, which
+// can take minutes, so the same check also runs eight seconds after this
+// script, whatever `load` is doing. A false alarm on a very slow connection
+// only costs the fade-in.
+const revealWatchdogScript = `try{var c=function(){var r=document.documentElement;if(!r.hasAttribute("data-reveal-ready"))r.classList.add("reveal-fallback")};addEventListener("load",function(){setTimeout(c,2000)});setTimeout(c,8000)}catch(e){}`;
+
 /** Contents of <head> shared by both languages' root layouts, so the two cannot
     drift apart. */
 export function SiteHead({ locale }: { locale: "en" | "ar" }) {
@@ -29,6 +41,7 @@ export function SiteHead({ locale }: { locale: "en" | "ar" }) {
           __html: locale === "ar" ? arabicPageScript : englishPageScript,
         }}
       />
+      <script dangerouslySetInnerHTML={{ __html: revealWatchdogScript }} />
       {/* Without JS, scroll-revealed content would stay at opacity 0. */}
       <noscript>
         <style>{`.reveal,.field-in{opacity:1!important;transform:none!important}.rule-draw{transform:none!important}`}</style>

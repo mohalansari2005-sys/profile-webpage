@@ -107,4 +107,12 @@ export const projects: WorkRecord[] = [
   },
 ];
 
+/** The records the chat can cite that have no row on the page (the about and
+    faq records). Only their titles ship, for the answer's source chips. */
+export const offPageRecords: Pick<WorkRecord, "id" | "title" | "ar">[] = [
+  { id: "about-bio", title: "About", ar: { title: "نبذة عني" } },
+  { id: "about-education", title: "Education", ar: { title: "التعليم" } },
+  { id: "faq-availability", title: "Are you available for work?", ar: { title: "هل أنت متاح للعمل؟" } },
+];
+
 export const toolById = new Map(tools.map((tool) => [tool.id, tool]));

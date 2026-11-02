@@ -16,7 +16,7 @@ he know?" but "where did he actually use it?"
 
 ```
 frontend/   Next.js app, static-exported, deployed on Vercel
-backend/    Django + DRF service for the chat feature; runs locally via Docker Compose
+backend/    Django + DRF service for the chat feature; Docker Compose locally and in production (see DEPLOYMENT.md)
 content/    Markdown corpus; frontend/lib/content.ts is generated from it
 docs/       Specs and implementation plans
 scripts/    Repo-level tooling
@@ -80,8 +80,16 @@ This rules out, for anything added later:
 
 Anything needing a backend (a contact form, say) has to call an external service
 from the client rather than a local API route. Response headers Vercel must add
-to the static files go in `frontend/vercel.json` instead; today that is only the
-`Content-Type` of `/opengraph-image`, which the export writes without an extension.
+to the static files go in `frontend/vercel.json` instead: the `Content-Type` of
+the generated images (`/opengraph-image`, `/icon`, `/apple-icon`), which the
+export writes without an extension, and the security headers on every path.
+The only Content-Security-Policy is `frame-ancestors 'none'`: a `script-src`
+would also block the inline theme and language scripts in `<head>`.
+
+`frontend/app/favicon.ico` is the `/icon` image (`app/icon.tsx`) in an .ico
+container, for clients that fetch `/favicon.ico` regardless of the page's
+links. It is committed rather than built: after changing the icon, build the
+frontend, then run `npm run favicon` from the repo root.
 
 ### Server Components by default
 
@@ -183,7 +191,12 @@ content.
 So it checks geometry synchronously on mount and reveals anything already at or
 above the fold, independent of the observer, and the observer's oversized top
 `rootMargin` covers jumps that happen later. A `<noscript>` rule in the layout
-handles the JS-disabled case. All three parts are load-bearing.
+handles the JS-disabled case, and a watchdog script in `site-head.tsx` handles
+JS that is on but never ran the reveal (a blocked, failed or stalled chunk): if
+`<Reveal>` has not marked `<html>` two seconds after load, or eight seconds
+after the page started, everything is shown. Printing
+is the last case: paper is laid out without scrolling, so a `@media print` rule
+in `globals.css` shows every block. All of these parts are load-bearing.
 
 ## The chat backend
 
@@ -227,7 +240,8 @@ npm run dev
 An answer's `sources` are `record_id`s — the same keys the tool strip filters
 on — so citing a record lights its row in amber, and each source chip scrolls
 you to it. A cited record with no row on the page (`about-bio`, an faq) renders
-as an inert chip and dims nothing.
+as an inert chip and dims nothing; only its `title` and `title_ar` ship to the
+site (`offPageRecords` in `frontend/lib/content.ts`), to name that chip.
 
 There is **one active join at a time**, owned by `frontend/components/join-context.tsx`:
 asking a question releases a pinned tool, picking a tool releases the citation,
@@ -288,5 +302,3 @@ build and redeploy automatically — nothing to run by hand.
 
 `frontend/AGENTS.md` is generated and rewritten by `next dev` itself, not by
 hand. It's expected to reappear if deleted; commit it rather than fight it.
-
-`frontend/public/*.svg` are unused `create-next-app` starter assets.

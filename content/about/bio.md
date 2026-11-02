@@ -6,6 +6,7 @@ org: ""
 period: ""
 tools: []
 summary: "Software engineer based in Riyadh, currently studying Information Systems in the Data Science and Management track and interning at Majara as a Product Engineering Intern. My work spans backend engineering, product development, and stakeholder-driven requirements, while I’m using this portfolio’s AI chat feature as a hands-on exercise in full-stack development, retrieval, and agent orchestration."
+title_ar: "نبذة عني"
 ---
 
 ## Who I am

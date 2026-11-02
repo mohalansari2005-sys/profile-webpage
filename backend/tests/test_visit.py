@@ -57,10 +57,13 @@ def test_a_visit_is_stored_with_a_hashed_ip(db, api):
 
 
 def test_the_ip_hash_matches_the_chat_logs_key_behind_a_proxy(db, api):
+    """Caddy names the visitor in X-Real-IP (Cloudflare's CF-Connecting-IP,
+    believed only from Cloudflare's ranges); a client-sent X-Forwarded-For is
+    never read."""
     from chat.models import hash_ip
 
-    beacon(api, {"path": "/"}, HTTP_X_FORWARDED_FOR="198.51.100.7, 10.0.0.1",
-           REMOTE_ADDR="10.0.0.1")
+    beacon(api, {"path": "/"}, HTTP_X_REAL_IP="198.51.100.7",
+           HTTP_X_FORWARDED_FOR="203.0.113.66", REMOTE_ADDR="10.0.0.1")
     assert stored()[0].ip_hash == hash_ip("198.51.100.7")
 
 

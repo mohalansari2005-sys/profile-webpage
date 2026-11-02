@@ -26,11 +26,13 @@ export function LanguageToggle() {
   const hash = useSyncExternalStore(subscribe, () => location.hash, () => "");
   const href = homePath(other) + (other === "en" ? "?lang=en" : "") + hash;
 
+  // `hrefLang` names the target's language. No `lang={other}`: the link's
+  // only text is its label, written in this page's language, and a screen
+  // reader would read it in the other language's voice.
   return (
     <a
       href={href}
       hrefLang={other}
-      lang={other}
       aria-label={t.lang.switchAria}
       title={t.lang.switchAria}
       className={iconChip}

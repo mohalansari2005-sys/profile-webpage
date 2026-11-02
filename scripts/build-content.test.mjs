@@ -74,6 +74,22 @@ test("emits Arabic copy to the frontend module when present", () => {
   assert.doesNotMatch(exp, /ar:/);
 });
 
+test("records with no row on the page ship their titles only", () => {
+  const withOffPage = structuredClone(corpus);
+  withOffPage.byKind.about = [{ id: "about-bio", title: "About", org: "", period: "",
+    summary: "OFF_PAGE_SUMMARY", tools: [], ar: { title: "نبذة", summary: "ملخص" } }];
+  withOffPage.byKind.faq = [{ id: "faq-x", title: "Are you free?", org: "", period: "",
+    summary: "Yes.", tools: [] }];
+  const out = renderModule(withOffPage);
+  const offPage = out.slice(out.indexOf("export const offPageRecords"));
+  assert.match(offPage, /\{ id: "about-bio", title: "About", ar: \{ title: "نبذة" \} \},/);
+  assert.match(offPage, /\{ id: "faq-x", title: "Are you free\?" \},/);
+  // A source chip needs a name, nothing more: no summary in either language.
+  assert.doesNotMatch(out, /OFF_PAGE_SUMMARY|ملخص/);
+  // ...and they stay out of the lists the page renders rows from.
+  assert.doesNotMatch(out.slice(0, out.indexOf("export const offPageRecords")), /about-bio|faq-x/);
+});
+
 test("Arabic copy never reaches the chat corpus JSON", () => {
   const json = renderCorpusJson(corpus);
   assert.doesNotMatch(json, /شيء|بُني/);

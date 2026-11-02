@@ -12,7 +12,16 @@ const KEY = "theme";
 const ORDER: Theme[] = ["system", "light", "dark"];
 const ICON = { system: Monitor, light: Sun, dark: Moon } as const;
 
+/** The choice made in this page view when storage would not save it: site
+    data blocked, some in-app browsers, or storage that reads but will not
+    write (full, or a private mode with no quota). Without it read() said
+    whatever storage last held, so the toggle could switch the page to light
+    once and never move again. Set only by a failed write, and it wins over
+    storage until a write succeeds. */
+let unsaved: Theme | null = null;
+
 function read(): Theme {
+  if (unsaved) return unsaved;
   try {
     const stored = localStorage.getItem(KEY);
     return stored === "light" || stored === "dark" ? stored : "system";
@@ -54,8 +63,10 @@ function choose(theme: Theme) {
   try {
     if (theme === "system") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, theme);
+    unsaved = null;
   } catch {
-    // Storage blocked: the choice still applies for this page view.
+    // Not saved: the choice still applies for this page view.
+    unsaved = theme;
   }
   apply(theme);
   listeners.forEach((notify) => notify());

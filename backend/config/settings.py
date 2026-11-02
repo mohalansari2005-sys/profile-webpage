@@ -34,6 +34,11 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # invented a chunk id, so the choice came down to price: at ~550 in / ~80 out
 # per question and the 200/day CHAT_DAILY_CAP, this is ~$2.40/month worst case,
 # against ~$12 for gpt-4.1 and ~$19 for gpt-5.4.
+# Those per-question figures predate whole-record retrieval: generate now reads
+# up to ~8k tokens of context and may write up to MAX_TOKENS_GENERATE
+# (chat/openai_client.py). With the classifiers, the worst case is about a cent
+# a turn -- ~$2 a *day* at the cap, not a month. The ranking by price stands;
+# size CHAT_DAILY_CAP from ChatLog's real token counts.
 #
 # OPENAI_FAST_MODEL serves the classifier calls, `condense` and `relevance`. It
 # was gpt-4.1-nano ($0.10 in / $0.40 out), 6/6 over two trials including a
@@ -49,6 +54,8 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # arguing the question WAS in scope. relevance fails closed, so an unstable
 # gate silently refuses real visitors. If this model is ever not found again,
 # openai_client falls back to OPENAI_MODEL rather than refusing everyone.
+# A reasoning model counts its reasoning against the output caps, which are
+# sized for this one: see MAX_TOKENS_* in chat/openai_client.py before switching.
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 OPENAI_FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "gpt-4.1-mini")
 # text-embedding-3-small is natively 1536 dimensions, which is exactly the
@@ -106,6 +113,18 @@ DATABASES = {
         "PASSWORD": required("POSTGRES_PASSWORD"),
         "HOST": os.environ.get("POSTGRES_HOST", "db"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        # Under gthread, gunicorn's --timeout no longer ends a stuck request,
+        # and CHAT_TURN_BUDGET bounds only the OpenAI calls: a query waiting
+        # on a lock would hold its thread -- one of 8 -- for good. Milliseconds.
+        # Every query here is small -- a vector search over a few dozen chunks,
+        # one ChatLog insert a turn, and migrate's and ingest_content's work on
+        # the same tables -- so 15s is room for anything legitimate. A
+        # migration that cannot get its lock in 5s fails rather than queue
+        # every ChatLog write behind it, and can simply be run again.
+        # connect_timeout (seconds) covers the one wait those two cannot: opening
+        # a connection to a Postgres that does not answer.
+        "OPTIONS": {"connect_timeout": 5,
+                    "options": "-c statement_timeout=15000 -c lock_timeout=5000"},
     }
 }
 
@@ -113,6 +132,10 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+        # Seconds. Every chat POST counts in Redis before anything else, so a
+        # Redis that stops answering would otherwise hang every thread on it;
+        # with these the request fails with a 500 instead.
+        "OPTIONS": {"SOCKET_CONNECT_TIMEOUT": 2, "SOCKET_TIMEOUT": 3},
     }
 }
 
@@ -151,3 +174,7 @@ LOGGING = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True
+# The local day, for the daily cap: it resets at midnight in Riyadh. Unset,
+# Django's default America/Chicago rolled it over at 08:00-09:00 Riyadh time.
+# Timestamps are still stored in UTC (USE_TZ).
+TIME_ZONE = "Asia/Riyadh"

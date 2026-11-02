@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { loadGoogleFont } from "@/lib/google-font";
 
 export const alt = "Mohammed Alansari";
 export const size = { width: 1200, height: 630 };
@@ -9,18 +10,6 @@ const PAPER = "#ebeef3";
 const INK = "#0f1626";
 const RULE = "#d2d8e0";
 const MATCH_INK = "#8e5f15";
-
-async function loadGoogleFont(family: string, weight: number, text: string) {
-  const css = await (
-    await fetch(
-      `https://fonts.googleapis.com/css2?family=${family}:wght@${weight}&text=${encodeURIComponent(text)}`,
-    )
-  ).text();
-  const match = css.match(/src: url\(([^)]+)\) format\('(opentype|truetype)'\)/);
-  if (!match) throw new Error(`could not resolve font data for ${family}`);
-  const res = await fetch(match[1]);
-  return res.arrayBuffer();
-}
 
 export default async function Image() {
   const displayText = "MAMohammedAlansari";
