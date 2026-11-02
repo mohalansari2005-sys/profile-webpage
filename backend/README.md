@@ -6,6 +6,7 @@ markdown corpus in `content/`, and refuses anything it cannot ground.
 ## Run it
 
     cp backend/.env.example backend/.env    # then fill in the real values
+    echo 'POSTGRES_PASSWORD=<same as backend/.env>' > .env   # see below
     npm run content                          # regenerates backend/corpus.json
     docker compose up -d --build
     docker compose run --rm web python manage.py migrate
@@ -13,6 +14,11 @@ markdown corpus in `content/`, and refuses anything it cannot ground.
 
     curl -X POST localhost:8000/api/chat/ -H 'Content-Type: application/json' \
       -d '{"question":"What did he build at Majara?"}'
+
+The root `.env` is for compose itself: it substitutes `${POSTGRES_PASSWORD}` into
+the `db` service from the shell or a `.env` next to the compose file, never from
+`backend/.env`, which only becomes the containers' environment. Keep the two
+passwords the same.
 
 **After changing `backend/.env`, recreate the container — do not restart it.**
 `docker compose restart` reuses the existing environment and will silently keep

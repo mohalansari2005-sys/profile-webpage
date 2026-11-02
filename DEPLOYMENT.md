@@ -71,6 +71,23 @@ CORS_ORIGINS=<your production frontend origin, e.g. https://yourdomain.com>
 DOMAIN=<your domain, e.g. api.yourdomain.com>
 ```
 
+Then create a second, smaller `.env` in the repo root, next to `docker-compose.prod.yml`
+(also gitignored):
+
+```bash
+printf 'POSTGRES_PASSWORD=%s\n' '<the same value as in backend/.env>' > .env
+chmod 600 .env backend/.env
+```
+
+Compose needs this one for itself. The `db` service's `${POSTGRES_PASSWORD}` (and
+`${POSTGRES_DB}`/`${POSTGRES_USER}`, which default to `chat`) are substituted by compose
+when it reads the file, from the shell or this root `.env` — **never from
+`backend/.env`**, which only becomes the `web` and `caddy` containers' environment.
+Without it every compose command stops with `required variable POSTGRES_PASSWORD is
+missing a value`. Keep the two files in step: if `backend/.env` sets a `POSTGRES_DB`
+or `POSTGRES_USER` other than `chat`, put the same line here, or Postgres creates one
+user and `web` logs in as another.
+
 `CORS_ALLOWED_ORIGIN_REGEXES` in `backend/config/settings.py` already whitelists any
 `*.vercel.app` subdomain, so Vercel preview deploys work without extra config; the
 `CORS_ORIGINS` value above is for the production domain specifically.
