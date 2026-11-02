@@ -358,9 +358,15 @@ html[lang="ar"] {
   --font-body: var(--font-arabic);
 }
 
+/* JetBrains Mono by its family name, not var(--font-mono): the variable also
+   lists next/font's size-matched "JetBrains Mono Fallback", a local(Arial) face
+   with no unicode-range. Arial has Arabic glyphs on macOS, Windows and iOS, so
+   it took every Arabic letter at 134% before Plex was reached — the labels
+   came out in an oversized foreign face, and the truncated status line in the
+   tool strip clipped their hamzas. */
 :lang(ar) .font-mono,
 :lang(ar) .field-label {
-  font-family: var(--font-mono), var(--font-arabic), sans-serif;
+  font-family: "JetBrains Mono", var(--font-arabic), sans-serif;
 }
 
 /* Arabic letters join, so any letter-spacing (the mono labels' 0.14em, the

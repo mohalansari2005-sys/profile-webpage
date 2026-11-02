@@ -55,6 +55,44 @@ test.describe("Arabic page", () => {
     expect(await family("h1")).toMatch(/IBM_Plex_Sans_Arabic|IBM Plex Sans Arabic/);
   });
 
+  // The computed family string looked right while the glyphs came from Arial,
+  // so this asks Chrome which fonts actually drew the text. (Linux has no
+  // Arial, so only a macOS or Windows run can catch the regression.)
+  test("mono labels draw Arabic letters in Plex, not a system fallback", async ({ page }) => {
+    await page.goto("/ar");
+    await page.evaluate(() => document.fonts.ready);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument");
+    for (const selector of ["#about .field-label", "#work p[aria-live]"]) {
+      const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector });
+      const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+      const names = fonts.map((font) => font.familyName);
+      expect(names.some((name) => /Plex/i.test(name)), `${selector}: ${names}`).toBe(true);
+      expect(names.some((name) => /Arial/i.test(name)), `${selector}: ${names}`).toBe(false);
+    }
+  });
+
+  test("the English page does not preload the Arabic typeface", async ({ page }) => {
+    const html = await (await page.request.get("/")).text();
+    const preloads = [...html.matchAll(/<link rel="preload" href="([^"]+\.woff2)"/g)].map(
+      (match) => match[1].split("/").pop(),
+    );
+    expect(preloads.length).toBeGreaterThan(0);
+    const plexFiles: string[] = [];
+    for (const [, href] of html.matchAll(/<link rel="stylesheet" href="([^"]+\.css)"/g)) {
+      const css = await (await page.request.get(href)).text();
+      for (const [, url] of css.matchAll(
+        /@font-face\s*\{[^}]*font-family:\s*["']?IBM Plex Sans Arabic["']?;[^}]*url\(([^)]+)\)/g,
+      )) {
+        plexFiles.push(url.split("/").pop()!);
+      }
+    }
+    expect(plexFiles.length).toBeGreaterThan(0);
+    expect(preloads.filter((file) => plexFiles.includes(file!))).toEqual([]);
+  });
+
   test("translates the work records and the project link", async ({ page }) => {
     await page.goto("/ar");
     const row = page.locator("#record-exp-majara");
