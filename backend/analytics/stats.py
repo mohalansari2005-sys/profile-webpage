@@ -18,10 +18,17 @@ from chat.models import ChatLog
 RANGES = (7, 30, 90, 365)
 DEFAULT_DAYS = 30
 
-# What relevance and generate log when the OpenAI call itself failed. Kept apart
-# from refusals: on 2026-10-23 a retired model made every question fail this
-# way for ten days, and as "refused" it looked like visitors asking off-topic.
-SERVICE_ERROR = "generation unavailable"
+# What chat logs for a turn the AI provider failed: "generation unavailable"
+# (the gate or generate), "retrieval unavailable" (the embedding) and
+# "condense unavailable; <the refusal that caused>". Kept apart from refusals:
+# on 2026-10-23 a retired model made every question fail this way for ten
+# days, and as "refused" it looked like visitors asking off-topic.
+SERVICE_ERROR = (Q(refusal_reason__endswith=" unavailable")
+                 | Q(refusal_reason__startswith="condense unavailable"))
+
+
+def _is_service_error(reason: str) -> bool:
+    return reason.endswith(" unavailable") or reason.startswith("condense unavailable")
 
 BREAKDOWN_ROWS = 10
 LATEST_QUESTIONS = 25
@@ -92,8 +99,8 @@ def _totals(views, chats) -> dict:
     c = chats.aggregate(
         chat_users=Count("ip_hash", distinct=True),
         questions=Count("id"),
-        refused=Count("id", filter=Q(refused=True) & ~Q(refusal_reason=SERVICE_ERROR)),
-        service_errors=Count("id", filter=Q(refusal_reason=SERVICE_ERROR)),
+        refused=Count("id", filter=Q(refused=True) & ~SERVICE_ERROR),
+        service_errors=Count("id", filter=SERVICE_ERROR),
     )
     # The join the shared ip_hash exists for: visitors in range who also asked.
     chatted = (views.filter(ip_hash__in=chats.values("ip_hash"))
@@ -107,7 +114,7 @@ def _daily(views, chats, tz, day_list) -> list[dict]:
         visitors=Count("ip_hash", distinct=True), page_views=Count("id"))}
     per_chat = {row["day"]: row for row in chats.annotate(day=day).values("day").annotate(
         chat_users=Count("ip_hash", distinct=True), questions=Count("id"),
-        service_errors=Count("id", filter=Q(refusal_reason=SERVICE_ERROR)))}
+        service_errors=Count("id", filter=SERVICE_ERROR))}
     empty_view = {"visitors": 0, "page_views": 0}
     empty_chat = {"chat_users": 0, "questions": 0, "service_errors": 0}
     rows = []
@@ -222,7 +229,7 @@ def _breakdowns(views) -> list[dict]:
 def _latest(tz) -> list[dict]:
     rows = []
     for log in ChatLog.objects.order_by("-created_at")[:LATEST_QUESTIONS]:
-        if log.refusal_reason == SERVICE_ERROR:
+        if _is_service_error(log.refusal_reason):
             outcome = "service error"
         elif log.refused:
             outcome = "refused"

@@ -355,3 +355,15 @@ def test_visitor_supplied_strings_are_escaped(db, client, password):
     assert "<b>src</b>" not in html
     assert "<i>x</i>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_every_outage_label_chat_writes_is_a_service_error(db):
+    """chat logs three: the gate or generate, the embedding, and a refusal
+    that followed a failed condense. None of them is the bot declining."""
+    for reason in ("generation unavailable", "retrieval unavailable",
+                   "condense unavailable; general: no subject"):
+        chat(refused=True, reason=reason)
+    chat(refused=True, reason="general: weather")
+    stats = collect(30)
+    assert (stats["totals"]["service_errors"], stats["totals"]["refused"]) == (3, 1)
+    assert [q["outcome"] for q in stats["latest"]].count("service error") == 3
