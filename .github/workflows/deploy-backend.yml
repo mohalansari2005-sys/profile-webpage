@@ -26,9 +26,7 @@ jobs:
             # never deployed.
             set -e
             cd /opt/profile-webpage
-            caddyfile_before=$(sha256sum Caddyfile)
             git pull
-            caddyfile_after=$(sha256sum Caddyfile)
             # A changed Caddyfile reaches Caddy only in a new container. `up`
             # does not recreate one for it, and `git pull` replaces the file
             # rather than rewriting it, so the running container's single-file
@@ -38,14 +36,19 @@ jobs:
             # yet touched. A recreated container binds the new file; its
             # certificates live in the caddy_data volume and carry over. Unlike
             # `exec`-ing into Caddy, this works with it stopped or crash-looping.
-            # Only when the pull changed the file: a recreate cuts off the
-            # requests in flight.
+            # Only when the file differs from the one last applied: a recreate
+            # cuts off the requests in flight. "Last applied" is a stamp written
+            # after a successful recreate, not "did this pull change it" -- a
+            # re-run of a deploy that pulled the file and then failed would
+            # otherwise see no change and leave Caddy on the old config.
             # First, before web: the Caddyfile sets the headers Django reads
             # the visitor's address from, and a new Django must not run behind
             # an old proxy config, even for the length of a build.
-            if [ "$caddyfile_after" != "$caddyfile_before" ]; then
+            caddyfile=$(sha256sum Caddyfile | cut -d' ' -f1)
+            if [ "$caddyfile" != "$(cat .git/caddyfile-applied 2>/dev/null)" ]; then
               docker compose -f docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
               docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+              echo "$caddyfile" > .git/caddyfile-applied
             fi
             # Migrate before the swap, in a one-off container of the new image,
             # while the old web keeps serving. Migrated after `up`, the new code

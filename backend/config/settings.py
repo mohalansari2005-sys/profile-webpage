@@ -103,7 +103,10 @@ DATABASES = {
         # the same tables -- so 15s is room for anything legitimate. A
         # migration that cannot get its lock in 5s fails rather than queue
         # every ChatLog write behind it, and can simply be run again.
-        "OPTIONS": {"options": "-c statement_timeout=15000 -c lock_timeout=5000"},
+        # connect_timeout (seconds) covers the one wait those two cannot: opening
+        # a connection to a Postgres that does not answer.
+        "OPTIONS": {"connect_timeout": 5,
+                    "options": "-c statement_timeout=15000 -c lock_timeout=5000"},
     }
 }
 

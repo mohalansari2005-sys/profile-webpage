@@ -142,12 +142,13 @@ deploy means the server may be part-way through — check `git log -1` and
 
 ```bash
 cd profile-webpage
-caddyfile_before=$(sha256sum Caddyfile)
 git pull
-# Only if the pull changed the Caddyfile:
-if [ "$(sha256sum Caddyfile)" != "$caddyfile_before" ]; then
+# Only if the Caddyfile differs from the one last applied (stamped below):
+caddyfile=$(sha256sum Caddyfile | cut -d' ' -f1)
+if [ "$caddyfile" != "$(cat .git/caddyfile-applied 2>/dev/null)" ]; then
   docker compose -f docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
   docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+  echo "$caddyfile" > .git/caddyfile-applied
 fi
 docker compose -f docker-compose.prod.yml build web
 docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate
