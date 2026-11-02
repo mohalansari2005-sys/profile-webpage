@@ -11,7 +11,10 @@ const OG_IMAGE = { url: "/opengraph-image", width: 1200, height: 630 };
 export function siteMetadata(locale: Locale): Metadata {
   const { meta } = getMessages(locale);
   return {
-    metadataBase: new URL("https://profile-webpage-liart.vercel.app"),
+    // The custom domain, not a *.vercel.app alias: canonical, hreflang and
+    // og:url are all resolved against this, and search engines index whichever
+    // host the canonical names.
+    metadataBase: new URL("https://www.alansari.stream"),
     title: meta.title,
     description: meta.description,
     alternates: {

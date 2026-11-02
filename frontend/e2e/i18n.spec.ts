@@ -87,6 +87,17 @@ test.describe("Arabic page", () => {
     await expect(page.locator('link[rel="alternate"][hreflang="ar"]')).toHaveCount(1);
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1);
   });
+
+  test("points search engines at the custom domain, per language", async ({ page }) => {
+    const site = "https://www.alansari.stream";
+    for (const [path, canonical] of [["/", site], ["/ar", `${site}/ar`]]) {
+      await page.goto(path);
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", canonical);
+      await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", canonical);
+      await expect(page.locator('link[rel="alternate"][hreflang="ar"]'))
+        .toHaveAttribute("href", `${site}/ar`);
+    }
+  });
 });
 
 test.describe("chat in Arabic", () => {

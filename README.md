@@ -4,7 +4,7 @@ Personal portfolio for Mohammed Alansari — a static site built with Next.js an
 deployed on Vercel, in English (`/`) and Arabic (`/ar`), with an AI chat backed
 by a Django service.
 
-**Live:** https://profile-webpage-liart.vercel.app
+**Live:** https://www.alansari.stream
 
 The page is built around one idea: everything on it is a typed record. Roles and
 projects are rows with fields, and the tool strip above them is a join —
