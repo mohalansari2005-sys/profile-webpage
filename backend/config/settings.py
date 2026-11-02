@@ -98,9 +98,10 @@ DATABASES = {
         # Under gthread, gunicorn's --timeout no longer ends a stuck request,
         # and CHAT_TURN_BUDGET bounds only the OpenAI calls: a query waiting
         # on a lock would hold its thread -- one of 8 -- for good. Milliseconds.
-        # Every query here, migrate's and ingest_content's included, is on
-        # tables of a few hundred rows; 15s is room for anything legitimate.
-        # A migration that cannot get its lock in 5s fails rather than queue
+        # Every query here is small -- a vector search over a few dozen chunks,
+        # one ChatLog insert a turn, and migrate's and ingest_content's work on
+        # the same tables -- so 15s is room for anything legitimate. A
+        # migration that cannot get its lock in 5s fails rather than queue
         # every ChatLog write behind it, and can simply be run again.
         "OPTIONS": {"options": "-c statement_timeout=15000 -c lock_timeout=5000"},
     }
