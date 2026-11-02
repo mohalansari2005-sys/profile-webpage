@@ -1,0 +1,299 @@
+{% load l10n %}<!doctype html>
+{% comment %}
+  Everything is computed in analytics/stats.py; this file only prints. Every
+  visitor-supplied string (paths, referrers, sources, questions, refusal
+  reasons) goes through Django's autoescape -- never mark it safe. No script,
+  no CDN, no web fonts: the font stacks name the site's faces first and fall
+  back to whatever the OS has.
+{% endcomment %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>Site analytics · last {{ stats.days }} days</title>
+<style>
+  /* The site's tokens (frontend/app/globals.css), light then dark. */
+  :root {
+    --paper: #ebeef3;
+    --ink: #0f1626;
+    --dim: #5c6779;
+    --rule: #d2d8e0;
+    --signal: #0b6e4f;
+    --match: #e09b2d;
+    --display: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* The grey bars are --dim thinned toward the ground, so the green series
+       nested in them stands apart; navy needs less thinning to stay visible. */
+    --outer-opacity: 0.4;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0f1626;
+      --ink: #e8e0cc;
+      --dim: #7b8598;
+      --rule: #26304399;
+      --signal: #4bbd8e;
+      --match: #f0b558;
+      --outer-opacity: 0.65;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 1rem/1.5 var(--body);
+  }
+  main { max-width: 64rem; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.2; margin: 0; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.15rem; }
+  h3 { font-size: 1rem; }
+  section { margin-top: 2.5rem; }
+  .label, th, .tick, .axis, .legend, nav, .meta, .when, .num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+  }
+  .dim, .meta, .tick, .axis, th { color: var(--dim); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  header { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: end; }
+  .meta { margin: 0.4rem 0 0; }
+  nav ul { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
+  nav a {
+    display: block; padding: 0.35rem 0.6rem; border: 1px solid var(--rule); border-radius: 4px;
+    color: var(--ink); text-decoration: none;
+  }
+  nav a[aria-current="page"] { border-color: var(--signal); box-shadow: inset 0 -2px 0 var(--signal); }
+  nav a:focus-visible, summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .tiles {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.75rem;
+    list-style: none; margin: 1.5rem 0 0; padding: 0;
+  }
+  .tile { border: 1px solid var(--rule); border-radius: 4px; padding: 0.75rem 0.9rem; }
+  .tile .label { display: block; color: var(--dim); }
+  .tile .value { display: block; font-family: var(--display); font-size: 1.6rem; font-weight: 600; margin-top: 0.2rem; }
+  .tile .note { display: block; font-size: 0.8rem; margin-top: 0.1rem; }
+  /* Amber is a fill, never text (2:1 on paper): the tile gets an amber bar. */
+  .tile[data-alert] { border-color: var(--match); box-shadow: inset 0 4px 0 var(--match); }
+  .alltime { margin: 1rem 0 0; color: var(--dim); }
+  .alltime b { color: var(--ink); font-weight: 600; }
+
+  figure { margin: 0; }
+  figcaption { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; justify-content: space-between; align-items: baseline; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; list-style: none; margin: 0; padding: 0; }
+  .legend li { white-space: nowrap; }
+  .key { display: inline-block; width: 0.7rem; height: 0.7rem; margin-right: 0.35rem; vertical-align: -0.05rem; border-radius: 2px; }
+  .key-outer, .outer { fill: var(--dim); background: var(--dim); fill-opacity: var(--outer-opacity); }
+  .key-outer { opacity: var(--outer-opacity); }
+  .key-inner, .inner { fill: var(--signal); background: var(--signal); }
+  .key-hi, .hi { fill: var(--match); background: var(--match); }
+  .plot { position: relative; margin-top: 1.25rem; border-bottom: 1px solid var(--rule); }
+  .plot svg { display: block; width: 100%; height: 10rem; overflow: visible; }
+  .tick { position: absolute; left: 0; top: -1.1rem; }
+  .grid { stroke: var(--rule); stroke-width: 1; }
+  .hit { fill: transparent; }
+  .day:hover .hit { fill: var(--rule); fill-opacity: 0.5; }
+  .axis { display: flex; justify-content: space-between; margin-top: 0.35rem; }
+  details { margin-top: 1.25rem; }
+  summary { cursor: pointer; font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 400; }
+  th, td { padding: 0.45rem 0.5rem 0.45rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th.num, td.num { padding: 0.45rem 0 0.45rem 0.75rem; }
+  .breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem 2.5rem; margin-top: 1rem; }
+  .latest { margin-top: 1rem; }
+  .breakdowns h3 { margin-bottom: 0.5rem; }
+  .share { display: block; height: 2px; margin-top: 0.3rem; background: var(--signal); }
+  .wrap { overflow-wrap: anywhere; }
+  .empty { color: var(--dim); font-style: italic; }
+  .scroll { overflow-x: auto; }
+  .flag { display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.35rem; border-radius: 2px; background: var(--match); }
+  .reason { display: block; color: var(--dim); font-size: 0.85rem; }
+
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--dim); font-size: 0.9rem; }
+  footer ul { padding-left: 1.1rem; }
+  footer code { font-family: var(--mono); font-size: 0.85em; color: var(--ink); }
+
+  /* Phones: one column throughout, and each latest-question row stacks
+     (when, outcome, latency on one line; the question under them). */
+  @media (max-width: 640px) {
+    main { padding: 1.25rem 1rem 2.5rem; }
+    .tiles, .breakdowns { grid-template-columns: 1fr; }
+    .latest thead { display: none; }
+    .latest tr { display: grid; grid-template-columns: auto 1fr auto; gap: 0.25rem 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+    .latest td { border: 0; padding: 0; }
+    .latest td.q { grid-row: 2; grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Site analytics</h1>
+      <p class="meta">{{ stats.first|date:"D d M Y" }} – {{ stats.today|date:"D d M Y" }} · days in {{ stats.tz }} · generated {{ stats.generated }}</p>
+    </div>
+    <nav aria-label="Range">
+      <ul>
+        {% for n in ranges %}
+        <li><a href="?days={{ n }}"{% if n == stats.days %} aria-current="page"{% endif %}>{{ n }} days</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </header>
+
+  <ul class="tiles">
+    {% for tile in stats.tiles %}
+    <li class="tile"{% if tile.alert %} data-alert="{{ tile.alert }}"{% endif %}>
+      <span class="label">{{ tile.label }}</span>
+      <span class="value">{{ tile.value }}</span>
+      {% if tile.note %}<span class="note">{% if tile.alert %}<span class="flag" aria-hidden="true"></span>{% endif %}{{ tile.note }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% with a=stats.all_time %}
+  <p class="alltime">All time:
+    <b>{{ a.visitors|floatformat:"g" }}</b> visitors ·
+    <b>{{ a.page_views|floatformat:"g" }}</b> page views{% if a.first_view %} since {{ a.first_view|date:"d M Y" }}{% endif %} ·
+    <b>{{ a.chat_users|floatformat:"g" }}</b> chatbot users ·
+    <b>{{ a.questions|floatformat:"g" }}</b> questions{% if a.first_question %} since {{ a.first_question|date:"d M Y" }}{% endif %}
+  </p>
+  {% endwith %}
+
+  {% for chart in stats.charts %}
+  <section aria-labelledby="chart-{{ forloop.counter }}">
+    <figure>
+      <figcaption>
+        <h2 id="chart-{{ forloop.counter }}">{{ chart.title }}</h2>
+        <ul class="legend">
+          <li><span class="key key-outer"></span>{{ chart.outer_label }}</li>
+          <li><span class="key key-inner"></span>{{ chart.inner_label }}</li>
+          {% if chart.hi_label %}<li><span class="key key-hi"></span>{{ chart.hi_label }}</li>{% endif %}
+        </ul>
+      </figcaption>
+      <div class="plot">
+        <span class="tick">{{ chart.top }}</span>
+        {% localize off %}{# SVG coordinates need a "." decimal whatever the locale #}
+        <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img"
+             aria-label="{{ chart.title }}, one bar per day; the exact numbers are under Daily numbers">
+          <line class="grid" x1="0" y1="0" x2="{{ chart.width }}" y2="0" vector-effect="non-scaling-stroke"/>
+          <line class="grid" x1="0" y1="{{ chart.mid_y }}" x2="{{ chart.width }}" y2="{{ chart.mid_y }}" vector-effect="non-scaling-stroke"/>
+          {% for b in chart.bars %}
+          <g class="day">
+            <title>{{ b.title }}</title>
+            <rect class="hit" x="{{ b.slot_x }}" y="0" width="{{ b.slot_w }}" height="{{ chart.height }}"/>
+            {% if b.h %}<rect class="outer" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}"/>{% endif %}
+            {% if b.hi_h %}<rect class="hi" x="{{ b.x }}" y="{{ b.hi_y }}" width="{{ b.w }}" height="{{ b.hi_h }}"/>{% endif %}
+            {% if b.inner_h %}<rect class="inner" x="{{ b.inner_x }}" y="{{ b.inner_y }}" width="{{ b.inner_w }}" height="{{ b.inner_h }}"/>{% endif %}
+          </g>
+          {% endfor %}
+        </svg>
+        {% endlocalize %}
+      </div>
+      <div class="axis"><span>{{ chart.first|date:"D d M" }}</span><span>{{ chart.last|date:"D d M" }}</span></div>
+    </figure>
+  </section>
+  {% endfor %}
+
+  <details>
+    <summary>Daily numbers</summary>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Day</th>
+            <th scope="col" class="num">Visitors</th>
+            <th scope="col" class="num">Page views</th>
+            <th scope="col" class="num">Chatbot users</th>
+            <th scope="col" class="num">Questions</th>
+            <th scope="col" class="num">Service errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in stats.daily reversed %}
+          <tr>
+            <td class="when">{{ d.day|date:"D d M" }}</td>
+            <td class="num">{{ d.visitors }}</td>
+            <td class="num">{{ d.page_views }}</td>
+            <td class="num">{{ d.chat_users }}</td>
+            <td class="num">{{ d.questions }}</td>
+            <td class="num">{{ d.service_errors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <section aria-labelledby="where">
+    <h2 id="where">Where visits came from</h2>
+    <div class="breakdowns">
+      {% for b in stats.breakdowns %}
+      <div>
+        <h3>{{ b.title }}</h3>
+        <table>
+          <thead>
+            <tr><th scope="col">Top {{ b.rows|length }}</th><th scope="col" class="num">Visitors</th><th scope="col" class="num">Views</th></tr>
+          </thead>
+          <tbody>
+            {% for r in b.rows %}
+            <tr>
+              <td class="wrap">{{ r.label }}<span class="share" style="width: {{ r.pct }}%"></span></td>
+              <td class="num">{{ r.visitors|floatformat:"g" }}</td>
+              <td class="num">{{ r.views|floatformat:"g" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="empty">No page views in this range.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section aria-labelledby="latest">
+    <h2 id="latest">Latest {{ stats.latest|length }} questions</h2>
+    <table class="latest">
+      <thead>
+        <tr><th scope="col">When</th><th scope="col">Question</th><th scope="col">Outcome</th><th scope="col" class="num">Took</th></tr>
+      </thead>
+      <tbody>
+        {% for q in stats.latest %}
+        <tr>
+          <td class="when">{{ q.when }}</td>
+          <td class="q wrap">{{ q.question }}</td>
+          <td>{% if q.outcome == "service error" %}<span class="flag" aria-hidden="true"></span>{% endif %}{{ q.outcome }}{% if q.reason %}<span class="reason wrap">{{ q.reason }}</span>{% endif %}</td>
+          <td class="num">{{ q.latency }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="empty">No questions yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <h2>How to read this</h2>
+    <ul>
+      <li>A visitor is a distinct salted IP hash, the same key the chat log uses. People sharing an IP (an office, a mobile carrier) count once; one person on two networks counts twice.</li>
+      <li>Only browsers that run JavaScript are counted, which leaves out most bots; visitors with strict ad or tracker blockers may be missed too.</li>
+      <li>Page views start on the day this shipped; there is no history before it. Chat numbers go back to the first logged question.</li>
+      <li>Days run midnight to midnight in {{ stats.tz }}. "Questions refused" counts the bot declining a question; service errors (the AI provider was unavailable) are counted on their own and are not refusals.</li>
+      <li>To stop counting your own visits, open the site once with <code>?analytics=off</code> in that browser; <code>?analytics=on</code> undoes it.</li>
+    </ul>
+  </footer>
+</main>
+</body>
+</html>
