@@ -101,3 +101,15 @@ def test_a_rejected_request_is_labelled_not_called_unparseable(monkeypatch):
     out = node.relevance({"condensed": "anything"})
     assert out["refusal_reason"] == "request rejected"
     assert out["unavailable"] is False
+
+
+def test_a_verdict_cut_off_at_its_cap_is_labelled_not_called_a_failed_check(monkeypatch):
+    from chat.graph.nodes import relevance as node
+
+    usage = {"prompt_tokens": 400, "completion_tokens": 1000, "truncated": True}
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, usage))
+    out = node.relevance({"condensed": "anything"})
+    assert out["in_scope"] is False
+    assert out["refusal_reason"] == "output cap reached"
+    assert out["unavailable"] is False
+    assert out["usage"]["completion_tokens"] == 1000

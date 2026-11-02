@@ -211,9 +211,12 @@ willing to pay per day, not against a quota. The day is Riyadh's
 The counter counts requests, not tokens, so each call also caps its output:
 `MAX_TOKENS_FAST` (1000) for `condense` and `relevance`, `MAX_TOKENS_GENERATE`
 (2500, room for a long Arabic answer) for `generate`, in `chat/openai_client.py`.
-A call that hits its cap is refused as an unparseable response, and its billed
-tokens are still logged. Worst case that is about a cent a turn -- ~$2 a day at
-the default cap of 200.
+What a call that hits its cap does depends on the node: `generate` refuses
+the turn, logged `output cap reached` with the tokens it was billed; `relevance`
+refuses it the same way, which the visitor reads as off-topic; `condense` falls
+back to the visitor's own question and the turn goes on. Count
+`output cap reached` rows before resizing a cap. With the caps, the worst case
+is about a cent a turn -- ~$2 a day at the default cap of 200.
 
 Only a POST that passes the per-IP limit **and** validates counts against the
 cap; other methods (405) are not throttled at all, and a 400 spends only the

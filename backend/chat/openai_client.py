@@ -42,8 +42,9 @@ MIN_SECONDS_GENERATE = 6.0
 # Output caps (max_completion_tokens). Without one a call may write up to the
 # model's own maximum -- 32k tokens on gpt-4.1-mini -- from a prompt the visitor
 # helped write, and CHAT_DAILY_CAP counts requests, not tokens. A call that
-# reaches its cap raises LengthFinishReasonError: a bad response, refused, with
-# its billed tokens still logged.
+# reaches its cap raises LengthFinishReasonError: no usable response, flagged
+# `truncated` with its billed tokens, so generate and relevance log the refusal
+# as "output cap reached" (condense falls back to the raw question).
 # The classifiers return a verdict, or condense's rewrite of a question of at
 # most 1000 characters plus its English version.
 MAX_TOKENS_FAST = 1000
@@ -234,8 +235,14 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
         # cut-off is billed in full, and carries the completion: its counts
         # are logged, or the costliest calls would be the ones missing.
         usage = getattr(getattr(exc, "completion", None), "usage", None)
-        return None, {"prompt_tokens": getattr(usage, "prompt_tokens", None),
-                      "completion_tokens": getattr(usage, "completion_tokens", None)}
+        counts = {"prompt_tokens": getattr(usage, "prompt_tokens", None),
+                  "completion_tokens": getattr(usage, "completion_tokens", None)}
+        if isinstance(exc, LengthFinishReasonError):
+            # Its own refusal reason. Logged as "unparseable response", a cut-off
+            # answer could be told from a real parse failure only by its token
+            # count -- and how often the cap is hit is what to resize it by.
+            counts["truncated"] = True
+        return None, counts
     except (OpenAIError, ValidationError):
         # Anything else raised once a response is in hand -- above all
         # pydantic's ValidationError when parse validates the content, which
@@ -258,9 +265,12 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
 
 def failure_reason(usage: dict, otherwise: str) -> str:
     """The refusal_reason for a call that produced nothing usable: an outage, a
-    request OpenAI rejected for what the visitor sent, or the caller's own."""
+    request OpenAI rejected for what the visitor sent, a response cut off at
+    its output cap, or the caller's own."""
     if usage.get("api_error"):
         return "generation unavailable"
     if usage.get("rejected"):
         return "request rejected"
+    if usage.get("truncated"):
+        return "output cap reached"
     return otherwise

@@ -149,3 +149,16 @@ def test_a_rejected_request_is_labelled_not_called_unparseable(monkeypatch):
     out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
     assert out["refusal_reason"] == "request rejected"
     assert out["unavailable"] is False
+
+
+def test_an_answer_cut_off_at_its_cap_is_labelled_not_called_unparseable(monkeypatch):
+    """How often answers hit MAX_TOKENS_GENERATE is what the cap is resized by;
+    as "unparseable response" they were counted with real parse failures."""
+    from chat.graph.nodes import generate as node
+
+    usage = {"prompt_tokens": 900, "completion_tokens": 2500, "truncated": True}
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, usage))
+    out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
+    assert out["refusal_reason"] == "output cap reached"
+    assert out["unavailable"] is False
+    assert out["usage"]["completion_tokens"] == 2500

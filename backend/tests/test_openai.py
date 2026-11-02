@@ -193,12 +193,12 @@ def _truncated_completion():
                           object="chat.completion")
 
 
-@pytest.mark.parametrize("error", [
-    pytest.param(ContentFilterFinishReasonError(), id="content-filter"),
+@pytest.mark.parametrize("error, flags", [
+    pytest.param(ContentFilterFinishReasonError(), {}, id="content-filter"),
     pytest.param(LengthFinishReasonError(completion=_truncated_completion()),
-                 id="length-truncated"),
+                 {"truncated": True}, id="length-truncated"),
 ])
-def test_finish_reason_errors_do_not_escape(monkeypatch, error):
+def test_finish_reason_errors_do_not_escape(monkeypatch, error, flags):
     """LengthFinishReasonError and ContentFilterFinishReasonError subclass
     OpenAIError, NOT APIError -- an `except APIError` alone lets them escape as
     a 500. They mean a bad response, not an outage, so no api_error flag."""
@@ -208,7 +208,7 @@ def test_finish_reason_errors_do_not_escape(monkeypatch, error):
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
-    assert usage == {"prompt_tokens": None, "completion_tokens": None}
+    assert usage == {"prompt_tokens": None, "completion_tokens": None, **flags}
     assert "api_error" not in usage
 
 
@@ -277,7 +277,8 @@ def test_a_capped_answer_still_reports_what_it_cost(monkeypatch):
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
-    assert usage == {"prompt_tokens": 900, "completion_tokens": 2500}
+    assert usage == {"prompt_tokens": 900, "completion_tokens": 2500, "truncated": True}
+    assert openai_client.failure_reason(usage, "unparseable response") == "output cap reached"
 
 
 def test_a_refusal_is_not_reported_as_an_api_error(monkeypatch):
