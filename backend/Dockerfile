@@ -8,7 +8,15 @@ RUN pip install --no-cache-dir ".[dev]"
 
 COPY . .
 
-# --timeout 120 because a turn makes three sequential generation calls plus an
-# embedding call, and a cold connection can push that past gunicorn's 30s
-# default and kill the request mid-answer.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+# gthread workers, 2 processes x 4 threads: a turn spends most of its time
+# waiting on OpenAI, and gunicorn's default -- one sync worker -- answered
+# visitors strictly one at a time, so in a burst the seventh waited past the
+# browser's 30s. Each turn's budget is a ContextVar and each thread has its own
+# DB connection, so neither is shared between turns; the fast-model fallback is
+# per process, so each worker pays one failed call. 8 connections at most, far
+# under Postgres's default of 100.
+# --timeout 120 was set because a turn's calls could outlast gunicorn's 30s
+# default. Under gthread it only restarts a worker that stops responding, not a
+# slow request: CHAT_TURN_BUDGET (25s) is what bounds a turn.
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
+     "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120"]
