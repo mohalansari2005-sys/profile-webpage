@@ -19,22 +19,35 @@ GRAPH = build_graph()
 
 class ChatView(APIView):
     throttle_scope = "chat"
-    # Per-IP first, and the first refusal ends the check (below), so a request
-    # the per-IP limit turns away never counts against the global cap.
-    throttle_classes = [ChatRateThrottle, GlobalDailyThrottle]
+    # Per-IP only. GlobalDailyThrottle counts as it asks, so post() asks it
+    # last: a request this limit turns away never reaches it, and neither does
+    # one whose body fails validation.
+    throttle_classes = [ChatRateThrottle]
 
     def check_throttles(self, request):
-        # DRF's own version asks every throttle even after one refuses, and
-        # GlobalDailyThrottle counts as it asks. One client spamming past its
-        # per-IP limit would then burn the whole day's cap for every visitor.
-        for throttle in self.get_throttles():
-            if not throttle.allow_request(request, self):
-                self.throttled(request, throttle.wait())
+        # Only a POST can become a chat turn. Anything else is a 405 (or
+        # OPTIONS' metadata) that costs nothing, and must not spend the
+        # visitor's per-IP budget. CORS preflights never get here: corsheaders
+        # answers them.
+        if request.method == "POST":
+            super().check_throttles(request)
 
     def post(self, request):
         serializer = ChatRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
+        # The daily cap is the spend limit, so only a turn that can spend may
+        # count. Checked in DRF's throttle pass, every GET, HEAD, OPTIONS and
+        # 400 counted too: a scanner or an uptime check could close the chat
+        # for the day without a cent spent.
+        if not GlobalDailyThrottle().allow_request(request, self):
+            # Its own code: a per-IP 429 clears in a minute, this one at
+            # midnight, and the UI can only tell visitors which if it is told.
+            return Response({"detail": "Today's question limit has been reached. "
+                                       "Please try again tomorrow.",
+                             "code": "daily_cap"},
+                            status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         with turn_budget(settings.CHAT_TURN_BUDGET):
             result = GRAPH.invoke({

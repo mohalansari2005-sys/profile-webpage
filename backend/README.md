@@ -167,10 +167,18 @@ The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
 appends to whatever the visitor sent, so its first entry is the visitor's to
 choose.
 
-The daily cap was sized against a free-tier daily quota. OpenAI is billed per token, not
-capped, so this counter is now the **spend** limit — it is the only thing
-between a scripted abuser and a real bill. Size it against what you are willing
-to pay per day, not against a quota.
+The daily cap was sized against a free-tier daily quota. OpenAI is billed per
+token, not capped, so this counter is now the **spend** limit — it is the only
+thing between a scripted abuser and a real bill. Size it against what you are
+willing to pay per day, not against a quota.
+
+Only a POST that passes the per-IP limit **and** validates counts against the
+cap; other methods (405) are not throttled at all, and a 400 spends only the
+sender's per-IP budget. A refusal from the cap is a 429 whose body carries
+`"code": "daily_cap"`, so the UI can say "come back tomorrow" rather than "try
+again in a minute"; a per-IP 429 is DRF's own body, with no `code`. The API is
+anonymous: DRF authentication is switched off, so an `Authorization` header is
+ignored rather than checked.
 
 To read the spend, each `ChatLog` row's `prompt_tokens`/`completion_tokens`
 belong to the model in its `model` column, and never mix two rates:

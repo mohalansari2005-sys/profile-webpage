@@ -107,6 +107,78 @@ def test_the_429_body_is_json_with_a_detail_key(db, settings, stub_graph):
     assert "detail" in r.json()
 
 
+def test_the_daily_cap_429_says_it_is_the_daily_cap(db, settings, stub_graph):
+    """A per-IP 429 clears in a minute; the daily cap's lasts until midnight.
+    Shown the same "try again in a minute", a visitor retried all day."""
+    settings.CHAT_DAILY_CAP = 0
+    r = APIClient().post("/api/chat/", {"question": "q"}, format="json")
+    assert r.status_code == 429
+    assert r.json()["code"] == "daily_cap"
+
+
+def test_a_per_ip_429_keeps_drf_s_body(db, settings, stub_graph):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    api = APIClient()
+    api.post("/api/chat/", {"question": "q"}, format="json")
+    r = api.post("/api/chat/", {"question": "q"}, format="json")
+    assert r.status_code == 429
+    assert "code" not in r.json()
+    assert "Expected available" in r.json()["detail"]
+
+
+def test_only_a_valid_chat_turn_spends_the_daily_cap(db, settings, stub_graph):
+    """GET and HEAD (405), a plain OPTIONS and a body that fails validation
+    (400) cost nothing upstream. Counted, ~200 of them from a scanner or an
+    uptime check closed the chat for every visitor until the next day."""
+    settings.CHAT_DAILY_CAP = 1
+    api = APIClient()
+    assert api.get("/api/chat/", REMOTE_ADDR="198.51.100.1").status_code == 405
+    assert api.head("/api/chat/", REMOTE_ADDR="198.51.100.2").status_code == 405
+    assert api.options("/api/chat/", REMOTE_ADDR="198.51.100.3").status_code == 200
+    assert api.post("/api/chat/", {}, format="json", REMOTE_ADDR="198.51.100.4").status_code == 400
+    body = {"question": "q"}
+    assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.5").status_code == 200
+    assert api.post("/api/chat/", body, format="json", REMOTE_ADDR="198.51.100.6").status_code == 429
+
+
+def test_other_methods_leave_the_per_ip_budget_alone(db, settings, stub_graph):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    api = APIClient()
+    for _ in range(3):
+        assert api.get("/api/chat/").status_code == 405
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
+
+
+def test_an_invalid_post_still_counts_against_the_per_ip_limit(db, settings, stub_graph):
+    """The per-IP limit stays in front of every POST, valid or not, so a
+    client cannot hammer the endpoint for free either."""
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    api = APIClient()
+    assert api.post("/api/chat/", {}, format="json").status_code == 400
+    assert api.post("/api/chat/", {}, format="json").status_code == 429
+
+
+def test_an_authorization_header_is_ignored_not_checked(db, settings, stub_graph, monkeypatch):
+    """The API is anonymous. DRF's default BasicAuthentication still looked up
+    a user and ran a million-round password hash for any request carrying the
+    header -- before any throttle, so nothing counted or limited it."""
+    from django.contrib.auth.backends import ModelBackend
+
+    def no_auth(*a, **k):
+        raise AssertionError("an anonymous API must not authenticate")
+
+    monkeypatch.setattr(ModelBackend, "authenticate", no_auth)
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    api = APIClient()
+    basic = {"HTTP_AUTHORIZATION": "Basic bm9ib2R5Ong="}  # nobody:x
+    assert api.post("/api/chat/", {"question": "q"}, format="json", **basic).status_code == 200
+    assert api.post("/api/chat/", {"question": "q"}, format="json", **basic).status_code == 429
+
+
 def test_a_refund_never_takes_the_counter_below_zero():
     """Two refunds racing for one slot, or one after the key expired, must not
     grant slots past the cap."""
