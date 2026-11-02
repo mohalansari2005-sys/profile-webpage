@@ -131,6 +131,63 @@ test("the daily cap says tomorrow and offers no retry", async ({ page }) => {
   await ask(page, "Anything?");
   await expect(page.getByText(en.ask.errors.dailyCap)).toBeVisible();
   await expect(page.getByRole("button", { name: en.ask.tryAgain })).toHaveCount(0);
+  // Nothing to retry, so focus goes back to the input rather than <body>.
+  await expect(page.locator("#ask-input")).toBeFocused();
+});
+
+test("after an error, focus lands on Try again, and again when the retry fails", async ({ page }) => {
+  await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
+  await page.goto("/");
+  await page.locator("#ask-input").fill("question");
+  await page.locator("#ask-input").press("Enter");
+  const retry = page.getByRole("button", { name: en.ask.tryAgain });
+  await expect(retry).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(en.ask.errors.server)).toBeVisible();
+  await expect(retry).toBeFocused();
+});
+
+// Answers take seconds; a reader may scroll off to read, or move focus to
+// something else, while one is on its way.
+function delayedAnswer(page: Page, answer: string) {
+  return page.route(CHAT_API, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await route.fulfill({ json: { answer, sources: [], refused: false } });
+  });
+}
+
+test("an answer arriving after the reader scrolled away does not pull the page back", async ({ page }) => {
+  await delayedAnswer(page, "A late answer.");
+  await page.goto("/");
+  await ask(page, "Take your time?");
+  await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+  await expect(page.getByText("A late answer.")).toBeVisible();
+  // The refocus runs in an effect after the answer renders.
+  await expect(page.locator("#ask-input")).toBeFocused();
+  // Still at the top: the input stays far below the fold (a plain focus()
+  // scrolled it back into view, about 3000px down).
+  expect(await page.evaluate(() => scrollY)).toBeLessThan(50);
+  const input = await page.locator("#ask-input").boundingBox();
+  expect(input!.y).toBeGreaterThan(page.viewportSize()!.height);
+});
+
+test("an answer does not take focus from what the reader moved to", async ({ page }) => {
+  await delayedAnswer(page, "A late answer.");
+  await page.goto("/");
+  await ask(page, "Take your time?");
+  const link = page.getByRole("link", { name: "Keyraa on GitHub" });
+  await link.evaluate((el: HTMLElement) => el.focus({ preventScroll: true }));
+  await expect(page.getByText("A late answer.")).toBeVisible();
+  await expect(link).toBeFocused();
+});
+
+test("a long answer offers a named button back to the latest message", async ({ page }) => {
+  await mock(page, LONG);
+  await page.goto("/");
+  await ask(page, "the long one?");
+  await expect(page.getByText("Sentence 1 about")).toBeVisible();
+  // A long answer is pinned at its start, so the box is no longer at the bottom.
+  await expect(page.getByRole("button", { name: en.ask.scrollToLatest })).toBeVisible();
 });
 
 for (const [name, body] of [

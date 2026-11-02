@@ -49,6 +49,15 @@ function scrollToRecord(recordId: string) {
   row.scrollIntoView({ block: "center" });
 }
 
+/** Whether the chat may take focus back: it is on the page itself (a disabled
+    input or an unmounted button drops it there) or still inside the chat. A
+    reader who moved it elsewhere while waiting, say to a record through a
+    source chip, keeps it. */
+function focusIsFree(): boolean {
+  const active = document.activeElement;
+  return !active || active === document.body || active.closest("#ask") !== null;
+}
+
 /** The chip shows the record's title in the page's language when the record has
     a row on the page; records without one (the bio, the FAQ) keep the title the
     server sent. */
@@ -142,6 +151,7 @@ export function Ask() {
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ question: string; error: ChatError } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
   const nextId = useRef(1);
   // `pending` only disables the input after a re-render, and a seed chip
   // supplies its own question rather than reading the (now-cleared) field, so
@@ -177,9 +187,26 @@ export function Ask() {
   // needs no reaching for the mouse. It has to wait for the re-render: calling
   // focus() beside setPending(null) targets an input React has not re-enabled
   // yet, and focusing a disabled element silently does nothing.
+  //
+  // `preventScroll` because an answer takes seconds and the reader may have
+  // scrolled off to read meanwhile: a plain focus() yanked the page back to
+  // the input, ~2000px on a phone.
   useEffect(() => {
-    if (turns.length) inputRef.current?.focus();
+    if (turns.length && focusIsFree()) {
+      inputRef.current?.focus({ preventScroll: true });
+    }
   }, [turns.length]);
+
+  // A failure needs the same: the disabled input (or the Try again button,
+  // which unmounts on a retry) dropped focus to <body>, and the next Tab went
+  // past the chat. Land on Try again, the thing to do next, or on the input
+  // when there is nothing to retry. `failed` is a new object every time, so
+  // this runs again after a retry fails again.
+  useEffect(() => {
+    if (failed && focusIsFree()) {
+      (retryRef.current ?? inputRef.current)?.focus({ preventScroll: true });
+    }
+  }, [failed]);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -307,6 +334,7 @@ export function Ask() {
                             only be refused again. */}
                         {failed.error !== "dailyCap" && (
                           <button
+                            ref={retryRef}
                             type="button"
                             onClick={() => void ask(failed.question)}
                             className="mt-3 cursor-pointer rounded-full font-mono text-xs tracking-[0.06em] underline underline-offset-4 transition-colors hover:text-match-ink"
@@ -322,7 +350,7 @@ export function Ask() {
                   turnId={turns[turns.length - 1]?.id}
                   pending={pending !== null}
                 />
-                <ConversationScrollButton />
+                <ConversationScrollButton aria-label={t.ask.scrollToLatest} />
               </Conversation>
 
               <form onSubmit={onSubmit} className="border-t border-rule p-3.5">
@@ -338,7 +366,11 @@ export function Ask() {
                     disabled={pending !== null}
                     maxLength={1000}
                     autoComplete="off"
-                    dir="auto"
+                    // Typed text follows its own direction, but an empty field
+                    // has none to detect and `auto` resolves it to LTR, which
+                    // put the Arabic placeholder on the wrong side of /ar.
+                    // Empty, it inherits the page's direction instead.
+                    dir={value.trim() ? "auto" : undefined}
                     placeholder={t.ask.placeholder}
                     className="w-full bg-transparent py-1.5 text-base outline-none placeholder:text-dim disabled:opacity-50 sm:text-lg"
                   />

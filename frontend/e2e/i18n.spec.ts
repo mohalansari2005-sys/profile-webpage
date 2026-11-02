@@ -179,6 +179,17 @@ test.describe("chat in Arabic", () => {
     await expect(page.getByText("Product Engineering Intern")).toHaveCount(0);
   });
 
+  test("the empty input follows the page, typed text its own direction", async ({ page }) => {
+    await page.goto("/ar");
+    const input = page.locator("#ask-input");
+    const direction = () => input.evaluate((el) => getComputedStyle(el).direction);
+    expect(await direction()).toBe("rtl");
+    await input.fill("What is Keyraa?");
+    expect(await direction()).toBe("ltr");
+    await input.fill("");
+    expect(await direction()).toBe("rtl");
+  });
+
   test("errors are shown in Arabic", async ({ page }) => {
     await page.route(CHAT_API, (route) => route.fulfill({ status: 500, body: "boom" }));
     await page.goto("/ar");

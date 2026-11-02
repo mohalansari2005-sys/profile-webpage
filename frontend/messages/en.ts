@@ -72,6 +72,7 @@ export const en = {
       "Answers come only from what Mohammed has written about his own work. Anything outside that, it declines.",
     thinking: "Thinking…",
     sources: "Sources",
+    scrollToLatest: "Scroll to the latest message",
     tryAgain: "Try again",
     errors: {
       throttled: "Too many questions right now — try again in a minute.",
