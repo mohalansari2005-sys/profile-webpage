@@ -97,9 +97,11 @@ Pydantic class itself and enforces the schema server-side.
 `except APIError` alone lets a truncated or filtered response escape as a 500.
 See `chat/openai_client.py` — both are caught and mapped to a refusal, without
 the `api_error` flag, because they mean a bad response rather than an outage.
-So is any other `OpenAIError`, and pydantic's `ValidationError` -- which `parse`
+Any other `OpenAIError`, and pydantic's `ValidationError` -- which `parse`
 raises when the content fails the schema, and which is no `OpenAIError` at all
--- logged with its traceback.
+-- is an outage instead, a 503 logged with its traceback: an SDK upgrade or a
+schema the model cannot meet fails for every visitor alike, and as a refusal
+it would have turned them all away as off-topic, as the retired model did.
 
 The `log` node is just as defensive about the database being unwell: a write
 that fails on a dropped connection, a full disk or a timeout (`OperationalError`,
@@ -136,7 +138,8 @@ nothing said why. What now stops a repeat:
   the visitor to see the 503. `ingest_content` runs outside a turn and keeps
   the SDK's patient defaults.
 - An outage -- auth, quota, rate limit, 5xx, the budget running out, a retired
-  model with nowhere to fall back -- answers **503**, the UI's "service hit an
+  model with nowhere to fall back, an unexpected SDK error or a response that
+  fails the schema -- answers **503**, the UI's "service hit an
   error, try again", instead of a refusal. A failed `condense` ends the turn the
   same way: unresolved, "what did he build there?" could come back a grounded
   answer about the wrong employer.

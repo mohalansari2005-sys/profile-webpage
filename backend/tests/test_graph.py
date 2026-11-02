@@ -212,6 +212,26 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
     assert ChatLog.objects.get().refusal_reason == "generation unavailable"
 
 
+def test_a_response_that_fails_the_schema_is_an_outage_not_a_refusal(db, stub_nodes, monkeypatch):
+    """Through the real structured(): refused as off-topic, a schema the model
+    cannot meet would turn every visitor away and look like their fault."""
+    from chat import openai_client
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog
+
+    class Completions:
+        def parse(self, **kwargs):
+            return Relevance.model_validate_json("{}")  # raises ValidationError
+
+    monkeypatch.setattr(openai_client, "_client", type("C", (), {
+        "chat": type("Chat", (), {"completions": Completions()})()})())
+    out = build_graph().invoke({"question": "What is Keyraa?", "history": [],
+                                "ip_hash": "h" * 64, "started_at": 0.0})
+    assert out["unavailable"] is True
+    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+
+
 def _condense_fails(stub_nodes, monkeypatch):
     monkeypatch.setattr(stub_nodes["condense"], "structured", lambda *a, **k: (
         None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}))

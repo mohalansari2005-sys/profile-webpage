@@ -223,18 +223,21 @@ def _validation_error():
     pytest.param(_validation_error, id="pydantic-validation"),
     pytest.param(lambda: OpenAIError("unexpected"), id="other-openai-error"),
 ])
-def test_an_unusable_response_is_refused_not_a_500(monkeypatch, caplog, error):
+def test_an_unexpected_sdk_or_schema_error_is_an_outage(monkeypatch, caplog, error):
     """parse validates the content with pydantic, whose ValidationError is no
     OpenAIError at all, so it escaped every except here as a 500 with no
-    ChatLog row. A bad response, not an outage -- and logged, with its
-    traceback, so it is not a silent refusal either."""
+    ChatLog row. Either error is systematic -- an SDK upgrade, a schema the
+    model cannot meet -- and fails for every visitor alike: called a bad
+    response, it would refuse them all as off-topic, as the retired model
+    did. An outage instead, a 503, logged with its traceback."""
     from chat import openai_client
 
     monkeypatch.setattr(openai_client, "_client", _fake_client(raises=error()))
     with caplog.at_level("ERROR", logger="chat.openai_client"):
         parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
-    assert usage == {"prompt_tokens": None, "completion_tokens": None}
+    assert usage == {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
+    assert openai_client.failure_reason(usage, "unparseable response") == "generation unavailable"
     assert caplog.records[-1].exc_info is not None
 
 

@@ -191,8 +191,9 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
     (condense, relevance), or OPENAI_MODEL once the fast one is not found.
 
     A failed API call (quota exhausted, rate limited, a 5xx that a retry did not
-    clear, the turn's budget spent, a retired model with nowhere to fall back)
-    returns parsed=None with usage["api_error"] -- every caller already fails
+    clear, the turn's budget spent, a retired model with nowhere to fall back,
+    an unexpected SDK error or a response that fails the schema) returns
+    parsed=None with usage["api_error"] -- every caller already fails
     closed on parsed=None, and the flag is what stops a refusal log from
     calling an outage an "unparseable response".
     """
@@ -244,13 +245,16 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             counts["truncated"] = True
         return None, counts
     except (OpenAIError, ValidationError):
-        # Anything else raised once a response is in hand -- above all
-        # pydantic's ValidationError when parse validates the content, which
-        # is no OpenAIError at all and escaped as a 500 with no log row. A bad
-        # response, not an outage; logged with its traceback so it is not a
-        # silent refusal either.
-        logger.exception("OpenAI response unusable: model=%s", model)
-        return None, {"prompt_tokens": None, "completion_tokens": None}
+        # Any other SDK error, or pydantic's ValidationError when parse checks
+        # the content against the schema -- no OpenAIError at all, and it
+        # escaped as a 500 with no log row. Either is systematic: an SDK
+        # upgrade or a schema the model cannot meet fails the same way for
+        # every visitor. Called a bad response, each would have been refused
+        # as off-topic or unanswerable, which is how a retired model went
+        # unnoticed for ten days. So it is an outage: a 503, logged with its
+        # traceback.
+        logger.exception("OpenAI call failed unexpectedly: model=%s", model)
+        return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
 
     usage = getattr(resp, "usage", None)
     counts = {
