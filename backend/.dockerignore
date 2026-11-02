@@ -1,6 +1,10 @@
-.env
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
+# Any env file, not only .env: a copy such as .env.prod or prod.env on the
+# server is invisible to git (.gitignore has .env*) but COPY . . would bake it
+# into an image layer.
+**/.env*
+**/*.env
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
 tests/

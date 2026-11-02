@@ -165,10 +165,16 @@ Verify with exit codes, not output:
     git check-ignore -q backend/.env          # 0 = ignored, correct
     git check-ignore -q backend/.env.example  # 1 = committable, correct
     docker run --rm --entrypoint sh profile-webpage-web:latest -c 'printenv | grep -i openai'
+    docker run --rm --entrypoint sh profile-webpage-web:latest -c 'find /app -name "*.env*"'
 
-The last command must print nothing. Use plain `docker run`, not
+The last two commands must print nothing. Use plain `docker run`, not
 `docker compose run` — compose always applies `env_file`, so it prints the
-runtime key and proves nothing about the image.
+runtime key and proves nothing about the image. `.dockerignore` keeps out every
+env file, not just `.env`: a server-side copy such as `.env.prod` is invisible
+to git but `COPY . .` would bake it into a layer.
+
+The image runs as an unprivileged `app` user (uid 1000), not root. It still
+installs the `[dev]` extras so `docker compose run --rm web pytest` works.
 
 `ChatLog` stores a salted SHA-256 of the client IP, never the address.
 

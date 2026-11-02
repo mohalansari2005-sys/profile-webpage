@@ -8,6 +8,13 @@ RUN pip install --no-cache-dir ".[dev]"
 
 COPY . .
 
+# Not root: gunicorn is what the internet reaches through Caddy, and a hole in
+# it should not come with the whole container. uid 1000 is usually the first
+# user on a Linux host too, so the dev compose's ./backend bind mount stays
+# writable for `docker compose run --rm web pytest`.
+RUN useradd --create-home --uid 1000 app
+USER app
+
 # gthread workers, 2 processes x 4 threads: a turn spends most of its time
 # waiting on OpenAI, and gunicorn's default -- one sync worker -- answered
 # visitors strictly one at a time, so in a burst the seventh waited past the
