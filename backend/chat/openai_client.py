@@ -52,6 +52,11 @@ MAX_TOKENS_FAST = 1000
 # same English). The turn budget usually ends a call this long first; the cap
 # is what bounds the bill for one the client gave up on.
 MAX_TOKENS_GENERATE = 2500
+# Both are sized for gpt-4.1-mini, which does not reason. On a reasoning model
+# (the gpt-5 and o-series families) max_completion_tokens counts the hidden
+# reasoning tokens as well as the visible answer, so at these sizes a call can
+# spend its cap thinking and be refused as "output cap reached". Raise both
+# before pointing OPENAI_MODEL or OPENAI_FAST_MODEL at one.
 
 
 @contextmanager

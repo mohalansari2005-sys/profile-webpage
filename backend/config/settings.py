@@ -54,6 +54,8 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # arguing the question WAS in scope. relevance fails closed, so an unstable
 # gate silently refuses real visitors. If this model is ever not found again,
 # openai_client falls back to OPENAI_MODEL rather than refusing everyone.
+# A reasoning model counts its reasoning against the output caps, which are
+# sized for this one: see MAX_TOKENS_* in chat/openai_client.py before switching.
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 OPENAI_FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "gpt-4.1-mini")
 # text-embedding-3-small is natively 1536 dimensions, which is exactly the
