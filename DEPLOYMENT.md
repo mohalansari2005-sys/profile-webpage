@@ -71,6 +71,23 @@ CORS_ORIGINS=<your production frontend origin, e.g. https://yourdomain.com>
 DOMAIN=<your domain, e.g. api.yourdomain.com>
 ```
 
+Then create a second, smaller `.env` in the repo root, next to `docker-compose.prod.yml`
+(also gitignored):
+
+```bash
+printf 'POSTGRES_PASSWORD=%s\n' '<the same value as in backend/.env>' > .env
+chmod 600 .env backend/.env
+```
+
+Compose needs this one for itself. The `db` service's `${POSTGRES_PASSWORD}` (and
+`${POSTGRES_DB}`/`${POSTGRES_USER}`, which default to `chat`) are substituted by compose
+when it reads the file, from the shell or this root `.env` — **never from
+`backend/.env`**, which only becomes the `web` and `caddy` containers' environment.
+Without it every compose command stops with `required variable POSTGRES_PASSWORD is
+missing a value`. Keep the two files in step: if `backend/.env` sets a `POSTGRES_DB`
+or `POSTGRES_USER` other than `chat`, put the same line here, or Postgres creates one
+user and `web` logs in as another.
+
 `CORS_ALLOWED_ORIGIN_REGEXES` in `backend/config/settings.py` already whitelists any
 `*.vercel.app` subdomain, so Vercel preview deploys work without extra config; the
 `CORS_ORIGINS` value above is for the production domain specifically.
@@ -118,12 +135,61 @@ devtools Network tab shows no CORS errors on the `api/chat/` request.
 
 Pushing to `main` with changes under `backend/**`, `docker-compose.prod.yml`, or
 `Caddyfile` triggers `.github/workflows/deploy-backend.yml`, which SSHes into the VPS
-and runs the same commands below. To update manually instead:
+and runs the same commands below under `set -e`: the first command that fails fails
+the job, and the chat canary (which runs after a successful deploy) is skipped. A red
+deploy means the server may be part-way through — check `git log -1` and
+`docker compose -f docker-compose.prod.yml ps` there. To update manually instead:
 
 ```bash
 cd profile-webpage
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate
+# Only if the Caddyfile differs from the one last applied (stamped below):
+caddyfile=$(sha256sum Caddyfile | cut -d' ' -f1)
+if [ "$caddyfile" != "$(cat .git/caddyfile-applied 2>/dev/null)" ]; then
+  docker compose -f docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+  echo "$caddyfile" > .git/caddyfile-applied
+fi
+docker compose -f docker-compose.prod.yml build web
+docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate
+docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
 ```
+
+Run by hand, stop at the first command that fails — the workflow's `set -e` does that
+for it.
+
+Migrations run before the swap, from a one-off container of the new image, while the
+old `web` keeps serving: so a migration must leave the old code working (a new column
+needs a database default — `db_default` on the field), which a rollback needs anyway.
+
+A `Caddyfile` change reaches Caddy only in a new container. `up` does not recreate the
+`caddy` container for it, and because `git pull` replaces the file rather than
+rewriting it, the running container's single-file bind mount keeps showing the old
+one. So when the pull changed the file, it is validated in a one-off container that
+mounts the pulled file — a bad file stops the update there, with Caddy still serving
+the old config and `web` untouched — and Caddy is then recreated with it. Its
+certificates live in the `caddy_data` volume, so the new container reuses them rather
+than requesting new ones. Unlike `exec`-ing into Caddy, this works when Caddy is
+stopped or crash-looping. A recreate cuts off the requests in flight, so it only
+happens when the file changed; with it unchanged, `up -d` still starts a stopped Caddy.
+
+It runs before `web` is rebuilt because the `Caddyfile` decides which headers Django
+reads the visitor's address from. The other way round, a freshly built `web` sat behind
+the old proxy config, which let a visitor choose their own per-IP bucket — until the end
+of the deploy, or for good if `migrate` or `ingest_content` failed first. The current
+file sets both `X-Real-IP` and `X-Forwarded-For`, so whichever Django is running reads
+the visitor correctly.
+
+Caddy's image is pinned (`caddy:2.11-alpine` in `docker-compose.prod.yml`, and the same
+tag in CI's `caddy` job — change both together). The first deploy after a change of tag
+pulls the new image when Caddy is recreated: by the validate step if the `Caddyfile`
+changed too, otherwise by `up -d`, which recreates Caddy for the new image after `web`
+is rebuilt.
+
+The `Caddyfile` trusts Cloudflare's `CF-Connecting-IP` header from Cloudflare's
+published IP ranges only, so the chat's per-IP limit sees the visitor rather than a
+Cloudflare edge. The ranges are listed by hand with the date they were fetched;
+refresh them from <https://www.cloudflare.com/ips/> now and then. CI's `caddy` job
+runs `caddy validate` on every pull request, so a bad edit is caught before it reaches
+the server — where a Caddy restart would load it from disk and keep failing.

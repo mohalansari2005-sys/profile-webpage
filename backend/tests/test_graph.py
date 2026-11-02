@@ -212,6 +212,26 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
     assert ChatLog.objects.get().refusal_reason == "generation unavailable"
 
 
+def test_a_response_that_fails_the_schema_is_an_outage_not_a_refusal(db, stub_nodes, monkeypatch):
+    """Through the real structured(): refused as off-topic, a schema the model
+    cannot meet would turn every visitor away and look like their fault."""
+    from chat import openai_client
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog
+
+    class Completions:
+        def parse(self, **kwargs):
+            return Relevance.model_validate_json("{}")  # raises ValidationError
+
+    monkeypatch.setattr(openai_client, "_client", type("C", (), {
+        "chat": type("Chat", (), {"completions": Completions()})()})())
+    out = build_graph().invoke({"question": "What is Keyraa?", "history": [],
+                                "ip_hash": "h" * 64, "started_at": 0.0})
+    assert out["unavailable"] is True
+    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+
+
 def _condense_fails(stub_nodes, monkeypatch):
     monkeypatch.setattr(stub_nodes["condense"], "structured", lambda *a, **k: (
         None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}))
@@ -258,3 +278,62 @@ def test_the_turn_budget_reaches_the_nodes(db, stub_nodes, monkeypatch):
         build_graph().invoke({"question": "weather", "history": [],
                               "ip_hash": "h" * 64, "started_at": 0.0})
     assert seen["deadline"] is not None
+
+
+def _answer_with_a_failing_log_write(stub_nodes, monkeypatch, error):
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.generate import Answer
+    from chat.graph.nodes.relevance import Relevance
+    from chat.models import ChatLog, ContentChunk
+
+    ContentChunk.objects.create(
+        chunk_id="exp-a#summary", record_id="exp-a", kind="experience",
+        title="Engineer", text="Built services.", content_hash="h",
+        embedding=[0.0] * 1536,
+    )
+    monkeypatch.setattr(stub_nodes["relevance"], "structured",
+                        lambda *a, **k: (Relevance(subject="mohammed", reason="ok"), {}))
+    monkeypatch.setattr(stub_nodes["generate"], "structured", lambda *a, **k: (
+        Answer(answer="He built services.", used_chunk_ids=["exp-a#summary"],
+               sufficient=True), {}))
+
+    def broken(**kwargs):
+        raise error
+
+    monkeypatch.setattr(ChatLog.objects, "create", broken)
+    return build_graph().invoke({"question": "what did he build", "history": [],
+                                 "ip_hash": "h" * 64, "started_at": 0.0})
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(("OperationalError", "could not connect to server"), id="dropped-connection"),
+    pytest.param(("InterfaceError", "connection already closed"), id="closed-connection"),
+])
+def test_a_failed_log_write_still_returns_the_answer(db, stub_nodes, monkeypatch, caplog, error):
+    """The answer is generated -- and billed -- before log runs. A failed write
+    (a full disk, a dropped connection) turned it into a 500 with no row."""
+    from django import db as django_db
+
+    name, message = error
+    with caplog.at_level("ERROR", logger="chat.graph.nodes.log"):
+        out = _answer_with_a_failing_log_write(stub_nodes, monkeypatch,
+                                               getattr(django_db, name)(message))
+    assert (out["refused"], out["answer"]) == (False, "He built services.")
+    assert "ChatLog write failed" in caplog.text
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(("ProgrammingError", 'column "model" does not exist'), id="schema-drift"),
+    pytest.param(("ProgrammingError", "permission denied for table chat_chatlog"), id="revoked-grant"),
+    pytest.param(("IntegrityError", 'null value in column "question"'), id="not-null"),
+    pytest.param(("DataError", "value too long"), id="bad-value"),
+])
+def test_a_broken_chatlog_still_fails_loudly(db, stub_nodes, monkeypatch, error):
+    """These fail every turn the same way. Answered with a 200 anyway, ChatLog
+    -- the only record of spend -- stopped recording while the canary, which
+    checks only the answer, stayed green."""
+    from django import db as django_db
+
+    name, message = error
+    with pytest.raises(getattr(django_db, name)):
+        _answer_with_a_failing_log_write(stub_nodes, monkeypatch, getattr(django_db, name)(message))

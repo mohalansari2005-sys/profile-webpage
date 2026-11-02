@@ -111,9 +111,12 @@ def generate(state: ChatState) -> dict:
         return _refuse(state, "insufficient context", usage)
 
     retrieved_ids = {c["chunk_id"] for c in retrieved}
-    if not set(parsed.used_chunk_ids) <= retrieved_ids:
-        # The model cited something retrieval never returned. Whatever it wrote
-        # is not grounded in the corpus, so it does not leave the server.
+    cited = set(parsed.used_chunk_ids)
+    if not cited or not cited <= retrieved_ids:
+        # The model cited something retrieval never returned, or nothing at
+        # all -- the empty set passes the subset test, so it needs its own.
+        # Either way what it wrote is not grounded in the corpus, so it does
+        # not leave the server.
         return _refuse(state, "ungrounded citation", usage)
 
     by_chunk = {c["chunk_id"]: c for c in retrieved}

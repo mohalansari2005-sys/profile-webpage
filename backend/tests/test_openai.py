@@ -4,6 +4,7 @@ import httpx
 import pytest
 from openai import (
     APITimeoutError,
+    OpenAIError,
     BadRequestError,
     ConflictError,
     ContentFilterFinishReasonError,
@@ -14,7 +15,7 @@ from openai import (
     RateLimitError,
 )
 from openai.types.chat import ChatCompletion
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 class Shape(BaseModel):
@@ -192,12 +193,12 @@ def _truncated_completion():
                           object="chat.completion")
 
 
-@pytest.mark.parametrize("error", [
-    pytest.param(ContentFilterFinishReasonError(), id="content-filter"),
+@pytest.mark.parametrize("error, flags", [
+    pytest.param(ContentFilterFinishReasonError(), {}, id="content-filter"),
     pytest.param(LengthFinishReasonError(completion=_truncated_completion()),
-                 id="length-truncated"),
+                 {"truncated": True}, id="length-truncated"),
 ])
-def test_finish_reason_errors_do_not_escape(monkeypatch, error):
+def test_finish_reason_errors_do_not_escape(monkeypatch, error, flags):
     """LengthFinishReasonError and ContentFilterFinishReasonError subclass
     OpenAIError, NOT APIError -- an `except APIError` alone lets them escape as
     a 500. They mean a bad response, not an outage, so no api_error flag."""
@@ -207,8 +208,80 @@ def test_finish_reason_errors_do_not_escape(monkeypatch, error):
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
-    assert usage == {"prompt_tokens": None, "completion_tokens": None}
+    assert usage == {"prompt_tokens": None, "completion_tokens": None, **flags}
     assert "api_error" not in usage
+
+
+def _validation_error():
+    try:
+        Shape.model_validate_json("{}")
+    except ValidationError as exc:
+        return exc
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(_validation_error, id="pydantic-validation"),
+    pytest.param(lambda: OpenAIError("unexpected"), id="other-openai-error"),
+])
+def test_an_unexpected_sdk_or_schema_error_is_an_outage(monkeypatch, caplog, error):
+    """parse validates the content with pydantic, whose ValidationError is no
+    OpenAIError at all, so it escaped every except here as a 500 with no
+    ChatLog row. Either error is systematic -- an SDK upgrade, a schema the
+    model cannot meet -- and fails for every visitor alike: called a bad
+    response, it would refuse them all as off-topic, as the retired model
+    did. An outage instead, a 503, logged with its traceback."""
+    from chat import openai_client
+
+    monkeypatch.setattr(openai_client, "_client", _fake_client(raises=error()))
+    with caplog.at_level("ERROR", logger="chat.openai_client"):
+        parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed is None
+    assert usage == {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
+    assert openai_client.failure_reason(usage, "unparseable response") == "generation unavailable"
+    assert caplog.records[-1].exc_info is not None
+
+
+def test_every_call_caps_its_output(monkeypatch):
+    """Without a cap a call may write up to the model's own maximum -- 32k
+    tokens on gpt-4.1-mini -- from a visitor-written prompt, and
+    CHAT_DAILY_CAP counts requests, not tokens."""
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        parse_hook=lambda m, msg, fmt, kw: seen.append(kw.get("max_completion_tokens"))))
+    openai_client.structured("prompt", Shape, fast=True)
+    openai_client.structured("prompt", Shape)
+    assert seen == [openai_client.MAX_TOKENS_FAST, openai_client.MAX_TOKENS_GENERATE]
+
+
+def test_the_sdk_takes_the_output_cap():
+    """The fakes would not notice the SDK renaming or dropping the parameter."""
+    import inspect
+
+    from chat import openai_client
+
+    assert "max_completion_tokens" in inspect.signature(
+        openai_client._client.chat.completions.parse).parameters
+
+
+def test_a_capped_answer_still_reports_what_it_cost(monkeypatch):
+    """Cut off at the cap, the call is billed in full. Logged as None, the
+    most expensive calls were the ones missing from ChatLog."""
+    from openai.types import CompletionUsage
+
+    from chat import openai_client
+
+    completion = ChatCompletion(
+        id="x", choices=[], created=0, model="m", object="chat.completion",
+        usage=CompletionUsage(prompt_tokens=900, completion_tokens=2500, total_tokens=3400))
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        raises=LengthFinishReasonError(completion=completion)))
+
+    parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed is None
+    assert usage == {"prompt_tokens": 900, "completion_tokens": 2500, "truncated": True}
+    assert openai_client.failure_reason(usage, "unparseable response") == "output cap reached"
 
 
 def test_a_refusal_is_not_reported_as_an_api_error(monkeypatch):

@@ -22,7 +22,8 @@ class Command(BaseCommand):
         except CorpusMissing as e:
             raise CommandError(str(e))
 
-        wanted = [c for record in corpus["records"] for c in chunk_record(record)]
+        tool_labels = {t["id"]: t["label"] for t in corpus.get("tools") or []}
+        wanted = [c for record in corpus["records"] for c in chunk_record(record, tool_labels)]
         existing = dict(ContentChunk.objects.values_list("chunk_id", "content_hash"))
 
         # The stored hash covers the text AND the model that embedded it.

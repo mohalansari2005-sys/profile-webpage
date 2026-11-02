@@ -50,7 +50,24 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def chunk_record(record: dict) -> list[Chunk]:
+def _header(record: dict, tool_labels: dict[str, str]) -> str:
+    """The record's structured fields as text: what the page shows above the
+    prose. Frontmatter only, they were never embedded or put in the prompt,
+    so "when did he work at SEET?" was refused although the page shows the
+    dates. Empty fields are left out."""
+    tools = ", ".join(tool_labels.get(t, t) for t in record.get("tools") or [])
+    fields = (
+        ("Title", record.get("title")),
+        ("Organisation", record.get("org")),
+        ("Period", record.get("period")),
+        ("Tools", tools),
+        ("Repository", record.get("repo")),
+    )
+    return "\n".join(f"{label}: {value}" for label, value in fields if value)
+
+
+def chunk_record(record: dict, tool_labels: dict[str, str] | None = None) -> list[Chunk]:
+    """`tool_labels` maps the corpus's tool ids to the labels the page shows."""
     record_id, kind, title = record["id"], record["kind"], record["title"]
 
     def make(suffix: str, text: str) -> Chunk:
@@ -62,7 +79,11 @@ def chunk_record(record: dict) -> list[Chunk]:
     chunks = []
     summary = (record.get("summary") or "").strip()
     if summary:
-        chunks.append(make("summary", summary))
+        # On the summary only. retrieve hands generate whole records, so the
+        # fields reach the prompt with any hit on the record, and the sections'
+        # embeddings stay about their own prose.
+        header = _header(record, tool_labels or {})
+        chunks.append(make("summary", f"{header}\n\n{summary}" if header else summary))
 
     used: set[str] = {"summary"}
     for heading, prose in _sections(record.get("body") or ""):
