@@ -27,13 +27,20 @@ jobs:
             set -e
             cd /opt/profile-webpage
             git pull
-            docker compose -f docker-compose.prod.yml up -d --build
-            docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate
-            docker compose -f docker-compose.prod.yml exec -T web python manage.py ingest_content
             # `up` does not recreate Caddy for a Caddyfile change, and the file
             # is a single-file bind mount: `git pull` replaces it with a new
             # file, so the running container keeps reading the old one. Hand
             # Caddy the pulled file on stdin instead. reload validates it first
             # and keeps serving the old config if it is invalid -- and fails
             # this job, so the canary does not run against it.
+            # First, before `up`: the Caddyfile sets the headers Django reads
+            # the visitor's address from. Reloaded last, a new Django ran behind
+            # the old proxy -- which passed a client-sent X-Real-IP through --
+            # until the job ended, or until the next good deploy if migrate or
+            # ingest_content failed in between. The file sets both headers, so
+            # the Django still running reads it correctly too, and a reload that
+            # fails stops the job before anything else has changed.
             docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml exec -T web python manage.py migrate
+            docker compose -f docker-compose.prod.yml exec -T web python manage.py ingest_content

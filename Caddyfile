@@ -25,5 +25,10 @@
 		# backend/chat/ip.py keys the per-IP limit and ChatLog's ip_hash on
 		# this. Set, not appended: an X-Real-IP the client sent is replaced.
 		header_up X-Real-IP {client_ip}
+		# Replaced too. From a trusted proxy Caddy appends to the incoming
+		# X-Forwarded-For, so its first entry would be whatever the visitor
+		# sent; a Django that still reads that header -- the one running when
+		# the deploy reloads this file -- must see the visitor here as well.
+		header_up X-Forwarded-For {client_ip}
 	}
 }
