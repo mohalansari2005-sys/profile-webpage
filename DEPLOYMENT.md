@@ -92,6 +92,14 @@ user and `web` logs in as another.
 `*.vercel.app` subdomain, so Vercel preview deploys work without extra config; the
 `CORS_ORIGINS` value above is for the production domain specifically.
 
+`CORS_ORIGINS` is also what analytics treats as the live site: list every origin
+the site is served from (comma-separated, e.g. both the `www.` and the bare
+domain if both serve pages rather than redirect). Entries are compared the way
+the CORS check compares them, by scheme and host, so a space after a comma is
+harmless. Questions from any other origin, or none (the canary, curl), are
+answered but logged as synthetic and left off the dashboard; page views from
+any other origin are not recorded.
+
 `DOMAIN` is read by both the `web` and `caddy` services (via `env_file: backend/.env`)
 and substituted into `Caddyfile`'s `{$DOMAIN}`.
 
@@ -130,6 +138,47 @@ This is inlined into the static export at build time, so an env-var-only change 
 a rebuild — push a commit, or use Vercel's "Redeploy" button. Then confirm on the live
 site that the Ask section renders, a real question returns an answer, and the browser
 devtools Network tab shows no CORS errors on the `api/chat/` request.
+
+## 8. Analytics dashboard (optional)
+
+Page views are recorded as soon as this backend and a frontend built with
+`NEXT_PUBLIC_CHAT_API_URL` are deployed; the deploy's `migrate` creates the
+table. The dashboard that shows them stays off (a 404) until it has a password.
+To turn it on, add a line to `backend/.env` on the server:
+
+```
+DASHBOARD_PASSWORD=<new random string, e.g. `openssl rand -hex 24`>
+```
+
+and recreate `web` so it reads the file again (`restart` would keep the old
+environment):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate web
+```
+
+Then open `https://<domain>/dashboard/`. The browser asks for a username and a
+password: the username can be anything, the password is the one above.
+`?days=7`, `30`, `90` or `365` picks the range. Days are counted in
+`Asia/Riyadh` unless `DASHBOARD_TZ` says otherwise.
+
+Service errors are chat turns logged with `ChatLog.unavailable` (the AI provider
+failed). Chat numbers leave out synthetic questions (`ChatLog.synthetic`): the
+daily canary, curl checks and Vercel previews; see `CORS_ORIGINS` above. Until
+`migrate` has run on a deploy, page views are dropped with one WARNING line each
+in `docker compose logs web`, not a 500.
+
+To keep your own visits out of the numbers, open the site once in each browser
+you use with `?analytics=off` (e.g. `https://yourdomain.com/?analytics=off`);
+`?analytics=on` undoes it. The page takes the parameter back out of the address
+bar once it has read it, so a link you copy afterwards does not opt out whoever
+opens it.
+
+Automated QA against the live site counts as a real visitor too: Playwright's
+desktop Chrome does not identify itself as headless, so the bot filter lets it
+through. Opt that browser out first, by opening a page with `?analytics=off`
+or by setting the flag before any page script runs:
+`page.addInitScript(() => localStorage.setItem("analytics", "off"))`.
 
 ## Updating the deployment
 

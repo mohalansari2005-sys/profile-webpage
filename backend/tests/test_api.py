@@ -106,6 +106,23 @@ def test_the_proxy_s_x_real_ip_wins_over_a_spoofed_x_forwarded_for(db, api, stub
     assert stub_graph["state"]["ip_hash"] == hash_ip("198.51.100.7")
 
 
+@pytest.mark.parametrize("origin, synthetic", [
+    ("https://example.dev", False),  # the live site
+    ("https://www.example.dev", False),  # listed after ", ": CORS still matches it
+    (None, True),  # the canary, curl
+    ("null", True),  # a sandboxed page or a local file
+    ("https://profile-webpage-git-feat-x.vercel.app", True),  # a preview: CORS allows it
+    ("https://evil.example", True),
+])
+def test_only_the_live_site_s_origin_is_a_real_question(db, api, stub_graph, settings,
+                                                        fresh_cache, origin, synthetic):
+    settings.CORS_ALLOWED_ORIGINS = ["https://example.dev", " https://www.example.dev"]
+    headers = {"HTTP_ORIGIN": origin} if origin else {}
+    r = api.post("/api/chat/", {"question": "q"}, format="json", **headers)
+    assert r.status_code == 200  # answered either way; only the dashboard differs
+    assert stub_graph["state"]["synthetic"] is synthetic
+
+
 def test_a_provider_outage_is_a_503_not_a_refusal(db, api, monkeypatch):
     """An off-topic refusal for an outage told every visitor their question was
     the problem. A 503 is what makes the UI say the service failed and offer a

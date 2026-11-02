@@ -7,6 +7,8 @@ class ChatState(TypedDict, total=False):
     history: list[dict[str, str]]
     ip_hash: str
     started_at: float
+    # Not from the live site (chat/views.py's synthetic()); only logged.
+    synthetic: bool
 
     # condense
     condensed: str

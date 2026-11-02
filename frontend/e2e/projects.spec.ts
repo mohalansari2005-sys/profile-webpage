@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 // Only one project exists today, so a rail that scrolls needs more cards. The
 // tests clone the real card in the browser and nudge the rail to re-measure

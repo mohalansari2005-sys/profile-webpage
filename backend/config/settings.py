@@ -71,12 +71,21 @@ CHAT_DAILY_CAP = int(os.environ.get("CHAT_DAILY_CAP", "200"))
 CHAT_TURN_BUDGET = float(os.environ.get("CHAT_TURN_BUDGET", "25"))
 CORPUS_PATH = Path(os.environ.get("CORPUS_PATH", BASE_DIR / "corpus.json"))
 
+# Analytics. Collection always runs; the dashboard only exists once a password
+# is set -- unset, /dashboard/ is a plain 404. .strip() for the reason given
+# in required() above.
+DASHBOARD_PASSWORD = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
+# Days on the dashboard are calendar days here, not in UTC: a visit at 01:00
+# Riyadh time belongs to that morning, not the previous evening.
+DASHBOARD_TZ = os.environ.get("DASHBOARD_TZ", "Asia/Riyadh")
+
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "rest_framework",
     "corsheaders",
     "chat",
+    "analytics",
 ]
 
 MIDDLEWARE = [
@@ -85,6 +94,15 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+# Only the dashboard renders a template. APP_DIRS finds analytics/templates/;
+# no context processors, because the page needs nothing but its own context.
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "APP_DIRS": True,
+    }
+]
 WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
@@ -122,7 +140,18 @@ CACHES = {
 }
 
 REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_RATES": {"chat": os.environ.get("CHAT_RATE", "10/min")},
+    "DEFAULT_THROTTLE_RATES": {
+        "chat": os.environ.get("CHAT_RATE", "10/min"),
+        # A page load sends one beacon, so this only stops scripted floods.
+        "visit": os.environ.get("VISIT_RATE", "60/min"),
+        # Every dashboard request counts, right password or wrong, so this is
+        # what slows a password guesser down.
+        "dashboard": os.environ.get("DASHBOARD_RATE", "30/min"),
+    },
+    # JSON only. With TEMPLATES configured, DRF's default list would also
+    # switch on the browsable API: an HTML form at /api/chat/ for anyone who
+    # opens it in a browser.
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
 
 CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o]

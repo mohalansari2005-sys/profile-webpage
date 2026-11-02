@@ -247,6 +247,30 @@ There is **one active join at a time**, owned by `frontend/components/join-conte
 asking a question releases a pinned tool, picking a tool releases the citation,
 and hovering a tool previews over either without destroying it.
 
+## Analytics
+
+Self-hosted in the same Django backend; no third-party service sees visitors.
+Each page load sends one beacon (`frontend/components/visit-beacon.tsx`) to
+`/api/visit/` on the chat's backend, derived from `NEXT_PUBLIC_CHAT_API_URL`, so
+nothing is sent when that is unset.
+
+- **Collected:** the page path, the referring site's host, a `utm_source`/`ref`
+  tag, a coarse device and browser family, the country if Cloudflare supplies
+  it, and a salted hash of the IP: the same key the chat log uses, so "visitors
+  who used the chat" is a join.
+- **Not collected:** raw IPs, the User-Agent string, cookies, or anything from
+  browsers without JavaScript. Bots are filtered by User-Agent on a best-effort
+  basis, and Vercel preview deployments are not counted: only the
+  `CORS_ORIGINS` origins are.
+- **Where to see it:** `https://<backend domain>/dashboard/`, behind a password
+  (`DASHBOARD_PASSWORD`; the page 404s until it is set). Visitors, page views,
+  chatbot use, service errors (`ChatLog.unavailable`: the AI provider failed,
+  not a refusal), sources and the latest questions. Chat numbers leave out
+  synthetic questions (`ChatLog.synthetic`: the daily canary, curl checks and
+  previews). See `DEPLOYMENT.md` to switch it on, and open the site once with
+  `?analytics=off` to stop counting your own browser (and any browser that
+  runs QA against the live site).
+
 ## Languages and theme
 
 English is served at `/` and Arabic at `/ar`. Each is its own root layout

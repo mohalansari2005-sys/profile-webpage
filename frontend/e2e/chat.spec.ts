@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { en } from "../messages/en";
 
 const CHAT_API = "http://chat.test/api/chat/";

@@ -38,3 +38,15 @@ class ChatLog(models.Model):
     completion_tokens = models.IntegerField(null=True, blank=True)
     latency_ms = models.IntegerField()
     model = models.CharField(max_length=60)
+    # The AI provider failed this turn, not the question (the graph's
+    # `unavailable`). A column of its own so an outage is counted by what
+    # happened, not by matching the wording of refusal_reason.
+    # db_default on both flags: the columns keep a database default, so code
+    # from before migration 0002 -- running again after a revert, since
+    # `migrate` never unapplies a migration whose file is gone -- can still
+    # insert rows without them. Without it every chat turn would be a 500.
+    unavailable = models.BooleanField(default=False, db_default=False)
+    # Not a visitor on the live site: the daily canary and curl checks send no
+    # Origin, a Vercel preview sends its own. Answered and logged like any
+    # turn, but left out of the dashboard's numbers.
+    synthetic = models.BooleanField(default=False, db_default=False)

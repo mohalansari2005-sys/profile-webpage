@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 // Scroll-revealed blocks ship at opacity 0. These cover the ways a reader can
 // reach the page without ever scrolling them into view.
