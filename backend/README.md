@@ -31,7 +31,7 @@ money.
 
 The `eval` cases are the exception, and are deselected above by default. They
 call the real `OPENAI_FAST_MODEL` to check what the stubs cannot: whether the
-prompts *judge* correctly. A full run is ~30 nano calls, well under a cent.
+prompts *judge* correctly. A full run is ~30 gpt-4.1-mini calls, about a cent.
 
 They exist because a scope gate that refused "What is Majara?" -- naming his own
 employer as unrelated to him -- passed a fully green suite. Every other test
@@ -60,7 +60,7 @@ have forced a second provider and a second key just to keep retrieval working.
 | Setting | Default | Used by |
 |---|---|---|
 | `OPENAI_MODEL` | `gpt-4.1-mini` | `generate` |
-| `OPENAI_FAST_MODEL` | `gpt-4.1-nano` | `condense`, `relevance` |
+| `OPENAI_FAST_MODEL` | `gpt-4.1-mini` | `condense`, `relevance` |
 | `OPENAI_EMBED_MODEL` | `text-embedding-3-small` | `retrieve`, `ingest_content` |
 
 `text-embedding-3-small` is natively 1536-dimensional, which is exactly the
@@ -91,6 +91,26 @@ less but showed up later: `gpt-5.4-nano` answers the relevance prompt fine, then
 returns a different `in_scope` for the same in-scope question on a second trial.
 `relevance` fails closed, so that reads to a visitor as a random refusal. It was
 rejected for `OPENAI_FAST_MODEL` on those grounds — see `config/settings.py`.
+
+`gpt-4.1-nano` held that slot until OpenAI shut it down on 2026-10-23. The gate
+fails closed, so for ten days every question was refused as off-topic and
+nothing said why. What now stops a repeat:
+
+- The default is `gpt-4.1-mini`, and the env templates no longer pin model
+  names, so a new default actually reaches the server.
+- A fast model that comes back `model_not_found` makes `openai_client` fall back
+  to `OPENAI_MODEL` for the life of that worker (an env file can still name a
+  retired model).
+- An outage -- auth, quota, rate limit, 5xx, timeout, a retired model with
+  nowhere to fall back -- answers **503**, the UI's "service hit an error, try
+  again", instead of a refusal. The turn is logged with `refusal_reason`
+  `generation unavailable` (or `retrieval unavailable` for embeddings) and does
+  not count against `CHAT_DAILY_CAP`. A request OpenAI rejects as bad (400/409/
+  422) fails the same way on retry, so it stays a refusal.
+- Every OpenAI failure is logged to stderr (`docker compose logs web`) with its
+  status and error code.
+
+Check OpenAI's deprecations page before a model's shutdown date, not after.
 
 ## Secrets
 

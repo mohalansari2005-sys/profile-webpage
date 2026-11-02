@@ -1,4 +1,3 @@
-from django.conf import settings
 from langgraph.graph import END, StateGraph
 
 from chat.graph.nodes.condense import condense
@@ -8,6 +7,7 @@ from chat.graph.nodes.relevance import relevance, route
 from chat.graph.nodes.retrieve import retrieve
 from chat.graph.state import ChatState
 from chat.language import is_arabic
+from chat.openai_client import fast_model
 
 REFUSAL_OUT_OF_SCOPE = (
     "I only answer questions about Mohammed's work — his roles, the projects "
@@ -27,7 +27,7 @@ def _mark_refused(state: ChatState) -> dict:
     answer = (REFUSAL_OUT_OF_SCOPE_AR if is_arabic(state.get("question", ""))
               else REFUSAL_OUT_OF_SCOPE)
     return {"answer": answer, "refused": True, "sources": [],
-            "used_chunk_ids": [], "model": settings.OPENAI_FAST_MODEL}
+            "used_chunk_ids": [], "model": fast_model()}
 
 
 def build_graph():

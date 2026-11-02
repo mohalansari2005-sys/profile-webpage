@@ -35,15 +35,22 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # per question and the 200/day CHAT_DAILY_CAP, this is ~$2.40/month worst case,
 # against ~$12 for gpt-4.1 and ~$19 for gpt-5.4.
 #
-# OPENAI_FAST_MODEL (gpt-4.1-nano, $0.10 in / $0.40 out) serves the classifier
-# calls, `condense` and `relevance`. gpt-5.4-nano is cheaper-looking but was
+# OPENAI_FAST_MODEL serves the classifier calls, `condense` and `relevance`. It
+# was gpt-4.1-nano ($0.10 in / $0.40 out), 6/6 over two trials including a
+# prompt-injection attempt, until OpenAI shut that model down on 2026-10-23:
+# every gate call then failed and, failing closed, refused every visitor as
+# off-topic. It is now gpt-4.1-mini, the model `generate` already runs, at ~4x
+# nano's price. The gate is ~600 tokens in; condense runs only on follow-ups
+# and Arabic, up to ~3.5k with a full history. If every one of the 200/day
+# capped questions were a long follow-up that is ~$8/month more; a first-turn
+# English question costs ~$0.0002 more. gpt-5.4-nano is cheaper-looking but was
 # rejected: on the relevance gate it returned in_scope=False for a plainly
 # in-scope question on one trial and True on the next -- with a reason string
 # arguing the question WAS in scope. relevance fails closed, so an unstable
-# gate silently refuses real visitors. gpt-4.1-nano was 6/6 over two trials,
-# including a prompt-injection attempt.
+# gate silently refuses real visitors. If this model is ever not found again,
+# openai_client falls back to OPENAI_MODEL rather than refusing everyone.
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
-OPENAI_FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "gpt-4.1-nano")
+OPENAI_FAST_MODEL = os.environ.get("OPENAI_FAST_MODEL", "gpt-4.1-mini")
 # text-embedding-3-small is natively 1536 dimensions, which is exactly the
 # ContentChunk vector column -- no migration, and `dimensions` below is a
 # no-op assertion rather than a Matryoshka truncation.
@@ -96,6 +103,19 @@ CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ORIGINS", "").split(",")
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
 ]
+
+# Without this, DEBUG=0 hands Django's request errors to mail_admins (no ADMINS
+# are set) and nothing else, so a 500 or a failing OpenAI call left no trace.
+# Everything at WARNING and up goes to stderr: `docker compose logs web`.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    # django.request logs every 4xx as a WARNING -- each throttled request and
+    # each bot probing /wp-login.php. Only 5xx are worth a line.
+    "loggers": {"django.request": {"level": "ERROR"}},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 USE_TZ = True

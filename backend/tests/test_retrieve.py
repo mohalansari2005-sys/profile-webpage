@@ -55,11 +55,11 @@ def test_retrieve_embeds_the_condensed_question_not_the_raw_one(db, three_chunks
     assert seen["q"] == "what did he build at Majara"
 
 
-def test_a_failed_embed_retrieves_nothing_instead_of_crashing(db, three_chunks, monkeypatch):
+def test_a_failed_embed_retrieves_nothing_and_flags_an_outage(db, three_chunks, monkeypatch):
     from chat.graph.nodes import retrieve as node
 
     monkeypatch.setattr(node, "embed_query", lambda q: None)
-    assert node.retrieve({"condensed": "anything"}) == {"retrieved": []}
+    assert node.retrieve({"condensed": "anything"}) == {"retrieved": [], "unavailable": True}
 
 
 @pytest.fixture

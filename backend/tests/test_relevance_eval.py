@@ -7,7 +7,7 @@ Only a real call to OPENAI_FAST_MODEL can catch that, so these cases are opt-in:
 
     docker compose run --rm web pytest -m eval
 
-A full run is ~30 gpt-4.1-nano calls, well under a cent.
+A full run is ~30 gpt-4.1-mini calls, about a cent.
 """
 import os
 

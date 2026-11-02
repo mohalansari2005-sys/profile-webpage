@@ -90,3 +90,42 @@ def test_x_forwarded_for_takes_the_first_hop(db, api, stub_graph):
     api.post("/api/chat/", {"question": "q"}, format="json",
              HTTP_X_FORWARDED_FOR="198.51.100.7, 10.0.0.1", REMOTE_ADDR="10.0.0.1")
     assert stub_graph["state"]["ip_hash"] == hash_ip("198.51.100.7")
+
+
+def test_a_provider_outage_is_a_503_not_a_refusal(db, api, monkeypatch):
+    """An off-topic refusal for an outage told every visitor their question was
+    the problem. A 503 is what makes the UI say the service failed and offer a
+    retry."""
+    from chat import views
+
+    class OutageGraph:
+        def invoke(self, state):
+            return {"answer": "I only answer questions about Mohammed's work.",
+                    "refused": True, "sources": [], "unavailable": True}
+
+    monkeypatch.setattr(views, "GRAPH", OutageGraph())
+    r = api.post("/api/chat/", {"question": "What is Keyraa?"}, format="json")
+    assert r.status_code == 503
+    assert "answer" not in r.json()
+
+
+def test_an_outage_does_not_spend_the_daily_cap(db, api, monkeypatch, settings):
+    """The 503 asks the visitor to try again. If those retries counted, the cap
+    would be gone by the time OpenAI came back."""
+    from django.core.cache import cache
+
+    from chat import views
+
+    cache.clear()
+    settings.CHAT_DAILY_CAP = 2
+    outage = {"answer": "", "refused": True, "sources": [], "unavailable": True}
+    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: outage})())
+    for _ in range(4):
+        assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
+
+    answered = {"answer": "ok", "refused": False, "sources": []}
+    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: answered})())
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 429
+    cache.clear()

@@ -16,6 +16,9 @@ class ChatState(TypedDict, total=False):
     # relevance
     in_scope: bool
     refusal_reason: str
+    # Set by any node whose OpenAI call failed outright. The turn is still
+    # logged, but the view answers 503: the provider failed, not the question.
+    unavailable: bool
 
     # retrieve
     retrieved: list[dict[str, Any]]

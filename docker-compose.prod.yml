@@ -24,6 +24,12 @@ services:
   web:
     build: ./backend
     env_file: backend/.env
+    # The web container now logs errors to stderr (config/settings.py
+    # LOGGING); Docker's json-file driver keeps that forever unless capped.
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
     expose:
       - "8000"
     depends_on:
