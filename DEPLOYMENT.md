@@ -76,10 +76,12 @@ DOMAIN=<your domain, e.g. api.yourdomain.com>
 `CORS_ORIGINS` value above is for the production domain specifically.
 
 `CORS_ORIGINS` is also what analytics treats as the live site: list every origin
-the site is served from, exactly (comma-separated, e.g. both the `www.` and the
-bare domain if both serve pages rather than redirect). Questions from any other
-origin, or none (the canary, curl), are answered but logged as synthetic and left
-off the dashboard; page views from any other origin are not recorded.
+the site is served from (comma-separated, e.g. both the `www.` and the bare
+domain if both serve pages rather than redirect). Entries are compared the way
+the CORS check compares them, by scheme and host, so a space after a comma is
+harmless. Questions from any other origin, or none (the canary, curl), are
+answered but logged as synthetic and left off the dashboard; page views from
+any other origin are not recorded.
 
 `DOMAIN` is read by both the `web` and `caddy` services (via `env_file: backend/.env`)
 and substituted into `Caddyfile`'s `{$DOMAIN}`.

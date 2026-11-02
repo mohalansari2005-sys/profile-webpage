@@ -170,7 +170,7 @@ without a third party:
   coarse device and browser families, and `hash_ip(client_ip(request))`, the
   same key `ChatLog.ip_hash` uses. The raw IP and the User-Agent string are
   never stored. Bots (by User-Agent), any `Origin` other than one listed
-  exactly in `CORS_ORIGINS` (so Vercel previews too, which the CORS regex
+  in `CORS_ORIGINS` (so Vercel previews too, which the CORS regex
   otherwise lets through) and bodies that fail `VisitSerializer` are dropped,
   and every answer is an empty 204 either way. So is a body the connection
   dropped mid-way, and a database error on save (the first deploy serves
@@ -180,9 +180,10 @@ without a third party:
   the AI provider failing), daily charts, breakdowns and the latest 25
   questions. HTTP Basic; only the password is checked. No JavaScript, no CDN.
 - Chat numbers leave out **synthetic** questions (`ChatLog.synthetic`): those
-  sent with no `Origin` (the canary, curl) or with one not listed exactly in
-  `CORS_ORIGINS` (Vercel previews). The chat still answers them. Rows logged
-  before the flag existed cannot be told apart and still count.
+  sent with no `Origin` (the canary, curl) or with one not listed in
+  `CORS_ORIGINS` (Vercel previews), compared by scheme and host as the CORS
+  check compares them (`chat/origin.py`). The chat still answers them. Rows
+  logged before the flag existed cannot be told apart and still count.
 
 | Setting | Default | |
 |---|---|---|

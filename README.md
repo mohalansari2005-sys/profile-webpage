@@ -246,7 +246,7 @@ nothing is sent when that is unset.
   who used the chat" is a join.
 - **Not collected:** raw IPs, the User-Agent string, cookies, or anything from
   browsers without JavaScript. Bots are filtered by User-Agent on a best-effort
-  basis, and Vercel preview deployments are not counted: only the exact
+  basis, and Vercel preview deployments are not counted: only the
   `CORS_ORIGINS` origins are.
 - **Where to see it:** `https://<backend domain>/dashboard/`, behind a password
   (`DASHBOARD_PASSWORD`; the page 404s until it is set). Visitors, page views,
