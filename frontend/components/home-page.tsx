@@ -6,6 +6,7 @@ import { Work } from "@/components/sections/work";
 import { I18nProvider } from "@/components/i18n-provider";
 import { JoinProvider } from "@/components/join-context";
 import { TopBar } from "@/components/top-bar";
+import { VisitBeacon } from "@/components/visit-beacon";
 import type { Locale } from "@/lib/i18n";
 import { getMessages } from "@/messages";
 
@@ -24,6 +25,10 @@ export function HomePage({ locale }: { locale: Locale }) {
   const t = getMessages(locale);
   return (
     <I18nProvider locale={locale} messages={t}>
+      {/* Here rather than in SiteLayout: both routes render this page once
+          each, whereas a layout stays mounted across navigations beneath it,
+          so a beacon there would count the layout, not each page view. */}
+      <VisitBeacon />
       <main className="relative">
         <TopBar />
         <Hero t={t.hero} />

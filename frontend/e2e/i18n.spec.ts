@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { experience } from "../lib/content";
 import { format } from "../lib/i18n";
 import { ar } from "../messages/ar";

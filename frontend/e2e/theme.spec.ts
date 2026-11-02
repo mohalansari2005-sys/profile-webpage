@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const DARK_BG = "rgb(15, 22, 38)"; // --surface-base in dark
 const LIGHT_BG = "rgb(235, 238, 243)"; // --surface-base in light

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // The chat API URL is baked in at build time (see CI), and every request to it
 // is intercepted here, so these tests never touch a real backend or OpenAI.

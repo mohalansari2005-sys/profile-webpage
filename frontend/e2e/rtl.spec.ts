@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 // The page is still English; these tests flip it to RTL/Arabic in the browser to
 // prove the CSS is direction-safe before any Arabic content exists.

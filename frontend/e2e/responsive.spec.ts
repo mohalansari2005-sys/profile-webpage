@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 // Phone and iPad sizes, each on both language pages. The first bug this guards
 // against: on a phone the page was wider than the screen (scrollWidth 643 on a
