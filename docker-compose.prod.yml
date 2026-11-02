@@ -43,7 +43,9 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: caddy:2-alpine
+    # Pinned, and the same tag as CI's `caddy validate`: a floating 2-alpine
+    # could validate a Caddyfile on one Caddy and run it on another.
+    image: caddy:2.11-alpine
     ports:
       - "80:80"
       - "443:443"

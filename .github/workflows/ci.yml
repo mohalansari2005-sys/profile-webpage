@@ -58,9 +58,10 @@ jobs:
       # server: the deploy has failed, and a Caddy restart before the fix
       # lands would load it. Catch it on the pull request instead.
       # DOMAIN is a placeholder; validate does not request a certificate.
+      # The image is the one docker-compose.prod.yml pins; keep them in step.
       - run: >-
           docker run --rm -e DOMAIN=example.com
-          -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+          -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11-alpine
           caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
   backend:

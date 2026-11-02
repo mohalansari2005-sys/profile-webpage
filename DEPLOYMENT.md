@@ -180,6 +180,12 @@ of the deploy, or for good if `migrate` or `ingest_content` failed first. The cu
 file sets both `X-Real-IP` and `X-Forwarded-For`, so whichever Django is running reads
 the visitor correctly.
 
+Caddy's image is pinned (`caddy:2.11-alpine` in `docker-compose.prod.yml`, and the same
+tag in CI's `caddy` job — change both together). The first deploy after a change of tag
+pulls the new image when Caddy is recreated: by the validate step if the `Caddyfile`
+changed too, otherwise by `up -d`, which recreates Caddy for the new image after `web`
+is rebuilt.
+
 The `Caddyfile` trusts Cloudflare's `CF-Connecting-IP` header from Cloudflare's
 published IP ranges only, so the chat's per-IP limit sees the visitor rather than a
 Cloudflare edge. The ranges are listed by hand with the date they were fetched;
