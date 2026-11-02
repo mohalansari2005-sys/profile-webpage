@@ -78,26 +78,31 @@ export function Contact({ t }: { t: Messages["contact"] }) {
             </p>
           </Reveal>
 
+          {/* The row grid is the Reveal itself: a <dl> allows one <div>
+              around each dt/dd pair, and a wrapper inside the Reveal made
+              it two. */}
           <dl className="mt-10">
             {links.map((link, index) => (
-              <Reveal key={link.key} delay={160 + index * 70}>
-                <div className="grid grid-cols-1 gap-1 border-t border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6">
-                  {/* The icon sits in the label column beside the mono label,
-                      not inside the link — the visible label and the full URL
-                      stay the accessible name, so the glyph is decorative. */}
-                  <dt className="field-label flex items-center gap-2 sm:pt-1">
-                    {link.icon}
-                    {t[link.key]}
-                  </dt>
-                  <dd>
-                    <a
-                      href={link.href}
-                      className="rounded-sm [overflow-wrap:anywhere] underline decoration-rule decoration-1 underline-offset-4 transition-colors hover:decoration-match-ink hover:text-match-ink"
-                    >
-                      {link.value}
-                    </a>
-                  </dd>
-                </div>
+              <Reveal
+                key={link.key}
+                delay={160 + index * 70}
+                className="grid grid-cols-1 gap-1 border-t border-rule py-4 sm:grid-cols-[7.5rem_1fr] sm:gap-6"
+              >
+                {/* The icon sits in the label column beside the mono label,
+                    not inside the link — the visible label and the full URL
+                    stay the accessible name, so the glyph is decorative. */}
+                <dt className="field-label flex items-center gap-2 sm:pt-1">
+                  {link.icon}
+                  {t[link.key]}
+                </dt>
+                <dd>
+                  <a
+                    href={link.href}
+                    className="rounded-sm [overflow-wrap:anywhere] underline decoration-rule decoration-1 underline-offset-4 transition-colors hover:decoration-match-ink hover:text-match-ink"
+                  >
+                    {link.value}
+                  </a>
+                </dd>
               </Reveal>
             ))}
           </dl>

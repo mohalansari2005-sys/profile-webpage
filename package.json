@@ -6,6 +6,7 @@
   "scripts": {
     "content": "node scripts/build-content.mjs",
     "content:check": "node scripts/build-content.mjs --check",
+    "favicon": "node scripts/build-favicon.mjs",
     "test": "node --test \"scripts/**/*.test.mjs\""
   },
   "devDependencies": {

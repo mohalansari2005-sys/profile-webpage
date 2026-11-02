@@ -34,6 +34,7 @@ export type ChatResult =
  */
 export type ChatError =
   | "throttled"
+  | "dailyCap"
   | "server"
   | "network"
   | "malformed"
@@ -66,6 +67,28 @@ function parseAnswer(value: unknown): ChatAnswer | null {
   };
 }
 
+/** Tells the two 429s apart. The backend marks the daily cap with
+    `code: "daily_cap"`; until that deploys, DRF's own body for it, which is
+    exactly "Request was throttled.": GlobalDailyThrottle.wait() is None, so
+    DRF adds no "Expected available in 42 seconds." (always in English, as
+    the backend has no LocaleMiddleware).
+
+    Only those two exact signals count. Anything else that answers 429 (a
+    proxy's or CDN's own JSON, a translated or reworded `detail`, a body that
+    cannot be read) is the ordinary limit. Mistaking it for the cap is the
+    costlier error: it hides Try again and sends the reader away over a wait
+    of a minute. The reverse costs one retry the server refuses again. */
+async function isDailyCap(response: Response): Promise<boolean> {
+  try {
+    const body: unknown = await response.json();
+    if (typeof body !== "object" || body === null) return false;
+    const { code, detail } = body as Record<string, unknown>;
+    return code === "daily_cap" || detail === "Request was throttled.";
+  } catch {
+    return false;
+  }
+}
+
 export async function askChat(input: {
   question: string;
   history: ChatMessage[];
@@ -87,9 +110,14 @@ export async function askChat(input: {
     });
 
     if (response.status === 429) {
-      // DRF's own `detail` is machine copy ("Expected available in 42
-      // seconds."), so the reader gets ours instead.
-      return { ok: false, error: "throttled" };
+      // Two limits answer 429. The per-visitor rate clears within a minute;
+      // the site-wide daily cap holds until the server's midnight, and a
+      // reader must not be told "a minute" all day. DRF's `detail` is machine
+      // copy, so the reader gets ours either way.
+      return {
+        ok: false,
+        error: (await isDailyCap(response)) ? "dailyCap" : "throttled",
+      };
     }
     if (!response.ok) return { ok: false, error: "server" };
 
