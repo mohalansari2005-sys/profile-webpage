@@ -16,7 +16,7 @@ he know?" but "where did he actually use it?"
 
 ```
 frontend/   Next.js app, static-exported, deployed on Vercel
-backend/    Django + DRF service for the chat feature; runs locally via Docker Compose
+backend/    Django + DRF service for the chat feature; Docker Compose locally and in production (see DEPLOYMENT.md)
 content/    Markdown corpus; frontend/lib/content.ts is generated from it
 docs/       Specs and implementation plans
 scripts/    Repo-level tooling
