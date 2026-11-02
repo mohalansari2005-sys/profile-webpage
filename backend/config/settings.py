@@ -104,11 +104,6 @@ CACHES = {
 }
 
 REST_FRAMEWORK = {
-    # Anonymous by design. DRF's defaults (session + Basic) authenticate before
-    # any throttle runs, and Basic runs a million-round password hash for every
-    # request carrying the header -- uncounted work anyone could ask for.
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "DEFAULT_THROTTLE_RATES": {"chat": os.environ.get("CHAT_RATE", "10/min")},
 }
 

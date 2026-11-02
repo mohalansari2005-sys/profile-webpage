@@ -18,6 +18,11 @@ GRAPH = build_graph()
 
 
 class ChatView(APIView):
+    # Anonymous by design. DRF's defaults (session + Basic) authenticate before
+    # any throttle runs, and Basic runs a million-round password hash for every
+    # request carrying the header -- uncounted work anyone could ask for.
+    authentication_classes = []
+    permission_classes = []
     throttle_scope = "chat"
     # Per-IP only. GlobalDailyThrottle counts as it asks, so post() asks it
     # last: a request this limit turns away never reaches it, and neither does
