@@ -93,6 +93,14 @@ DATABASES = {
         "PASSWORD": required("POSTGRES_PASSWORD"),
         "HOST": os.environ.get("POSTGRES_HOST", "db"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        # Under gthread, gunicorn's --timeout no longer ends a stuck request,
+        # and CHAT_TURN_BUDGET bounds only the OpenAI calls: a query waiting
+        # on a lock would hold its thread -- one of 8 -- for good. Milliseconds.
+        # Every query here, migrate's and ingest_content's included, is on
+        # tables of a few hundred rows; 15s is room for anything legitimate.
+        # A migration that cannot get its lock in 5s fails rather than queue
+        # every ChatLog write behind it, and can simply be run again.
+        "OPTIONS": {"options": "-c statement_timeout=15000 -c lock_timeout=5000"},
     }
 }
 
@@ -100,6 +108,10 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+        # Seconds. Every chat POST counts in Redis before anything else, so a
+        # Redis that stops answering would otherwise hang every thread on it;
+        # with these the request fails with a 500 instead.
+        "OPTIONS": {"SOCKET_CONNECT_TIMEOUT": 2, "SOCKET_TIMEOUT": 3},
     }
 }
 

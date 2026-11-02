@@ -330,3 +330,10 @@ def test_the_daily_counter_is_keyed_on_the_configured_zone_s_date(db, settings, 
         APIClient().post("/api/chat/", {"question": "q"}, format="json")
         today = datetime.now(ZoneInfo(zone)).date().isoformat()
         assert cache.get(f"chat:daily:{today}") == 1
+
+
+def test_a_redis_call_cannot_wait_forever():
+    """Every chat POST counts in Redis first; without socket timeouts a Redis
+    that stopped answering held every gthread thread that reached it."""
+    kwargs = cache.client.get_client().connection_pool.connection_kwargs
+    assert (kwargs["socket_connect_timeout"], kwargs["socket_timeout"]) == (2, 3)

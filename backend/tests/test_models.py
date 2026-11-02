@@ -39,3 +39,16 @@ def test_hash_ip_is_stable_and_salted(settings):
     assert hash_ip("203.0.113.9") == a
     settings.IP_HASH_SALT = "salt-b"
     assert hash_ip("203.0.113.9") != a
+
+
+def test_a_query_cannot_wait_forever(db):
+    """Under gthread nothing else ends a stuck query: gunicorn's --timeout no
+    longer kills a slow request, and the turn budget covers OpenAI only."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW statement_timeout")
+        statement = cursor.fetchone()[0]
+        cursor.execute("SHOW lock_timeout")
+        lock = cursor.fetchone()[0]
+    assert (statement, lock) == ("15s", "5s")

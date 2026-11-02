@@ -31,6 +31,9 @@ USER app
 # 25s, against the browser's 30s.
 # --timeout 120 was set because a turn's calls could outlast gunicorn's 30s
 # default. Under gthread it only restarts a worker that stops responding, not a
-# slow request: CHAT_TURN_BUDGET (25s) is what bounds a turn.
+# slow request, so nothing bounds a turn as a whole. Each wait in it is bounded
+# instead: CHAT_TURN_BUDGET (25s) covers its OpenAI calls, statement_timeout
+# and lock_timeout its queries, and socket timeouts its Redis calls
+# (config/settings.py).
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
      "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120"]
