@@ -34,6 +34,11 @@ OPENAI_API_KEY = required("OPENAI_API_KEY")
 # invented a chunk id, so the choice came down to price: at ~550 in / ~80 out
 # per question and the 200/day CHAT_DAILY_CAP, this is ~$2.40/month worst case,
 # against ~$12 for gpt-4.1 and ~$19 for gpt-5.4.
+# Those per-question figures predate whole-record retrieval: generate now reads
+# up to ~8k tokens of context and may write up to MAX_TOKENS_GENERATE
+# (chat/openai_client.py). With the classifiers, the worst case is about a cent
+# a turn -- ~$2 a *day* at the cap, not a month. The ranking by price stands;
+# size CHAT_DAILY_CAP from ChatLog's real token counts.
 #
 # OPENAI_FAST_MODEL serves the classifier calls, `condense` and `relevance`. It
 # was gpt-4.1-nano ($0.10 in / $0.40 out), 6/6 over two trials including a

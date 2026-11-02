@@ -211,6 +211,48 @@ def test_finish_reason_errors_do_not_escape(monkeypatch, error):
     assert "api_error" not in usage
 
 
+def test_every_call_caps_its_output(monkeypatch):
+    """Without a cap a call may write up to the model's own maximum -- 32k
+    tokens on gpt-4.1-mini -- from a visitor-written prompt, and
+    CHAT_DAILY_CAP counts requests, not tokens."""
+    from chat import openai_client
+
+    seen = []
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        parse_hook=lambda m, msg, fmt, kw: seen.append(kw.get("max_completion_tokens"))))
+    openai_client.structured("prompt", Shape, fast=True)
+    openai_client.structured("prompt", Shape)
+    assert seen == [openai_client.MAX_TOKENS_FAST, openai_client.MAX_TOKENS_GENERATE]
+
+
+def test_the_sdk_takes_the_output_cap():
+    """The fakes would not notice the SDK renaming or dropping the parameter."""
+    import inspect
+
+    from chat import openai_client
+
+    assert "max_completion_tokens" in inspect.signature(
+        openai_client._client.chat.completions.parse).parameters
+
+
+def test_a_capped_answer_still_reports_what_it_cost(monkeypatch):
+    """Cut off at the cap, the call is billed in full. Logged as None, the
+    most expensive calls were the ones missing from ChatLog."""
+    from openai.types import CompletionUsage
+
+    from chat import openai_client
+
+    completion = ChatCompletion(
+        id="x", choices=[], created=0, model="m", object="chat.completion",
+        usage=CompletionUsage(prompt_tokens=900, completion_tokens=2500, total_tokens=3400))
+    monkeypatch.setattr(openai_client, "_client", _fake_client(
+        raises=LengthFinishReasonError(completion=completion)))
+
+    parsed, usage = openai_client.structured("prompt", Shape)
+    assert parsed is None
+    assert usage == {"prompt_tokens": 900, "completion_tokens": 2500}
+
+
 def test_a_refusal_is_not_reported_as_an_api_error(monkeypatch):
     """`parsed` is None when the model refused instead of answering. The call
     succeeded, so the token counts are real and api_error must be absent --

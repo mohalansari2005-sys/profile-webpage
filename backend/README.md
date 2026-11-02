@@ -181,6 +181,13 @@ token, not capped, so this counter is now the **spend** limit — it is the only
 thing between a scripted abuser and a real bill. Size it against what you are
 willing to pay per day, not against a quota.
 
+The counter counts requests, not tokens, so each call also caps its output:
+`MAX_TOKENS_FAST` (1000) for `condense` and `relevance`, `MAX_TOKENS_GENERATE`
+(2500, room for a long Arabic answer) for `generate`, in `chat/openai_client.py`.
+A call that hits its cap is refused as an unparseable response, and its billed
+tokens are still logged. Worst case that is about a cent a turn -- ~$2 a day at
+the default cap of 200.
+
 Only a POST that passes the per-IP limit **and** validates counts against the
 cap; other methods (405) are not throttled at all, and a 400 spends only the
 sender's per-IP budget. A refusal from the cap is a 429 whose body carries

@@ -38,6 +38,19 @@ _deadline: contextvars.ContextVar[float | None] = contextvars.ContextVar(
 MIN_SECONDS_FAST = 2.0
 MIN_SECONDS_GENERATE = 6.0
 
+# Output caps (max_completion_tokens). Without one a call may write up to the
+# model's own maximum -- 32k tokens on gpt-4.1-mini -- from a prompt the visitor
+# helped write, and CHAT_DAILY_CAP counts requests, not tokens. A call that
+# reaches its cap raises LengthFinishReasonError: a bad response, refused, with
+# its billed tokens still logged.
+# The classifiers return a verdict, or condense's rewrite of a question of at
+# most 1000 characters plus its English version.
+MAX_TOKENS_FAST = 1000
+# A long, detailed Arabic answer (Arabic takes roughly twice the tokens of the
+# same English). The turn budget usually ends a call this long first; the cap
+# is what bounds the bill for one the client gave up on.
+MAX_TOKENS_GENERATE = 2500
+
 
 @contextmanager
 def turn_budget(seconds: float):
@@ -189,6 +202,7 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
             model=model,
             messages=[{"role": "user", "content": prompt}],
             response_format=schema,
+            max_completion_tokens=MAX_TOKENS_FAST if fast else MAX_TOKENS_GENERATE,
             # The classifiers are decisions, not prose. At the default
             # temperature the gate samples its verdict: the same question
             # measured 2/5 in_scope across five calls, so a visitor could be
@@ -212,12 +226,15 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
         if exc.code in _REJECTED_CODES:
             return None, {"prompt_tokens": None, "completion_tokens": None, "rejected": True}
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
-    except (LengthFinishReasonError, ContentFilterFinishReasonError):
+    except (LengthFinishReasonError, ContentFilterFinishReasonError) as exc:
         # Neither subclasses APIError, so an `except APIError` alone lets these
         # escape as a 500. They mean the model produced nothing usable -- a bad
-        # response, not an outage -- so they get no api_error flag. Token counts
-        # are unreachable on these, unlike the parse failures below.
-        return None, {"prompt_tokens": None, "completion_tokens": None}
+        # response, not an outage -- so they get no api_error flag. A length
+        # cut-off is billed in full, and carries the completion: its counts
+        # are logged, or the costliest calls would be the ones missing.
+        usage = getattr(getattr(exc, "completion", None), "usage", None)
+        return None, {"prompt_tokens": getattr(usage, "prompt_tokens", None),
+                      "completion_tokens": getattr(usage, "completion_tokens", None)}
 
     usage = getattr(resp, "usage", None)
     counts = {
