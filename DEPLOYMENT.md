@@ -142,30 +142,43 @@ deploy means the server may be part-way through — check `git log -1` and
 
 ```bash
 cd profile-webpage
+caddyfile_before=$(sha256sum Caddyfile)
 git pull
-docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
+# Only if the pull changed the Caddyfile:
+if [ "$(sha256sum Caddyfile)" != "$caddyfile_before" ]; then
+  docker compose -f docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+fi
 docker compose -f docker-compose.prod.yml build web
 docker compose -f docker-compose.prod.yml run --rm -T web python manage.py migrate
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec web python manage.py ingest_content
 ```
 
+Run by hand, stop at the first command that fails — the workflow's `set -e` does that
+for it.
+
 Migrations run before the swap, from a one-off container of the new image, while the
 old `web` keeps serving: so a migration must leave the old code working (a new column
 needs a database default — `db_default` on the field), which a rollback needs anyway.
 
-The `caddy reload` line is how a `Caddyfile` change reaches Caddy. `up` does not
-recreate the `caddy` container for it, and because `git pull` replaces the file rather
-than rewriting it, the container's single-file bind mount keeps showing the old one —
-so the file goes in on stdin. `caddy reload` validates it first and keeps the running
-config if it is invalid; stop there if it fails.
+A `Caddyfile` change reaches Caddy only in a new container. `up` does not recreate the
+`caddy` container for it, and because `git pull` replaces the file rather than
+rewriting it, the running container's single-file bind mount keeps showing the old
+one. So when the pull changed the file, it is validated in a one-off container that
+mounts the pulled file — a bad file stops the update there, with Caddy still serving
+the old config and `web` untouched — and Caddy is then recreated with it. Its
+certificates live in the `caddy_data` volume, so the new container reuses them rather
+than requesting new ones. Unlike `exec`-ing into Caddy, this works when Caddy is
+stopped or crash-looping. A recreate cuts off the requests in flight, so it only
+happens when the file changed; with it unchanged, `up -d` still starts a stopped Caddy.
 
-It runs before `up` because the `Caddyfile` decides which headers Django reads the
-visitor's address from. The other way round, a freshly built `web` sat behind the old
-proxy config, which let a visitor choose their own per-IP bucket — until the end of the
-deploy, or for good if `migrate` or `ingest_content` failed first. The current file
-sets both `X-Real-IP` and `X-Forwarded-For`, so whichever Django is running reads the
-visitor correctly.
+It runs before `web` is rebuilt because the `Caddyfile` decides which headers Django
+reads the visitor's address from. The other way round, a freshly built `web` sat behind
+the old proxy config, which let a visitor choose their own per-IP bucket — until the end
+of the deploy, or for good if `migrate` or `ingest_content` failed first. The current
+file sets both `X-Real-IP` and `X-Forwarded-For`, so whichever Django is running reads
+the visitor correctly.
 
 The `Caddyfile` trusts Cloudflare's `CF-Connecting-IP` header from Cloudflare's
 published IP ranges only, so the chat's per-IP limit sees the visitor rather than a

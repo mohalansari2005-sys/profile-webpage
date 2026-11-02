@@ -28,7 +28,8 @@
 		# Replaced too. From a trusted proxy Caddy appends to the incoming
 		# X-Forwarded-For, so its first entry would be whatever the visitor
 		# sent; a Django that still reads that header -- the one running when
-		# the deploy reloads this file -- must see the visitor here as well.
+		# the deploy recreates Caddy with this file -- must see the visitor
+		# here as well.
 		header_up X-Forwarded-For {client_ip}
 		# Caddy keeps idle connections to gunicorn for reuse (2 minutes by
 		# default), and gunicorn closes one idle past its --keep-alive (2s by

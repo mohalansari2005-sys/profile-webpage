@@ -212,7 +212,7 @@ a visitor can pick any address in theirs, a new one per request if they
 like, and keyed on the full address each was a fresh per-IP bucket. IPv4 is
 keyed as it is, and an IPv4-mapped IPv6 address as its IPv4 one. Caddy still
 overwrites `X-Forwarded-For` with the visitor's address, for the Django that is
-running while a deploy reloads the `Caddyfile`; see DEPLOYMENT.md.
+running while a deploy recreates Caddy with a new `Caddyfile`; see DEPLOYMENT.md.
 
 The daily cap was sized against a free-tier daily quota. OpenAI is billed per
 token, not capped, so this counter is now the **spend** limit — it is the only

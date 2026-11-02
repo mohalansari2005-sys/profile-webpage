@@ -26,21 +26,27 @@ jobs:
             # never deployed.
             set -e
             cd /opt/profile-webpage
+            caddyfile_before=$(sha256sum Caddyfile)
             git pull
-            # `up` does not recreate Caddy for a Caddyfile change, and the file
-            # is a single-file bind mount: `git pull` replaces it with a new
-            # file, so the running container keeps reading the old one. Hand
-            # Caddy the pulled file on stdin instead. reload validates it first
-            # and keeps serving the old config if it is invalid -- and fails
-            # this job, so the canary does not run against it.
-            # First, before `up`: the Caddyfile sets the headers Django reads
-            # the visitor's address from. Reloaded last, a new Django ran behind
-            # the old proxy -- which passed a client-sent X-Real-IP through --
-            # until the job ended, or until the next good deploy if migrate or
-            # ingest_content failed in between. The file sets both headers, so
-            # the Django still running reads it correctly too, and a reload that
-            # fails stops the job before anything else has changed.
-            docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config - --adapter caddyfile < Caddyfile
+            caddyfile_after=$(sha256sum Caddyfile)
+            # A changed Caddyfile reaches Caddy only in a new container. `up`
+            # does not recreate one for it, and `git pull` replaces the file
+            # rather than rewriting it, so the running container's single-file
+            # bind mount keeps showing the old one. Validated first, in a
+            # one-off container that mounts the pulled file: a bad one fails
+            # the job here, with Caddy still serving the old config and web not
+            # yet touched. A recreated container binds the new file; its
+            # certificates live in the caddy_data volume and carry over. Unlike
+            # `exec`-ing into Caddy, this works with it stopped or crash-looping.
+            # Only when the pull changed the file: a recreate cuts off the
+            # requests in flight.
+            # First, before web: the Caddyfile sets the headers Django reads
+            # the visitor's address from, and a new Django must not run behind
+            # an old proxy config, even for the length of a build.
+            if [ "$caddyfile_after" != "$caddyfile_before" ]; then
+              docker compose -f docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+              docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate caddy
+            fi
             # Migrate before the swap, in a one-off container of the new image,
             # while the old web keeps serving. Migrated after `up`, the new code
             # ran against the old schema until migrate finished, and a turn
