@@ -35,11 +35,13 @@ function RecordRow({
   const text = localize(record, locale);
   return (
     <Reveal delay={delay}>
+      {/* scroll-mt-28 (112px) clears the sticky tool strip (91px, 99px on
+          touch screens) when a source chip scrolls a record to the top. */}
       <article
         id={`record-${record.id}`}
         tabIndex={-1}
         data-state={state}
-        className="group relative border-b border-rule transition-opacity duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100"
+        className="group relative scroll-mt-28 border-b border-rule transition-opacity duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100"
       >
         {/* The match marker — the only place amber appears. */}
         <span
@@ -132,11 +134,12 @@ function ProjectCard({
   const text = localize(record, locale);
   return (
     <Reveal delay={delay} className="w-[min(22rem,85vw)] shrink-0 snap-start">
+      {/* scroll-mt-28: see RecordRow. */}
       <article
         id={`record-${record.id}`}
         tabIndex={-1}
         data-state={state}
-        className="flex h-full flex-col rounded-2xl border border-rule bg-foreground/[0.04] p-5 transition duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100 data-[state=lit]:border-match data-[state=lit]:bg-match/10"
+        className="flex h-full scroll-mt-28 flex-col rounded-2xl border border-rule bg-foreground/[0.04] p-5 transition duration-200 data-[state=dim]:opacity-40 data-[state=dim]:hover:opacity-100 data-[state=dim]:focus-within:opacity-100 data-[state=lit]:border-match data-[state=lit]:bg-match/10"
       >
         <div className="flex items-start justify-between gap-3">
           <p className="field-label pt-1">{text.period}</p>

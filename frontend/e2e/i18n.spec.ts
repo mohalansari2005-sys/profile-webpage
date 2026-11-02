@@ -179,6 +179,33 @@ test.describe("chat in Arabic", () => {
     await expect(page.getByText("Product Engineering Intern")).toHaveCount(0);
   });
 
+  test("records with no row on the page get Arabic chip titles too", async ({ page }) => {
+    const english = {
+      "about-bio": "About",
+      "about-education": "Education",
+      "faq-availability": "Are you available for work?",
+    };
+    await page.route(CHAT_API, (route) =>
+      route.fulfill({
+        json: {
+          answer: "إجابة.",
+          sources: Object.entries(english).map(([record_id, title]) => ({ record_id, title })),
+          refused: false,
+        },
+      }),
+    );
+    await page.goto("/ar");
+    await ask(page, ar.ask.seeds[2]);
+    // Scoped to the chat: the About section's own heading has the same words.
+    const chat = page.locator("#ask");
+    for (const [id, title] of Object.entries(english)) {
+      await expect(
+        chat.getByText(ar.ask.sourceTitles[id as keyof typeof english], { exact: true }),
+      ).toBeVisible();
+      await expect(chat.getByText(title, { exact: true })).toHaveCount(0);
+    }
+  });
+
   test("the empty input follows the page, typed text its own direction", async ({ page }) => {
     await page.goto("/ar");
     const input = page.locator("#ask-input");

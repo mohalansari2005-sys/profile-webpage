@@ -79,6 +79,11 @@ export const ar: Messages = {
       "تستند الإجابات إلى ما كتبه محمد عن أعماله فقط، ويعتذر المساعد عن أي سؤال خارج هذا النطاق.",
     thinking: "جارٍ التفكير…",
     sources: "المصادر",
+    sourceTitles: {
+      "about-bio": "نبذة عني",
+      "about-education": "التعليم",
+      "faq-availability": "هل أنت متاح للعمل؟",
+    },
     scrollToLatest: "الانتقال إلى أحدث رسالة",
     tryAgain: "إعادة المحاولة",
     errors: {

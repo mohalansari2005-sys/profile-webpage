@@ -46,7 +46,12 @@ function scrollToRecord(recordId: string) {
   // No `behavior` argument on purpose: the page's own `scroll-behavior` is
   // smooth in CSS and forced to `auto` under prefers-reduced-motion, so
   // inheriting it is what makes the reduced-motion case correct.
-  row.scrollIntoView({ block: "center" });
+  //
+  // `start`, not `center`: a project card can be taller than a short phone
+  // screen, and centring it put its title under the sticky tool strip. The
+  // records' `scroll-mt-*` (work.tsx) keeps the start clear of that strip;
+  // `inline: "nearest"` still brings an off-screen card in the rail into view.
+  row.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
 /** Whether the chat may take focus back: it is on the page itself (a disabled
@@ -58,12 +63,18 @@ function focusIsFree(): boolean {
   return !active || active === document.body || active.closest("#ask") !== null;
 }
 
-/** The chip shows the record's title in the page's language when the record has
-    a row on the page; records without one (the bio, the FAQ) keep the title the
-    server sent. */
-function sourceTitle(source: ChatSource, locale: Locale): string {
+/** The chip shows the record's title in the page's language. Records with a row
+    on the page carry it in content.ts; the ones without (the bio, education,
+    the FAQ) never reach the page, so theirs are in the dictionary. A record
+    neither knows keeps the title the server sent. */
+function sourceTitle(
+  source: ChatSource,
+  locale: Locale,
+  titles: Record<string, string | undefined>,
+): string {
   const record = [...experience, ...projects].find((r) => r.id === source.record_id);
-  return record ? localize(record, locale).title : source.title;
+  if (record) return localize(record, locale).title;
+  return titles[source.record_id] ?? source.title;
 }
 
 function historyFrom(turns: Turn[]): ChatMessage[] {
@@ -289,7 +300,7 @@ export function Ask() {
                             <ul className="flex flex-wrap gap-2">
                               {turn.sources.map((source) => {
                                 const hasRow = ROW_IDS.has(source.record_id);
-                                const title = sourceTitle(source, locale);
+                                const title = sourceTitle(source, locale, t.ask.sourceTitles);
                                 return (
                                   <li key={source.record_id}>
                                     {hasRow ? (
@@ -302,7 +313,13 @@ export function Ask() {
                                         {title}
                                       </button>
                                     ) : (
-                                      <span className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim">
+                                      // dir="auto": a server title in English
+                                      // would otherwise take the page's RTL and
+                                      // print its "?" at the front on /ar.
+                                      <span
+                                        dir="auto"
+                                        className="rounded-full border border-rule px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-dim"
+                                      >
                                         {title}
                                       </span>
                                     )}

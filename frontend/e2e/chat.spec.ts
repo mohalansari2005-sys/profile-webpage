@@ -219,3 +219,45 @@ test("a source chip still jumps to its record", async ({ page }) => {
     await expect(card).toBeFocused({ timeout: 1500 });
   }).toPass({ timeout: 15_000 });
 });
+
+test.describe("on a short phone", () => {
+  test.use({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
+
+  test("a source chip lands the record's title below the sticky tool strip", async ({ page }) => {
+    await mock(page, "It is a booking platform.", [
+      { record_id: "proj-keyraa", title: "Keyraa" },
+    ]);
+    await page.goto("/");
+    await ask(page, "What is Keyraa?");
+    const card = page.locator("#record-proj-keyraa");
+    // Retry click + focus together (see "a source chip still jumps").
+    await expect(async () => {
+      await page.getByRole("button", { name: /Keyraa/ }).click();
+      await expect(card).toBeFocused({ timeout: 1500 });
+    }).toPass({ timeout: 15_000 });
+    // The card is taller than this screen; centring it hid the title.
+    const strip = page.locator("#work > div").first();
+    await expect
+      .poll(async () => {
+        const [s, title] = [await strip.boundingBox(), await card.locator("h3").boundingBox()];
+        return title!.y >= s!.y + s!.height && title!.y + title!.height <= 667;
+      })
+      .toBe(true);
+  });
+
+  test("a long URL wraps inside its bubble instead of being cut off", async ({ page }) => {
+    const url = "https://github.com/mohalansari2005-sys/keyraa-hotel-booking";
+    await mock(page, `The code is at ${url}`);
+    await page.goto("/");
+    await ask(page, `Is it ${url}?`);
+    await expect(page.getByText(`The code is at ${url}`)).toBeVisible();
+    for (const text of [`Is it ${url}?`, `The code is at ${url}`]) {
+      const bubble = page.getByText(text).last().locator("..");
+      const { scroll, client } = await bubble.evaluate((el) => ({
+        scroll: el.scrollWidth,
+        client: el.clientWidth,
+      }));
+      expect(scroll, text).toBeLessThanOrEqual(client);
+    }
+  });
+});

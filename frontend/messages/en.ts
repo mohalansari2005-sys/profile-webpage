@@ -72,6 +72,13 @@ export const en = {
       "Answers come only from what Mohammed has written about his own work. Anything outside that, it declines.",
     thinking: "Thinking…",
     sources: "Sources",
+    /** Chip titles for records the chat can cite but the page has no row for,
+        keyed by record id. */
+    sourceTitles: {
+      "about-bio": "About",
+      "about-education": "Education",
+      "faq-availability": "Are you available for work?",
+    },
     scrollToLatest: "Scroll to the latest message",
     tryAgain: "Try again",
     errors: {
