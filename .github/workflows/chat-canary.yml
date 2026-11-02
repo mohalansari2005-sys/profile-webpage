@@ -1,0 +1,40 @@
+name: Chat canary
+
+# Asks the live chatbot one question it must answer. The chat once refused
+# every visitor for ten days -- OpenAI shut down gpt-4.1-nano on 2026-10-23 --
+# and nothing noticed. This runs daily and after every backend deploy; a failed
+# run emails the repo owner. Each attempt is one real question: one slot of
+# CHAT_DAILY_CAP and well under a cent.
+
+on:
+  schedule:
+    - cron: "17 5 * * *" # 08:17 in Riyadh
+  workflow_run:
+    workflows: ["Deploy backend"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  ask:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the live chatbot a question it must answer
+        env:
+          API: https://api.alansari.stream/api/chat/
+        run: |
+          # Three attempts, 30s apart: right after a deploy the web container
+          # can still be starting.
+          for attempt in 1 2 3; do
+            status=$(curl -sS -m 60 -o body.json -w '%{http_code}' -X POST "$API" \
+              -H 'Content-Type: application/json' \
+              -d '{"question":"What is Keyraa?","history":[]}') || status=000
+            echo "attempt $attempt: HTTP $status"
+            cat body.json 2>/dev/null; echo
+            if [ "$status" = 200 ] && jq -e '.refused == false and (.answer | length) > 0' body.json > /dev/null; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::The live chatbot did not answer an in-scope question. Check: docker compose -f docker-compose.prod.yml logs web"
+          exit 1

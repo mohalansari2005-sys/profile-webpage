@@ -109,9 +109,10 @@ def test_a_provider_outage_is_a_503_not_a_refusal(db, api, monkeypatch):
     assert "answer" not in r.json()
 
 
-def test_an_outage_does_not_spend_the_daily_cap(db, api, monkeypatch, settings):
-    """The 503 asks the visitor to try again. If those retries counted, the cap
-    would be gone by the time OpenAI came back."""
+def test_an_outage_still_counts_against_the_daily_cap(db, api, monkeypatch, settings):
+    """The cap is the hard spend limit. An outage turn may already have paid
+    for the gate and an embedding before generate failed, so it is not given
+    back -- refunding those once let a partial outage spend without limit."""
     from django.core.cache import cache
 
     from chat import views
@@ -120,12 +121,7 @@ def test_an_outage_does_not_spend_the_daily_cap(db, api, monkeypatch, settings):
     settings.CHAT_DAILY_CAP = 2
     outage = {"answer": "", "refused": True, "sources": [], "unavailable": True}
     monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: outage})())
-    for _ in range(4):
-        assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
-
-    answered = {"answer": "ok", "refused": False, "sources": []}
-    monkeypatch.setattr(views, "GRAPH", type("G", (), {"invoke": lambda self, s: answered})())
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
-    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 200
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
+    assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 503
     assert api.post("/api/chat/", {"question": "q"}, format="json").status_code == 429
     cache.clear()

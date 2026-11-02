@@ -68,12 +68,12 @@ class Answer(BaseModel):
 
 
 def _refuse(state: ChatState, reason: str, usage: dict | None = None,
-            unavailable: bool = False) -> dict:
+            unavailable: bool = False, model: str | None = None) -> dict:
     answer = REFUSAL_AR if is_arabic(state.get("question", "")) else REFUSAL
     return {
         "answer": answer, "used_chunk_ids": [], "sources": [],
         "refused": True, "refusal_reason": reason, "usage": usage or {},
-        "model": settings.OPENAI_MODEL, "unavailable": unavailable,
+        "model": model or settings.OPENAI_MODEL, "unavailable": unavailable,
     }
 
 
@@ -83,8 +83,8 @@ def generate(state: ChatState) -> dict:
         if state.get("unavailable"):
             # retrieve's embedding call failed and generate never ran: the
             # gate's tokens are the only ones spent, so its model owns the row.
-            return {**_refuse(state, "retrieval unavailable", state.get("usage"), unavailable=True),
-                    "model": fast_model()}
+            return _refuse(state, "retrieval unavailable", state.get("usage"),
+                           unavailable=True, model=fast_model())
         return _refuse(state, "nothing retrieved")
 
     context = "\n\n".join(f"[{c['chunk_id']}] {c['text']}" for c in retrieved)
@@ -106,7 +106,8 @@ def generate(state: ChatState) -> dict:
 
     if parsed is None:
         unavailable = bool(usage.get("api_error"))
-        reason = "generation unavailable" if unavailable else "unparseable response"
+        reason = ("generation unavailable" if unavailable
+                  else "request rejected" if usage.get("rejected") else "unparseable response")
         return _refuse(state, reason, usage, unavailable=unavailable)
     if not parsed.sufficient:
         return _refuse(state, "insufficient context", usage)

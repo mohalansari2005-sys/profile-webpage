@@ -4,6 +4,7 @@ import httpx
 import pytest
 from openai import (
     BadRequestError,
+    ConflictError,
     ContentFilterFinishReasonError,
     LengthFinishReasonError,
     NotFoundError,
@@ -361,7 +362,7 @@ def test_a_missing_generate_model_does_not_touch_the_fast_one(monkeypatch, setti
     assert openai_client.fast_model() == "fast-model"
 
 
-def test_a_rejected_request_is_not_an_outage(monkeypatch):
+def test_a_rejected_prompt_is_not_an_outage(monkeypatch):
     """A flagged prompt fails the same way on every retry. Reported as an
     outage, the visitor would be told to try again, forever."""
     from chat import openai_client
@@ -371,7 +372,24 @@ def test_a_rejected_request_is_not_an_outage(monkeypatch):
 
     parsed, usage = openai_client.structured("prompt", Shape)
     assert parsed is None
+    assert usage.get("rejected") is True
     assert "api_error" not in usage
+
+
+@pytest.mark.parametrize("error", [
+    pytest.param(lambda: _status_error(BadRequestError, 400, "unsupported_parameter"),
+                 id="config-400"),
+    pytest.param(lambda: _status_error(ConflictError, 409, None), id="conflict-409"),
+])
+def test_a_config_error_or_a_conflict_is_an_outage(monkeypatch, error):
+    """A 400 can be configuration -- a parameter the model does not take --
+    and the SDK retries a 409 as transient. Calling either "not an outage"
+    would hide a broken deploy behind refusals again."""
+    from chat import openai_client
+
+    monkeypatch.setattr(openai_client, "_client", _fake_client(raises=error()))
+    parsed, usage = openai_client.structured("prompt", Shape)
+    assert (parsed, usage.get("api_error")) == (None, True)
 
 
 def test_an_api_error_is_logged_without_its_message(monkeypatch, caplog):

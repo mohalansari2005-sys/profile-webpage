@@ -101,14 +101,23 @@ nothing said why. What now stops a repeat:
 - A fast model that comes back `model_not_found` makes `openai_client` fall back
   to `OPENAI_MODEL` for the life of that worker (an env file can still name a
   retired model).
-- An outage -- auth, quota, rate limit, 5xx, timeout, a retired model with
-  nowhere to fall back -- answers **503**, the UI's "service hit an error, try
-  again", instead of a refusal. The turn is logged with `refusal_reason`
-  `generation unavailable` (or `retrieval unavailable` for embeddings) and does
-  not count against `CHAT_DAILY_CAP`. A request OpenAI rejects as bad (400/409/
-  422) fails the same way on retry, so it stays a refusal.
+- An outage -- auth, quota, rate limit, 5xx, a timeout (20s, one retry, so it
+  ends inside gunicorn's 120s), a retired model with nowhere to fall back --
+  answers **503**, the UI's "service hit an error, try again", instead of a
+  refusal. It still counts against `CHAT_DAILY_CAP`: earlier calls in the turn
+  may have been billed, and the cap is the hard spend limit.
+- Only a prompt OpenAI rejects for what the visitor sent (`invalid_prompt`,
+  `context_length_exceeded`) stays a refusal, logged `request rejected`. Any
+  other 400 can be configuration, so it is an outage and gets noticed.
 - Every OpenAI failure is logged to stderr (`docker compose logs web`) with its
   status and error code.
+- `.github/workflows/chat-canary.yml` asks the live API one real question every
+  day and after every backend deploy, and fails -- which emails the repo owner
+  -- if it is refused or errors.
+
+`refusal_reason` on an outage row says which call failed: `generation
+unavailable` for the gate or `generate`, `retrieval unavailable` for the
+embedding.
 
 Check OpenAI's deprecations page before a model's shutdown date, not after.
 
@@ -145,11 +154,12 @@ belong to the model in its `model` column, and never mix two rates:
 
 | Row | `model` | Tokens counted |
 |---|---|---|
-| Refused at the gate | `OPENAI_FAST_MODEL` | `condense` + `relevance`, summed |
+| Refused at the gate | the fast model that ran (`OPENAI_FAST_MODEL`, or `OPENAI_MODEL` after a fallback) | `condense` + `relevance`, summed |
+| `retrieval unavailable` | the fast model that ran | `condense` + `relevance`, summed |
 | Answered, or refused by `generate` | `OPENAI_MODEL` | the `generate` call only |
 
 So an answered turn does not record the two fast calls that preceded it. That
-undercount is deliberate: one row names one model, and adding nano tokens to a
-mini row at mini's rate would overstate the bill by more than the tokens are
-worth. Multiply each row by its own model's price and sum — do not sum the
+undercount dates from when the fast model was nano: one row names one model,
+and adding nano tokens to a mini row at mini's rate would have overstated the
+bill. Multiply each row by its own model's price and sum — do not sum the
 token columns across rows and multiply once.

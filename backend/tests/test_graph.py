@@ -212,23 +212,23 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
     assert ChatLog.objects.get().refusal_reason == "generation unavailable"
 
 
-def test_a_condense_outage_ends_the_turn_without_a_gate_call(db, stub_nodes, monkeypatch):
-    """Without the rewrite, a follow-up's pronoun or an Arabic question would
-    reach retrieval unresolved and come back "I don't have that"."""
+def test_a_condense_failure_still_lets_the_raw_question_through(db, stub_nodes, monkeypatch):
+    """A self-contained follow-up does not need the rewrite. Ending the turn
+    on a condense failure would 503 questions the later calls could answer."""
     from chat.graph.build import build_graph
-    from chat.models import ChatLog
+    from chat.graph.nodes.relevance import Relevance
 
     monkeypatch.setattr(stub_nodes["condense"], "structured", lambda *a, **k: (
         None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}))
+    seen = {}
 
-    def no_gate(*a, **k):
-        raise AssertionError("the gate must not be paid for after condense failed")
+    def gate(prompt, *a, **k):
+        seen["prompt"] = prompt
+        return Relevance(subject="general", reason="mock"), {}
 
-    monkeypatch.setattr(stub_nodes["relevance"], "structured", no_gate)
-
-    out = build_graph().invoke({
-        "question": "and there?", "ip_hash": "h" * 64, "started_at": 0.0,
-        "history": [{"role": "user", "content": "tell me about Majara"},
-                    {"role": "assistant", "content": "He works there."}]})
-    assert out["unavailable"] is True
-    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", gate)
+    build_graph().invoke({
+        "question": "What tools does Mohammed use at Majara?", "ip_hash": "h" * 64,
+        "started_at": 0.0, "history": [{"role": "user", "content": "hi"},
+                                        {"role": "assistant", "content": "Hello."}]})
+    assert "What tools does Mohammed use at Majara?" in seen["prompt"]

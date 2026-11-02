@@ -27,6 +27,7 @@ services:
     # The web container now logs errors to stderr (config/settings.py
     # LOGGING); Docker's json-file driver keeps that forever unless capped.
     logging:
+      driver: json-file
       options:
         max-size: "10m"
         max-file: "3"

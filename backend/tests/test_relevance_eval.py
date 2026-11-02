@@ -20,6 +20,18 @@ pytestmark = [
     ),
 ]
 
+@pytest.fixture(autouse=True)
+def no_fallback(settings):
+    """openai_client falls back to OPENAI_MODEL when the fast model is gone.
+    Here that would grade a model other than the one named, so it fails."""
+    from chat import openai_client
+
+    yield
+    assert openai_client.fast_model() == settings.OPENAI_FAST_MODEL, (
+        f"OPENAI_FAST_MODEL {settings.OPENAI_FAST_MODEL} was not found; "
+        "the eval ran on the fallback instead")
+
+
 # Named entities from content/. The gate is never told these exist, so each one
 # is the case that broke in production: an unrecognised proper noun read as
 # "not about Mohammed" and refused.

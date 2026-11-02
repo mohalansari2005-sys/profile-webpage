@@ -69,10 +69,6 @@ class Relevance(BaseModel):
 
 
 def relevance(state: ChatState) -> dict:
-    if state.get("unavailable"):
-        # condense already hit an outage; the turn ends as one without paying
-        # for a second call that would most likely fail the same way.
-        return {"in_scope": False, "refusal_reason": "generation unavailable"}
     parsed, usage = structured(PROMPT.format(glossary=NAME_GLOSSARY, question=state["condensed"]),
                                Relevance, fast=True)
     # Same model as condense, so the two merge into one honest fast-model total.
@@ -82,7 +78,8 @@ def relevance(state: ChatState) -> dict:
     if parsed is None:
         # Fail closed: a response we cannot read is not permission to answer.
         unavailable = bool(usage.get("api_error"))
-        reason = "generation unavailable" if unavailable else "scope check failed"
+        reason = ("generation unavailable" if unavailable
+                  else "request rejected" if usage.get("rejected") else "scope check failed")
         return {"in_scope": False, "refusal_reason": reason, "unavailable": unavailable, **spent}
     in_scope = parsed.subject in IN_SCOPE
     return {

@@ -4,19 +4,20 @@ import math
 from django.conf import settings
 from openai import (
     APIError,
-    BadRequestError,
-    ConflictError,
     ContentFilterFinishReasonError,
     LengthFinishReasonError,
     OpenAI,
-    UnprocessableEntityError,
 )
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 # Named openai_client, not openai, so it can never shadow the SDK it imports.
-_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+# The SDK's defaults (a 600s timeout, 2 retries with backoff) outlast
+# gunicorn's 120s, which then kills the worker mid-turn: no ChatLog row, no
+# 503, just a 502 from Caddy. 20s and one retry keep a turn's few sequential
+# calls inside it, so a hung or failing provider ends as a logged outage.
+_client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=20.0, max_retries=1)
 
 # Set the first time OPENAI_FAST_MODEL comes back model_not_found. OpenAI retires
 # models on a schedule -- gpt-4.1-nano was shut down on 2026-10-23 -- and
@@ -28,11 +29,12 @@ _client = OpenAI(api_key=settings.OPENAI_API_KEY)
 # when a project cannot use a model, and an unrelated 404 must not flip this.
 _fast_model_gone = False
 
-# A request the API judged bad (a flagged prompt, an oversized context) fails
-# the same way on every retry -- a bad response, not an outage, so no
-# api_error and no "try again". Auth, quota, rate limits, 5xx, timeouts and a
-# retired model are the service, and are.
-_NOT_AN_OUTAGE = (BadRequestError, ConflictError, UnprocessableEntityError)
+# Codes for a request the API judged bad because of what the visitor sent: it
+# fails the same way on every retry, so it is a refusal ("request rejected"),
+# not an outage. Matched by code, not by 400: a 400 can also be configuration
+# (a parameter the model does not take), and calling that "not an outage"
+# would hide the next broken deploy behind refusals again.
+_REJECTED_CODES = {"invalid_prompt", "context_length_exceeded"}
 
 
 def fast_model() -> str:
@@ -135,8 +137,8 @@ def structured(prompt: str, schema: type[BaseModel], *, fast: bool = False):
                          "OPENAI_MODEL %s. Update backend/.env.", model, settings.OPENAI_MODEL)
             _fast_model_gone = True
             return structured(prompt, schema, fast=fast)
-        if isinstance(exc, _NOT_AN_OUTAGE):
-            return None, {"prompt_tokens": None, "completion_tokens": None}
+        if exc.code in _REJECTED_CODES:
+            return None, {"prompt_tokens": None, "completion_tokens": None, "rejected": True}
         return None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}
     except (LengthFinishReasonError, ContentFilterFinishReasonError):
         # Neither subclasses APIError, so an `except APIError` alone lets these
