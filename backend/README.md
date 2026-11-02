@@ -192,6 +192,12 @@ installs the `[dev]` extras so `docker compose run --rm web pytest` works.
 ## Limits
 
 `CHAT_RATE` is per IP; `CHAT_DAILY_CAP` is one counter for the whole service.
+Both count with one atomic Redis `INCR` per request (`chat/throttling.py`), so
+requests arriving together cannot slip past either: DRF's own throttle, and the
+cap before it, read the count and wrote it back later, and under gthread a
+burst from one visitor got through together. `CHAT_RATE` is a fixed window --
+`10/min` allows 10 per clock minute -- so a burst that straddles two minutes can
+get up to twice that; the 429 says how many seconds are left in the window.
 The IP is the visitor's, not Cloudflare's: Caddy takes it from Cloudflare's
 `CF-Connecting-IP` -- trusted only from Cloudflare's ranges, see the root
 `Caddyfile` -- and passes it on as `X-Real-IP`, which is what `chat/ip.py` reads.

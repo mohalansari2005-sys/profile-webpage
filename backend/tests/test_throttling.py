@@ -1,6 +1,9 @@
+import threading
+from types import SimpleNamespace
+
 import pytest
 from django.core.cache import cache
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +70,73 @@ def test_a_spoofed_x_forwarded_for_does_not_buy_a_fresh_bucket(db, settings, stu
         r = api.post("/api/chat/", body, format="json", REMOTE_ADDR="172.18.0.5",
                      HTTP_X_FORWARDED_FOR=f"{spoofed}, 172.70.1.1", **real_ip)
         assert r.status_code == expected
+
+
+def _at_once(n, send):
+    """Calls send(i) from n threads released together -- what gthread does
+    with one visitor's parallel requests -- and returns the results."""
+    barrier = threading.Barrier(n)
+    results = [None] * n
+
+    def worker(i):
+        barrier.wait()
+        results[i] = send(i)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return results
+
+
+def test_parallel_requests_from_one_ip_never_pass_the_per_ip_limit(db, settings, stub_graph):
+    """DRF's throttle read a visitor's history and wrote it back later: 16
+    requests at once against 2 a period, and 12 to 14 of them got through.
+    A day-long window, so the burst cannot straddle two."""
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "2/day"}}
+    statuses = _at_once(16, lambda i: APIClient().post(
+        "/api/chat/", {"question": "q"}, format="json",
+        REMOTE_ADDR="198.51.100.1").status_code)
+    assert sorted(statuses) == [200] * 2 + [429] * 14
+
+
+def test_scopes_sharing_the_per_ip_throttle_count_separately(settings):
+    from chat.throttling import ChatRateThrottle
+
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/day", "visit": "1/day"}}
+    request = APIRequestFactory().post("/", REMOTE_ADDR="198.51.100.1")
+    for scope in ("chat", "visit"):
+        view = SimpleNamespace(throttle_scope=scope)
+        assert ChatRateThrottle().allow_request(request, view)
+        assert not ChatRateThrottle().allow_request(request, view)
+
+
+def test_a_per_ip_429_says_when_the_window_ends(db, settings, stub_graph, monkeypatch):
+    settings.REST_FRAMEWORK = {**settings.REST_FRAMEWORK,
+                               "DEFAULT_THROTTLE_RATES": {"chat": "1/min"}}
+    # 15 seconds into a minute-long window.
+    monkeypatch.setattr("chat.throttling.time", SimpleNamespace(time=lambda: 60 * 1000 + 15.0))
+    api = APIClient()
+    api.post("/api/chat/", {"question": "q"}, format="json")
+    r = api.post("/api/chat/", {"question": "q"}, format="json")
+    assert r.status_code == 429
+    assert r.json()["detail"] == "Request was throttled. Expected available in 45 seconds."
+    assert r["Retry-After"] == "45"
+
+
+def test_parallel_turns_never_pass_the_daily_cap(db, settings, stub_graph):
+    """The cap was read, compared and incremented in three steps: 16 turns at
+    once against a cap of 2, and 7 to 9 of them got through."""
+    settings.CHAT_DAILY_CAP = 3
+    statuses = _at_once(16, lambda i: APIClient().post(
+        "/api/chat/", {"question": "q"}, format="json",
+        REMOTE_ADDR=f"198.51.100.{i + 1}").status_code)
+    assert sorted(statuses) == [200] * 3 + [429] * 13
+    from django.utils import timezone
+    assert cache.get(f"chat:daily:{timezone.localdate().isoformat()}") == 3
 
 
 def test_the_global_cap_stops_everyone(db, settings, stub_graph):

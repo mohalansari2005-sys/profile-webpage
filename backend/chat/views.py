@@ -46,7 +46,7 @@ class ChatView(APIView):
         # count. Checked in DRF's throttle pass, every GET, HEAD, OPTIONS and
         # 400 counted too: a scanner or an uptime check could close the chat
         # for the day without a cent spent.
-        if not GlobalDailyThrottle().allow_request(request, self):
+        if not GlobalDailyThrottle.take(request):
             # Its own code: a per-IP 429 clears in a minute, this one at
             # midnight, and the UI can only tell visitors which if it is told.
             return Response({"detail": "Today's question limit has been reached. "
