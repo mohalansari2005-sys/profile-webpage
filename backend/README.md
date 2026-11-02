@@ -101,14 +101,39 @@ nothing said why. What now stops a repeat:
 - A fast model that comes back `model_not_found` makes `openai_client` fall back
   to `OPENAI_MODEL` for the life of that worker (an env file can still name a
   retired model).
-- An outage -- auth, quota, rate limit, 5xx, timeout, a retired model with
-  nowhere to fall back -- answers **503**, the UI's "service hit an error, try
-  again", instead of a refusal. The turn is logged with `refusal_reason`
-  `generation unavailable` (or `retrieval unavailable` for embeddings) and does
-  not count against `CHAT_DAILY_CAP`. A request OpenAI rejects as bad (400/409/
-  422) fails the same way on retry, so it stays a refusal.
+- A turn has one time budget, `CHAT_TURN_BUDGET` (25s, under the browser's
+  30s). Each OpenAI call gets what is left of it -- connect time included --
+  with no SDK retries (they sleep out a 429's Retry-After) but one retry of a
+  dropped connection or 5xx while the budget allows. A call is not started
+  with less than 2s left (6s for `generate`, which OpenAI bills even when the
+  client gives up). So a hung or failing provider ends the turn in time for
+  the visitor to see the 503. `ingest_content` runs outside a turn and keeps
+  the SDK's patient defaults.
+- An outage -- auth, quota, rate limit, 5xx, the budget running out, a retired
+  model with nowhere to fall back -- answers **503**, the UI's "service hit an
+  error, try again", instead of a refusal. A failed `condense` ends the turn the
+  same way: unresolved, "what did he build there?" could come back a grounded
+  answer about the wrong employer.
+- An outage that never got past the gate gives its `CHAT_DAILY_CAP` slot back:
+  at most a classifier call was billed, and counting the retries of a quota
+  outage would leave the cap spent when OpenAI recovers. Past the gate, the
+  slot counts -- refunding those let a partial outage spend without limit.
+- Only a prompt OpenAI rejects for what the visitor sent (`invalid_prompt`)
+  stays a refusal, logged `request rejected`. Any other 400 can be
+  configuration, so it is an outage and gets noticed.
 - Every OpenAI failure is logged to stderr (`docker compose logs web`) with its
   status and error code.
+- `.github/workflows/chat-canary.yml` asks the live API one real question every
+  day and after every backend deploy, and fails -- which emails the repo owner
+  -- if it is refused or errors.
+
+`refusal_reason` on an outage row says which call failed: `condense
+unavailable`, `generation unavailable` (the gate or `generate`) or `retrieval
+unavailable` (the embedding).
+
+GitHub disables a scheduled workflow after 60 days without activity in the
+repository; it emails a warning first. Re-enable the canary from the Actions
+tab if that happens.
 
 Check OpenAI's deprecations page before a model's shutdown date, not after.
 
@@ -145,11 +170,12 @@ belong to the model in its `model` column, and never mix two rates:
 
 | Row | `model` | Tokens counted |
 |---|---|---|
-| Refused at the gate | `OPENAI_FAST_MODEL` | `condense` + `relevance`, summed |
+| Refused at the gate | the fast model that ran (`OPENAI_FAST_MODEL`, or `OPENAI_MODEL` after a fallback) | `condense` + `relevance`, summed |
+| `retrieval unavailable` | the fast model that ran | `condense` + `relevance`, summed |
 | Answered, or refused by `generate` | `OPENAI_MODEL` | the `generate` call only |
 
 So an answered turn does not record the two fast calls that preceded it. That
-undercount is deliberate: one row names one model, and adding nano tokens to a
-mini row at mini's rate would overstate the bill by more than the tokens are
-worth. Multiply each row by its own model's price and sum — do not sum the
+undercount dates from when the fast model was nano: one row names one model,
+and adding nano tokens to a mini row at mini's rate would have overstated the
+bill. Multiply each row by its own model's price and sum — do not sum the
 token columns across rows and multiply once.

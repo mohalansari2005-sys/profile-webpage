@@ -212,23 +212,49 @@ def test_a_gate_outage_is_logged_and_flagged(db, stub_nodes, monkeypatch):
     assert ChatLog.objects.get().refusal_reason == "generation unavailable"
 
 
-def test_a_condense_outage_ends_the_turn_without_a_gate_call(db, stub_nodes, monkeypatch):
-    """Without the rewrite, a follow-up's pronoun or an Arabic question would
-    reach retrieval unresolved and come back "I don't have that"."""
-    from chat.graph.build import build_graph
-    from chat.models import ChatLog
-
+def _condense_fails(stub_nodes, monkeypatch):
     monkeypatch.setattr(stub_nodes["condense"], "structured", lambda *a, **k: (
         None, {"prompt_tokens": None, "completion_tokens": None, "api_error": True}))
 
+
+FOLLOW_UP = {"ip_hash": "h" * 64, "started_at": 0.0,
+             "history": [{"role": "user", "content": "tell me about Majara"},
+                         {"role": "assistant", "content": "He works there."}]}
+
+
+def test_a_condense_outage_ends_the_turn_without_a_gate_call(db, stub_nodes, monkeypatch):
+    """Unresolved, "what did he build there?" could come back a grounded answer
+    about the wrong employer. The visitor gets the 503 instead, and the gate is
+    not paid for a call that would most likely fail the same way."""
+    from chat.graph.build import build_graph
+    from chat.models import ChatLog
+
+    _condense_fails(stub_nodes, monkeypatch)
+
     def no_gate(*a, **k):
-        raise AssertionError("the gate must not be paid for after condense failed")
+        raise AssertionError("the gate must not be called after condense failed")
 
     monkeypatch.setattr(stub_nodes["relevance"], "structured", no_gate)
+    out = build_graph().invoke({"question": "what did he build there?", **FOLLOW_UP})
+    assert (out["unavailable"], out["in_scope"]) == (True, False)
+    assert ChatLog.objects.get().refusal_reason == "condense unavailable"
 
-    out = build_graph().invoke({
-        "question": "and there?", "ip_hash": "h" * 64, "started_at": 0.0,
-        "history": [{"role": "user", "content": "tell me about Majara"},
-                    {"role": "assistant", "content": "He works there."}]})
-    assert out["unavailable"] is True
-    assert ChatLog.objects.get().refusal_reason == "generation unavailable"
+
+def test_the_turn_budget_reaches_the_nodes(db, stub_nodes, monkeypatch):
+    """The deadline travels in a ContextVar. If LangGraph stopped carrying it
+    into nodes, every call would silently fall back to the SDK's 600s."""
+    from chat import openai_client
+    from chat.graph.build import build_graph
+    from chat.graph.nodes.relevance import Relevance
+
+    seen = {}
+
+    def gate(*a, **k):
+        seen["deadline"] = openai_client._deadline.get()
+        return Relevance(subject="general", reason="mock"), {}
+
+    monkeypatch.setattr(stub_nodes["relevance"], "structured", gate)
+    with openai_client.turn_budget(10):
+        build_graph().invoke({"question": "weather", "history": [],
+                              "ip_hash": "h" * 64, "started_at": 0.0})
+    assert seen["deadline"] is not None

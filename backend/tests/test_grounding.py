@@ -124,3 +124,12 @@ def test_the_context_block_carries_every_retrieved_chunk_id(monkeypatch):
     node.generate({"condensed": "q", "retrieved": RETRIEVED})
     for c in RETRIEVED:
         assert c["chunk_id"] in seen["prompt"]
+
+
+def test_a_rejected_request_is_labelled_not_called_unparseable(monkeypatch):
+    from chat.graph.nodes import generate as node
+
+    monkeypatch.setattr(node, "structured", lambda *a, **k: (None, {"rejected": True}))
+    out = node.generate({"condensed": "q", "retrieved": RETRIEVED})
+    assert out["refusal_reason"] == "request rejected"
+    assert out["unavailable"] is False

@@ -53,7 +53,8 @@ def condense(state: ChatState) -> dict:
     # Billable even when the rewrite is discarded, so it is carried, not dropped.
     out = {"condensed": condensed, "search_query": english or condensed, "usage": usage}
     if usage.get("api_error"):
-        # The raw question would reach retrieval unresolved (a pronoun, or
-        # Arabic against an English corpus) and come back "I don't have that".
-        out["unavailable"] = True
+        # Without the rewrite, "what did he build there?" reaches retrieval
+        # unresolved and can come back a well-grounded answer about the wrong
+        # employer -- worse than an honest 503. relevance ends the turn here.
+        out.update(unavailable=True, refusal_reason="condense unavailable")
     return out

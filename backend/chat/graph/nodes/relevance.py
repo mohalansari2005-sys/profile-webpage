@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from chat.graph.state import ChatState
 from chat.language import NAME_GLOSSARY
-from chat.openai_client import merge_usage, structured
+from chat.openai_client import failure_reason, merge_usage, structured
 
 # The gate names the subject; Python decides scope. Asking the fast model for
 # the boolean directly meant encoding precedence in prose ("apply this rule
@@ -70,9 +70,9 @@ class Relevance(BaseModel):
 
 def relevance(state: ChatState) -> dict:
     if state.get("unavailable"):
-        # condense already hit an outage; the turn ends as one without paying
-        # for a second call that would most likely fail the same way.
-        return {"in_scope": False, "refusal_reason": "generation unavailable"}
+        # condense hit an outage and the turn ends as one; a second call to
+        # the same provider would most likely fail the same way.
+        return {"in_scope": False}
     parsed, usage = structured(PROMPT.format(glossary=NAME_GLOSSARY, question=state["condensed"]),
                                Relevance, fast=True)
     # Same model as condense, so the two merge into one honest fast-model total.
@@ -81,9 +81,8 @@ def relevance(state: ChatState) -> dict:
     spent = {"usage": merge_usage(state.get("usage"), usage)}
     if parsed is None:
         # Fail closed: a response we cannot read is not permission to answer.
-        unavailable = bool(usage.get("api_error"))
-        reason = "generation unavailable" if unavailable else "scope check failed"
-        return {"in_scope": False, "refusal_reason": reason, "unavailable": unavailable, **spent}
+        return {"in_scope": False, "refusal_reason": failure_reason(usage, "scope check failed"),
+                "unavailable": bool(usage.get("api_error")), **spent}
     in_scope = parsed.subject in IN_SCOPE
     return {
         "in_scope": in_scope,
