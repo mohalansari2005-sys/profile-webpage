@@ -63,7 +63,9 @@ NAME_GLOSSARY = (
     "Names written in Arabic script: مجرة (also written مجره, and formerly "
     "ماجرة) is Majara, Mohammed's employer, a company, and not the Arabic word "
     "for galaxy; صيت is SEET (a company he worked at); كيرا is Keyraa (a hotel "
-    "booking project). They are names, not ordinary Arabic words."
+    "booking project). They are names, not ordinary Arabic words. وكيل, when "
+    "used as a name, is Wakil, the property management platform he works on at "
+    "Majara; as an ordinary word it means agent, as in an AI agent."
 )
 
 _ARABIC_LETTER = "\u0621-\u064a"
