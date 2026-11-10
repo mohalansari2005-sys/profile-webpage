@@ -366,9 +366,9 @@ def test_service_errors_are_counted_by_the_flag_not_the_wording(db):
     refusal whose reason happens to end in "unavailable" is still the bot
     declining."""
     for reason in ("condense unavailable", "generation unavailable", "retrieval unavailable"):
-        chat(refused=True, reason=reason, unavailable=True)
-    chat(refused=True, reason="general: that product is unavailable")
-    chat(refused=True, reason="general: weather")
+        chat(at=NOW, refused=True, reason=reason, unavailable=True)
+    chat(at=NOW, refused=True, reason="general: that product is unavailable")
+    chat(at=NOW, refused=True, reason="general: weather")
     stats = collect(30)
     assert (stats["totals"]["service_errors"], stats["totals"]["refused"]) == (3, 2)
     assert stats["daily"][-1]["service_errors"] == 3
