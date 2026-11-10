@@ -14,7 +14,7 @@ summary_ar: "متدرب مهندس منتجات على منصة وكيل لإد�
 
 ## Majara and Wakil
 
-Majara is a Riyadh startup builder, a venture studio. I joined as a Product Engineer Intern, working hybrid out of Riyadh. My work there is on Wakil, a property management and real-estate platform in Majara's portfolio, turning problems into products and shipping them to production. Wakil is multi-tenant SaaS: a CRM with contacts and deals, properties, projects, leases, automations, a website builder, and an Arabic and English interface.
+Majara is a Riyadh startup builder, a venture studio. I joined as a Product Engineer Intern, working hybrid out of Riyadh. My work there is on Wakil, a property management and real-estate platform in Majara's portfolio, turning problems into products and shipping them to production. I did not create Wakil: an existing engineering team was already building it before I joined. I'm one of several engineers contributing to it, and my own contributions are the features and fixes described below. Wakil is multi-tenant SaaS: a CRM with contacts and deals, properties, projects, leases, automations, a website builder, and an Arabic and English interface.
 
 I work on Wakil as part of a multi-person engineering team, with code review on every PR and work tracked in sprints. The stack I worked in on Wakil is a Django REST Framework and PostgreSQL backend, a React and TypeScript frontend, Celery for the automations engine, Playwright for end-to-end tests, and an Arabic and English interface that switches between right-to-left and left-to-right layouts.
 
@@ -41,7 +41,7 @@ On Wakil I redesigned and rebuilt the Tasks module. I authored the product brief
 
 ## Bug fixing, QA and security
 
-I helped the engineering team on Wakil clear its bug backlog: I fixed 13 bugs, including 2 security flaws that exposed data between companies, and designed a workflow that stress-tests bug reports and ranks them by severity. The security fixes were multi-tenant data-isolation bugs, where data could leak between companies, in the automations engine.
+I helped the engineering team on Wakil clear its bug backlog: I fixed 13 bugs, including 2 security flaws that exposed data between companies, and designed a workflow that stress-tests bug reports and ranks them by severity. That workflow is for bug reports in general, not only security ones. The security fixes were multi-tenant data-isolation bugs, where data could leak between companies, in the automations engine.
 
 Other fixes were smaller: API input validation that returns a clear 400 instead of a 500 or silently wiping data, Arabic UI text, form error states, and keyboard accessibility in the sidebar.
 

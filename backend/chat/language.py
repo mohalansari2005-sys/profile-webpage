@@ -65,7 +65,8 @@ NAME_GLOSSARY = (
     "for galaxy; صيت is SEET (a company he worked at); كيرا is Keyraa (a hotel "
     "booking project). They are names, not ordinary Arabic words. وكيل, when "
     "used as a name, is Wakil, the property management platform he works on at "
-    "Majara; as an ordinary word it means agent, as in an AI agent."
+    "Majara; as an ordinary word it means agent, as in an AI agent: "
+    "وكيل ذكاء اصطناعي and وكيل ذكي mean an AI agent, not Wakil."
 )
 
 _ARABIC_LETTER = "\u0621-\u064a"
