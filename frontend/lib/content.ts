@@ -66,12 +66,12 @@ export const tools: Tool[] = [
 export const experience: WorkRecord[] = [
   {
     id: "exp-majara",
-    title: "Product Engineering Intern",
+    title: "Product Engineer Intern",
     org: "Majara — Riyadh, hybrid",
-    period: "Nov 2025 — Present",
-    summary: "Worked across full-stack development and product development, translating requirements and functional needs into prototypes and product features from concept through to working software.",
-    tools: ["python", "javascript", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"],
-    ar: { title: "متدرب في هندسة المنتجات", org: "مجرة — الرياض، عمل هجين", period: "نوفمبر 2025 — الآن", summary: "أجمع في عملي بين التطوير المتكامل (Full-stack) وتطوير المنتجات، فأحوّل المتطلبات والاحتياجات الوظيفية إلى نماذج أولية وميزات للمنتج، بدءًا من الفكرة ووصولًا إلى برنامج يعمل فعليًا." },
+    period: "Dec 2025 — Present",
+    summary: "Product engineer intern on Wakil, Majara's property management platform, working in a multi-person engineering team. I took Customer 360 end to end, from product definition to shipped code, and work across the full stack in Django REST Framework and React with TypeScript.",
+    tools: ["python", "javascript", "django", "react", "typescript", "playwright", "rest-apis", "full-stack", "systems-analysis", "agile", "sdlc", "b2b"],
+    ar: { title: "متدرب مهندس منتجات", org: "مجرة — الرياض، عمل هجين", period: "ديسمبر 2025 — الآن", summary: "متدرب مهندس منتجات على منصة وكيل لإدارة العقارات التابعة لمجرة، ضمن فريق هندسي من عدة مهندسين. تولّيت ميزة Customer 360 من تعريف المنتج حتى الشيفرة المنشورة، وأعمل على المنصة بكامل مكوّناتها (Full-stack) باستخدام Django REST Framework وReact مع TypeScript." },
   },
   {
     id: "exp-seet",

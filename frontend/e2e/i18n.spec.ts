@@ -202,7 +202,7 @@ test.describe("chat in Arabic", () => {
       route.fulfill({
         json: {
           answer: "إجابة.",
-          sources: [{ record_id: "exp-majara", title: "Product Engineering Intern" }],
+          sources: [{ record_id: "exp-majara", title: "Product Engineer Intern" }],
           refused: false,
         },
       }),
@@ -210,7 +210,7 @@ test.describe("chat in Arabic", () => {
     await page.goto("/ar");
     await ask(page, "ماذا فعل؟");
     await expect(page.getByRole("button", { name: new RegExp(majara.ar!.title!) })).toBeVisible();
-    await expect(page.getByText("Product Engineering Intern")).toHaveCount(0);
+    await expect(page.getByText("Product Engineer Intern")).toHaveCount(0);
   });
 
   test("records with no row on the page get Arabic chip titles too", async ({ page }) => {

@@ -51,6 +51,9 @@ IN_SCOPE_ENTITIES = [
     "What tools did he use for his hotel backend?",
     "Did he deploy the hotel booking system?",
     "What did he learn from Keyraa?",
+    "What is Wakil?",
+    "What is Customer 360?",
+    "What did he build on Wakil?",
 ]
 
 # About Mohammed, but nothing in content/ answers them. They must still pass:
@@ -72,6 +75,7 @@ IN_SCOPE_TOPICS = [
     "What is his GPA?",
     "Is he available for work?",
     "What did he build at Majara?",
+    "What did he do on the Tasks module?",
 ]
 
 # The site and chatbot the visitor is using are one of Mohammed's projects.
@@ -97,6 +101,8 @@ IN_SCOPE_ARABIC = [
     "ما هو مشروع كيرا؟",
     "ما هي الأدوات التي يستخدمها محمد؟",
     "هل هو متاح للعمل؟",
+    "ما هو وكيل؟",
+    "وش سوّى محمد في وكيل؟",
 ]
 
 OUT_OF_SCOPE_ARABIC = [
