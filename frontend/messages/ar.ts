@@ -57,6 +57,8 @@ export const ar: Messages = {
     nextProject: "المشروع التالي",
     onGithub: "{title} على GitHub",
     viewOnGithub: "عرض على GitHub",
+    liveSite: "موقع {title} المباشر",
+    viewLiveSite: "فتح الموقع المباشر",
   },
   ask: {
     label: "المحادثة الذكية",

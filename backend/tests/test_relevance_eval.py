@@ -54,6 +54,9 @@ IN_SCOPE_ENTITIES = [
     "What is Wakil?",
     "What is Customer 360?",
     "What did he build on Wakil?",
+    "What is Home Finder?",
+    "How does the home finder score listings?",
+    "Why did he use a MacBook as a worker for the house hunting app?",
 ]
 
 # About Mohammed, but nothing in content/ answers them. They must still pass:
@@ -104,6 +107,9 @@ IN_SCOPE_ARABIC = [
     "ما هو وكيل؟",
     "وش سوّى محمد في وكيل؟",
     "هل بنى محمد وكيل ذكاء اصطناعي؟",
+    "وش هو بيتنا؟",
+    "كيف سوّى محمد تطبيق البحث عن بيت؟",
+    "ما هو مشروع هوم فايندر؟",
 ]
 
 OUT_OF_SCOPE_ARABIC = [

@@ -26,6 +26,7 @@ export type WorkRecord = {
   period: string;
   summary: string;
   tools: string[];
+  /** Live site. Optional; it renders as the card's external-link icon. */
   href?: string;
   /** GitHub repository. Every project should have one; it renders as the
       card's GitHub icon link. */
@@ -40,6 +41,7 @@ export const tools: Tool[] = [
   { id: "fastapi", label: "FastAPI", group: "Build" },
   { id: "sqlalchemy", label: "SQLAlchemy", group: "Build" },
   { id: "rest-apis", label: "REST APIs", group: "Build" },
+  { id: "web-scraping", label: "Web scraping", group: "Build" },
   { id: "full-stack", label: "Full-stack", group: "Build" },
   { id: "typescript", label: "TypeScript", group: "Build" },
   { id: "react", label: "React", group: "Build" },
@@ -55,6 +57,7 @@ export const tools: Tool[] = [
   { id: "docker", label: "Docker", group: "Data & infrastructure" },
   { id: "pytest", label: "pytest", group: "Data & infrastructure" },
   { id: "pgvector", label: "pgvector", group: "Data & infrastructure" },
+  { id: "postgis", label: "PostGIS", group: "Data & infrastructure" },
   { id: "playwright", label: "Playwright", group: "Data & infrastructure" },
   { id: "github-actions", label: "GitHub Actions", group: "Data & infrastructure" },
   { id: "systems-analysis", label: "Systems analysis", group: "Practice" },
@@ -85,6 +88,17 @@ export const experience: WorkRecord[] = [
 ];
 
 export const projects: WorkRecord[] = [
+  {
+    id: "proj-home-finder",
+    title: "Home Finder",
+    org: "Personal project",
+    period: "2026",
+    summary: "A private, Arabic-first web app that helps my family find a home to buy in Riyadh. It scrapes Aqar and Haraj, merges duplicate ads, scores every listing 0–100 against our priorities with a breakdown of why, shows rush-hour drive times, learns from what we save and reject, and plans visit trips. A LangGraph chat assistant changes filters and finds homes from plain Arabic sentences.",
+    tools: ["python", "fastapi", "sqlalchemy", "web-scraping", "react", "typescript", "tailwind", "langgraph", "openai-api", "postgres", "postgis", "docker", "pytest", "playwright", "github-actions"],
+    href: "https://home.alansari.stream",
+    repo: "https://github.com/mohalansari2005-sys/home-finder",
+    ar: { title: "بيتنا", org: "مشروع شخصي", summary: "تطبيق ويب خاص يعمل بالعربية أولًا، بنيته لمساعدة عائلتي في البحث عن منزل لشرائه في الرياض. يجمع الإعلانات من عقار وحراج، ويدمج الإعلانات المكررة، ويمنح كل عقار درجة من 0 إلى 100 وفق أولوياتنا مع تفصيل أسبابها، ويعرض أوقات القيادة في ساعة الذروة، ويتعلّم مما نحفظه ونرفضه، ويخطط لجولات زيارة العقارات. ويضم مساعد محادثة مبنيًا بـLangGraph يعدّل معايير البحث ويقترح المنازل انطلاقًا من جمل عربية عادية." },
+  },
   {
     id: "proj-keyraa",
     title: "Keyraa",

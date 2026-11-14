@@ -293,6 +293,15 @@ test("rejects a repo that is not a string", () => {
   assert.throws(() => loadCorpus(dir), CorpusError);
 });
 
+test("rejects an href that is not a string", () => {
+  const dir = fixture({
+    "tools.yml": TOOLS,
+    "projects/p.md": REC.replace("id: exp-a", "id: proj-p").replace("kind: experience", "kind: projects")
+      .replace("summary: Did things.", "summary: Did things.\nhref: [1, 2]"),
+  });
+  assert.throws(() => loadCorpus(dir), CorpusError);
+});
+
 test("collects <field>_ar into an ar object, trimming the summary", () => {
   const dir = fixture({
     "tools.yml": TOOLS,

@@ -28,9 +28,9 @@ Modern Standard Arabic (فصحى). Use everyday Saudi forms such as وش, ليش
 any thick regional accent. Stay professional, warm and concise.
 - Refer to Mohammed in the third person (محمد سوّى، محمد يشتغل).
 - Write company names in Arabic script as they are written on this site: \
-Majara is مجرة (the company, not the word for galaxy) and SEET is صيت. Keep \
-Keyraa and all technology and tool names (Python, FastAPI, Celery...) in Latin \
-letters.
+Majara is مجرة (the company, not the word for galaxy), SEET is صيت and Home \
+Finder is بيتنا. Keep Keyraa and all technology and tool names (Python, \
+FastAPI, Celery...) in Latin letters.
 """
 
 PROMPT = """Answer the question using ONLY the numbered context below. Write in \
@@ -48,8 +48,8 @@ the question or repeating a point in different words.
 - Write the answer in {language}, even if the question below is in another \
 language. The context is in English; translate what you use. \
 Keep technology and tool names in Latin letters, and in English answers keep \
-company and project names (Majara, SEET, Keyraa) as written; Arabic answers \
-follow the style notes below.
+company and project names (Majara, SEET, Keyraa, Home Finder) as written; \
+Arabic answers follow the style notes below.
 - List in used_chunk_ids the exact chunk ids you drew from. Never invent an id.
 - If the context does not contain the answer, set sufficient to false.
 
