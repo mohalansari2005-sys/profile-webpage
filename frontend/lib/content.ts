@@ -93,11 +93,11 @@ export const projects: WorkRecord[] = [
     title: "Home Finder",
     org: "Personal project",
     period: "2026",
-    summary: "A private, Arabic-first web app that helps my family find a home to buy in Riyadh. It scrapes Aqar and Haraj, merges duplicate ads, scores every listing 0–100 against our priorities with a breakdown of why, shows rush-hour drive times, learns from what we save and reject, and plans visit trips. A LangGraph chat assistant changes filters and finds homes from plain Arabic sentences.",
+    summary: "Our search for a family home in Riyadh meant scrolling Aqar and Haraj daily: the same villa from three brokers, sizes buried in ad text, guessing the school run, and forgetting what we had rejected and why. So I built a private, Arabic-first app to do the tedious part. It merges listings, fills gaps in ads with an LLM, and scores each home 0–100 against our priorities, with reasons. It adds rush-hour drive times, learns from what we save and reject, plans visit days by district, and takes requests in plain Arabic through a LangGraph assistant.",
     tools: ["python", "fastapi", "sqlalchemy", "web-scraping", "react", "typescript", "tailwind", "langgraph", "openai-api", "postgres", "postgis", "docker", "pytest", "playwright", "github-actions"],
     href: "https://home.alansari.stream",
     repo: "https://github.com/mohalansari2005-sys/home-finder",
-    ar: { title: "بيتنا", org: "مشروع شخصي", summary: "تطبيق ويب خاص يعمل بالعربية أولًا، بنيته لمساعدة عائلتي في البحث عن منزل لشرائه في الرياض. يجمع الإعلانات من عقار وحراج، ويدمج الإعلانات المكررة، ويمنح كل عقار درجة من 0 إلى 100 وفق أولوياتنا مع تفصيل أسبابها، ويعرض أوقات القيادة في ساعة الذروة، ويتعلّم مما نحفظه ونرفضه، ويخطط لجولات زيارة العقارات. ويضم مساعد محادثة مبنيًا بـLangGraph يعدّل معايير البحث ويقترح المنازل انطلاقًا من جمل عربية عادية." },
+    ar: { title: "بيتنا", org: "مشروع شخصي", summary: "كان بحث عائلتي عن منزل نشتريه في الرياض عبئًا يوميًا: تصفّحٌ متواصل لعقار وحراج، والمنزل نفسه يعرضه أكثر من وسيط، ومساحته وعمره مخفيّان في نص الإعلان، وزمن الطريق إلى المدرسة صباحًا مجرد تخمين، ثم يضيع علينا ما استبعدناه ولماذا. فبنيت تطبيقًا خاصًا بالعربية يتولّى هذا العناء عنّا: يجمع الإعلانات ويدمج المكرر منها، ويستكمل بياناتها الناقصة بنموذج لغوي، ويمنح كل منزل درجة من 100 وفق أولوياتنا مع بيان أسبابها. ويحسب زمن الوصول في ساعات الذروة، ويعدّل أوزان التقييم بحسب ما نحفظه ونستبعده، وينظّم جولات المعاينة حسب الأحياء. ويضم مساعدًا ذكيًا مبنيًا بـLangGraph يعدّل معايير البحث ويقترح المنازل من طلباتنا بلغتنا اليومية." },
   },
   {
     id: "proj-keyraa",

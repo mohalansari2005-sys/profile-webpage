@@ -7,11 +7,23 @@ period: "2026"
 href: "https://home.alansari.stream"
 repo: "https://github.com/mohalansari2005-sys/home-finder"
 tools: ["python", "fastapi", "sqlalchemy", "web-scraping", "react", "typescript", "tailwind", "langgraph", "openai-api", "postgres", "postgis", "docker", "pytest", "playwright", "github-actions"]
-summary: "A private, Arabic-first web app that helps my family find a home to buy in Riyadh. It scrapes Aqar and Haraj, merges duplicate ads, scores every listing 0–100 against our priorities with a breakdown of why, shows rush-hour drive times, learns from what we save and reject, and plans visit trips. A LangGraph chat assistant changes filters and finds homes from plain Arabic sentences."
+summary: "Our search for a family home in Riyadh meant scrolling Aqar and Haraj daily: the same villa from three brokers, sizes buried in ad text, guessing the school run, and forgetting what we had rejected and why. So I built a private, Arabic-first app to do the tedious part. It merges listings, fills gaps in ads with an LLM, and scores each home 0–100 against our priorities, with reasons. It adds rush-hour drive times, learns from what we save and reject, plans visit days by district, and takes requests in plain Arabic through a LangGraph assistant."
 title_ar: "بيتنا"
 org_ar: "مشروع شخصي"
-summary_ar: "تطبيق ويب خاص يعمل بالعربية أولًا، بنيته لمساعدة عائلتي في البحث عن منزل لشرائه في الرياض. يجمع الإعلانات من عقار وحراج، ويدمج الإعلانات المكررة، ويمنح كل عقار درجة من 0 إلى 100 وفق أولوياتنا مع تفصيل أسبابها، ويعرض أوقات القيادة في ساعة الذروة، ويتعلّم مما نحفظه ونرفضه، ويخطط لجولات زيارة العقارات. ويضم مساعد محادثة مبنيًا بـLangGraph يعدّل معايير البحث ويقترح المنازل انطلاقًا من جمل عربية عادية."
+summary_ar: "كان بحث عائلتي عن منزل نشتريه في الرياض عبئًا يوميًا: تصفّحٌ متواصل لعقار وحراج، والمنزل نفسه يعرضه أكثر من وسيط، ومساحته وعمره مخفيّان في نص الإعلان، وزمن الطريق إلى المدرسة صباحًا مجرد تخمين، ثم يضيع علينا ما استبعدناه ولماذا. فبنيت تطبيقًا خاصًا بالعربية يتولّى هذا العناء عنّا: يجمع الإعلانات ويدمج المكرر منها، ويستكمل بياناتها الناقصة بنموذج لغوي، ويمنح كل منزل درجة من 100 وفق أولوياتنا مع بيان أسبابها. ويحسب زمن الوصول في ساعات الذروة، ويعدّل أوزان التقييم بحسب ما نحفظه ونستبعده، وينظّم جولات المعاينة حسب الأحياء. ويضم مساعدًا ذكيًا مبنيًا بـLangGraph يعدّل معايير البحث ويقترح المنازل من طلباتنا بلغتنا اليومية."
 ---
+
+## Why I built Home Finder
+
+I built Home Finder because my family's search for a home in Riyadh was manual
+and exhausting. Every day someone scrolled Aqar and
+Haraj, saw the same villa posted by three brokers, opened each ad to find its
+size and age, pasted the location into a map to guess the morning school run,
+and shared screenshots in the family group. We lost track of what we liked,
+what we had rejected and why, and which sellers we had called. We did not need
+another listings site. We needed something to do the tedious part: read
+everything, remember our priorities, and bring back only the homes worth a
+look, with reasons.
 
 ## What it is
 
@@ -21,17 +33,6 @@ behind a single shared family login, so visitors cannot use it, but the code is
 public on GitHub. It is a personal project from November 2026, built through
 five milestones: foundation, scoring, the assistant, learning, and visit
 planning, all merged.
-
-## The problem it solves
-
-Our search was manual and exhausting. Every day someone scrolled Aqar and
-Haraj, saw the same villa posted by three brokers, opened each ad to find its
-size and age, pasted the location into a map to guess the morning school run,
-and shared screenshots in the family group. We lost track of what we liked,
-what we had rejected and why, and which sellers we had called. We did not need
-another listings site. We needed something to do the tedious part: read
-everything, remember our priorities, and bring back only the homes worth a
-look, with reasons.
 
 ## What it does
 
