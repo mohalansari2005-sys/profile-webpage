@@ -148,8 +148,12 @@ test.describe("on a phone", () => {
     const next = page.getByRole("button", { name: "Next project" });
     const rail = page.locator("[data-project-rail]");
     await next.focus();
-    await page.keyboard.press("Enter");
-    await settle(page);
+    // One press per card until the last one is in view.
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press("Enter");
+      await settle(page);
+      if (await next.isDisabled()) break;
+    }
     // The end of the rail disables Next; a natively disabled button would
     // have dropped focus to <body>.
     await expect(next).toBeDisabled();
