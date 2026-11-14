@@ -127,6 +127,10 @@ test.describe("Arabic page", () => {
       "href",
       "https://github.com/mohalansari2005-sys/keyraa-hotel-booking",
     );
+    await expect(page.getByRole("link", { name: format(ar.work.liveSite, { title: "بيتنا" }) })).toHaveAttribute(
+      "href",
+      "https://home.alansari.stream",
+    );
   });
 
   test("the language switch is read in the page's own language", async ({ page }) => {

@@ -61,6 +61,7 @@ export type WorkRecord = {
   period: string;
   summary: string;
   tools: string[];
+  /** Live site. Optional; it renders as the card's external-link icon. */
   href?: string;
   /** GitHub repository. Every project should have one; it renders as the
       card's GitHub icon link. */

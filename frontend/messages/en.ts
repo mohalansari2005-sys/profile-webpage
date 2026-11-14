@@ -50,6 +50,8 @@ export const en = {
     nextProject: "Next project",
     onGithub: "{title} on GitHub",
     viewOnGithub: "View on GitHub",
+    liveSite: "{title} live site",
+    viewLiveSite: "Open the live site",
   },
   ask: {
     label: "AI chat",

@@ -11,8 +11,8 @@ the latest message's language: never translate it (an Arabic message stays \
 Arabic).
 
 Also give english_query: the same standalone question in English, to search an \
-English portfolio. Keep proper names (Majara, SEET, Keyraa, tool names) in Latin \
-letters. If the question is already English, repeat it.
+English portfolio. Keep proper names (Majara, SEET, Keyraa, Home Finder, tool \
+names) in Latin letters. If the question is already English, repeat it.
 
 {glossary}
 

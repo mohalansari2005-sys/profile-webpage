@@ -42,6 +42,7 @@ def is_arabic(text: str) -> bool:
 NAME_ALIASES = {
     "Majara": ("ماجرة", "ماجره", "ماجراة", "ماجارا"),
     "Keyraa": ("كيرا", "كايرا", "كيرآ"),
+    "Home Finder": ("هوم فايندر", "هوم فايندير"),
 }
 
 # Spellings that are also ordinary words: "مجرة" (also typed "مجره") is Majara,
@@ -66,7 +67,9 @@ NAME_GLOSSARY = (
     "booking project). They are names, not ordinary Arabic words. وكيل, when "
     "used as a name, is Wakil, the property management platform he works on at "
     "Majara; as an ordinary word it means agent, as in an AI agent: "
-    "وكيل ذكاء اصطناعي and وكيل ذكي mean an AI agent, not Wakil."
+    "وكيل ذكاء اصطناعي and وكيل ذكي mean an AI agent, not Wakil. بيتنا, "
+    "when used as a name, is Home Finder, his family home-search app; as an "
+    "ordinary phrase it means our home."
 )
 
 _ARABIC_LETTER = "\u0621-\u064a"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { GithubIcon } from "@/components/github-icon";
 import { useI18n } from "@/components/i18n-provider";
 import { format, localize } from "@/lib/i18n";
@@ -115,6 +116,10 @@ function Chevron({ direction }: { direction: "left" | "right" }) {
   );
 }
 
+// The live-site and GitHub icon links in a project card's top corner.
+const cardLink =
+  "flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground pointer-coarse:size-11";
+
 /** One project as a rounded card in the horizontal rail. State styling mirrors
     RecordRow (lit on a tool/citation match, dim otherwise); the card border
     stands in for RecordRow's start-edge marker, which would be clipped by the
@@ -143,18 +148,32 @@ function ProjectCard({
       >
         <div className="flex items-start justify-between gap-3">
           <p className="field-label pt-1">{text.period}</p>
-          {record.repo && (
-            <a
-              href={record.repo}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={format(t.work.onGithub, { title: text.title })}
-              title={t.work.viewOnGithub}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-rule transition-colors hover:border-foreground pointer-coarse:size-11"
-            >
-              <GithubIcon className="size-4" />
-            </a>
-          )}
+          <div className="flex shrink-0 gap-2">
+            {record.href && (
+              <a
+                href={record.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={format(t.work.liveSite, { title: text.title })}
+                title={t.work.viewLiveSite}
+                className={cardLink}
+              >
+                <ExternalLink aria-hidden="true" className="size-4" />
+              </a>
+            )}
+            {record.repo && (
+              <a
+                href={record.repo}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={format(t.work.onGithub, { title: text.title })}
+                title={t.work.viewOnGithub}
+                className={cardLink}
+              >
+                <GithubIcon className="size-4" />
+              </a>
+            )}
+          </div>
         </div>
 
         <h3

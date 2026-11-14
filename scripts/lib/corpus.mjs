@@ -117,7 +117,7 @@ export function loadCorpus(contentDir) {
       }
 
       // Check string fields
-      for (const field of ["title", "org", "period", "summary", "repo"]) {
+      for (const field of ["title", "org", "period", "summary", "href", "repo"]) {
         if (data[field] !== undefined && typeof data[field] !== "string") {
           problems.push(`${id} (${where}) ${field} must be a string, got ${typeof data[field]}`);
         }

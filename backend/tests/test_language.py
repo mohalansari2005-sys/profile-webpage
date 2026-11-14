@@ -75,6 +75,7 @@ from chat.language import NAME_GLOSSARY, normalize_names  # noqa: E402
     ("ما هي ماجرة؟", "ما هي Majara؟"),
     ("ماذا فعل محمد في صيت؟", "ماذا فعل محمد في SEET؟"),
     ("ما هو مشروع كيرا؟", "ما هو مشروع Keyraa؟"),
+    ("ما هو مشروع هوم فايندر؟", "ما هو مشروع Home Finder؟"),
     ("ماذا يعمل في ماجرة وفي صيت", "ماذا يعمل في Majara وفي SEET"),
     ("هل عمل بماجرة؟", "هل عمل ب Majara؟"),  # one-letter prefix is kept
     ("ما هي ماجارا؟", "ما هي Majara؟"),
@@ -108,14 +109,16 @@ def test_known_names_are_mapped_to_latin(text, expected):
     "هل محمد ذائع الصيت في مجاله؟",
     "بنى محمد سمعة طيبة وحسن الصيت",
     "هذا مهم للصيت",
+    # بيتنا is also the ordinary phrase "our home": glossary only, never rewritten
+    "وش رايكم في بيتنا؟",
     "",
 ])
 def test_look_alike_arabic_words_are_left_alone(text):
     assert normalize_names(text) == text
 
 
-def test_the_glossary_names_all_three():
-    for name in ("Majara", "SEET", "Keyraa"):
+def test_the_glossary_names_every_project_and_company():
+    for name in ("Majara", "SEET", "Keyraa", "Wakil", "Home Finder"):
         assert name in NAME_GLOSSARY
 
 

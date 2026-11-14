@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "./fixtures";
 
-// Only one project exists today, so a rail that scrolls needs more cards. The
+// A rail that pages several times needs more cards than exist today. The
 // tests clone the real card in the browser and nudge the rail to re-measure
 // (it listens for resize). Clones lose their ids so #record-* stays unique.
 async function withMoreCards(page: Page, extra = 4) {
@@ -14,6 +14,16 @@ async function withMoreCards(page: Page, extra = 4) {
     }
     window.dispatchEvent(new Event("resize"));
   }, extra);
+}
+
+// The opposite: three cards already overflow a desktop rail, so the "every
+// card fits" case keeps only the first.
+async function withOneCard(page: Page) {
+  await page.evaluate(() => {
+    const rail = document.querySelector("[data-project-rail]")!;
+    while (rail.children.length > 1) rail.lastElementChild!.remove();
+    window.dispatchEvent(new Event("resize"));
+  });
 }
 
 // Paging is a smooth scroll; wait until scrollLeft stops moving so button
@@ -42,6 +52,16 @@ test("a project links to its GitHub repo", async ({ page }) => {
   await expect(link).toHaveAttribute("rel", /noopener/);
 });
 
+test("a project with a live site links to it in a new tab", async ({ page }) => {
+  await page.goto("/");
+  const link = page.getByRole("link", { name: "Home Finder live site" });
+  await expect(link).toHaveAttribute("href", "https://home.alansari.stream");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", /noopener/);
+  // Projects without a live site show only the GitHub icon.
+  await expect(page.locator("#record-proj-keyraa a")).toHaveCount(1);
+});
+
 test("projects are rounded cards in a horizontal rail", async ({ page }) => {
   await page.goto("/");
   const card = page.locator("[data-project-rail] article").first();
@@ -52,6 +72,7 @@ test("projects are rounded cards in a horizontal rail", async ({ page }) => {
 
 test("when every card fits, both chevrons are disabled and skipped by Tab", async ({ page }) => {
   await page.goto("/");
+  await withOneCard(page);
   for (const name of ["Previous project", "Next project"]) {
     const chevron = page.getByRole("button", { name });
     await expect(chevron).toBeDisabled();
@@ -102,9 +123,11 @@ test("the rail scrolls sideways without moving the page down", async ({ page }) 
 });
 
 
-test("both projects are cards, each with a GitHub link", async ({ page }) => {
+test("every project is a card with a GitHub link", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("[data-project-rail] article")).toHaveCount(2);
+  await expect(page.locator("[data-project-rail] article")).toHaveCount(3);
+  await expect(page.getByRole("link", { name: "Home Finder on GitHub" }))
+    .toHaveAttribute("href", "https://github.com/mohalansari2005-sys/home-finder");
   await expect(page.getByRole("link", { name: "Portfolio website with an AI chat on GitHub" }))
     .toHaveAttribute("href", "https://github.com/mohalansari2005-sys/profile-webpage");
   await expect(page.getByRole("link", { name: "Keyraa on GitHub" }))
@@ -125,8 +148,12 @@ test.describe("on a phone", () => {
     const next = page.getByRole("button", { name: "Next project" });
     const rail = page.locator("[data-project-rail]");
     await next.focus();
-    await page.keyboard.press("Enter");
-    await settle(page);
+    // One press per card until the last one is in view.
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press("Enter");
+      await settle(page);
+      if (await next.isDisabled()) break;
+    }
     // The end of the rail disables Next; a natively disabled button would
     // have dropped focus to <body>.
     await expect(next).toBeDisabled();
